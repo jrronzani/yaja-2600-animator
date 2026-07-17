@@ -1,0 +1,106 @@
+name: Build Desktop Apps
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    paths:
+      - "windows/**"
+      - "macos/**"
+      - "linux/**"
+      - ".github/workflows/desktop-builds.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: windows/package-lock.json
+      - run: npm ci
+        working-directory: windows
+      - run: npm run desktop:portable
+        working-directory: windows
+      - shell: pwsh
+        run: |
+          Copy-Item "windows/README.md" "windows/dist/YAJA 2600 Animator-win32-x64/README.md" -Force
+          Copy-Item "windows/DOCUMENTATION.md" "windows/dist/YAJA 2600 Animator-win32-x64/DOCUMENTATION.md" -Force
+          Compress-Archive -Path "windows/dist/YAJA 2600 Animator-win32-x64/*" -DestinationPath "windows/dist/yaja-2600-animator-windows-v0.075.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yaja-animator-windows
+          path: windows/dist/yaja-2600-animator-windows-v0.075.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: macos/package-lock.json
+      - run: npm ci
+        working-directory: macos
+      - name: Generate macOS icon
+        run: |
+          mkdir -p macos/build/icon.iconset
+          sips -z 16 16 macos/build/icon.png --out macos/build/icon.iconset/icon_16x16.png
+          sips -z 32 32 macos/build/icon.png --out macos/build/icon.iconset/icon_16x16@2x.png
+          sips -z 32 32 macos/build/icon.png --out macos/build/icon.iconset/icon_32x32.png
+          sips -z 64 64 macos/build/icon.png --out macos/build/icon.iconset/icon_32x32@2x.png
+          sips -z 128 128 macos/build/icon.png --out macos/build/icon.iconset/icon_128x128.png
+          sips -z 256 256 macos/build/icon.png --out macos/build/icon.iconset/icon_128x128@2x.png
+          sips -z 256 256 macos/build/icon.png --out macos/build/icon.iconset/icon_256x256.png
+          sips -z 512 512 macos/build/icon.png --out macos/build/icon.iconset/icon_256x256@2x.png
+          cp macos/build/icon.png macos/build/icon.iconset/icon_512x512.png
+          cp macos/build/icon.png macos/build/icon.iconset/icon_512x512@2x.png
+          iconutil -c icns macos/build/icon.iconset -o macos/build/icon.icns
+      - run: npm run desktop:portable
+        working-directory: macos
+      - name: Sign and package
+        run: |
+          source_zip="$(find macos/dist -maxdepth 1 -name '*.zip' | head -n 1)"
+          temp_dir="$(mktemp -d)"
+          unzip -q "$source_zip" -d "$temp_dir"
+          app_path="$(find "$temp_dir" -maxdepth 1 -name '*.app' -type d | head -n 1)"
+          codesign --force --deep --sign - --timestamp=none "$app_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          cp macos/README.md "$temp_dir/README.md"
+          cp macos/DOCUMENTATION.md "$temp_dir/DOCUMENTATION.md"
+          cp "macos/HOW TO INSTALL ON MACOS.md" "$temp_dir/HOW TO INSTALL ON MACOS.md"
+          rm -f "$source_zip"
+          (cd "$temp_dir" && zip -qry "$GITHUB_WORKSPACE/macos/dist/yaja-2600-animator-macos-v0.075.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yaja-animator-macos
+          path: macos/dist/yaja-2600-animator-macos-v0.075.zip
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: linux/package-lock.json
+      - run: npm ci
+        working-directory: linux
+      - run: npm run desktop:portable
+        working-directory: linux
+      - name: Package AppImage
+        run: |
+          appimage="$(find linux/dist -maxdepth 1 -name '*.AppImage' | head -n 1)"
+          mkdir -p linux/dist/portable
+          cp "$appimage" linux/dist/portable/yaja-2600-animator-linux-v0.075.AppImage
+          cp linux/README.md linux/dist/portable/README.md
+          cp linux/DOCUMENTATION.md linux/dist/portable/DOCUMENTATION.md
+          (cd linux/dist/portable && zip -qry "$GITHUB_WORKSPACE/linux/dist/yaja-2600-animator-linux-v0.075.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yaja-animator-linux
+          path: linux/dist/yaja-2600-animator-linux-v0.075.zip

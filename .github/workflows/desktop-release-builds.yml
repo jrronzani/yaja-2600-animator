@@ -1,0 +1,30 @@
+name: Desktop Release Builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        required: true
+        default: v0.075
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/desktop-builds.yml
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: yaja-animator-*
+          merge-multiple: true
+          path: release-assets
+      - name: Create draft release and upload platform ZIPs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ inputs.tag }}" release-assets/* --draft --title "YAJA 2600 Animator ${{ inputs.tag }}" --notes "Publishable web and desktop release candidate."
