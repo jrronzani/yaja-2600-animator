@@ -253,7 +253,7 @@ function createAppMenu() {
             type: "info",
             title: "About YAJA 2600 Animator",
             message: "YAJA 2600 Animator",
-            detail: "Version 0.070\nAtari 2600 sprite animation editor by Nebulords."
+            detail: "Version 1.0.0\nAtari 2600 sprite animation editor by Nebulords."
           })
         }
       ]

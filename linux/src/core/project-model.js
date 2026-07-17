@@ -61,7 +61,7 @@ export function migrateProject(input) {
   if (!Array.isArray(project.frames) || !project.frames.length) throw new Error("Project must contain at least one frame.");
 
   project.schemaVersion = CURRENT_SCHEMA_VERSION;
-  project.version = "0.075";
+  project.version = "1.0.0";
   project.app = "YAJA 2600 Animator";
   project.projectName = String(project.projectName || "Untitled Project");
   project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";

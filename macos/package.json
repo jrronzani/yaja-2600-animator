@@ -1,7 +1,7 @@
 {
   "name": "yaja-2600-animator-macos",
   "productName": "YAJA 2600 Animator",
-  "version": "0.075.0",
+  "version": "1.0.0",
   "description": "macOS desktop build of YAJA 2600 Animator.",
   "main": "electron-main.js",
   "private": true,
@@ -22,6 +22,6 @@
     "asar": true,
     "directories": { "output": "dist", "buildResources": "build" },
     "files": ["index.html", "index.css", "app.bundle.js", "assets/**/*", "src/**/*", "README.md", "DOCUMENTATION.md", "electron-main.js", "electron-preload.js"],
-    "mac": { "target": ["zip"], "category": "public.app-category.graphics-design", "icon": "build/icon.icns" }
+    "mac": { "target": ["zip"], "category": "public.app-category.graphics-design", "icon": "build/icon.png" }
   }
 }

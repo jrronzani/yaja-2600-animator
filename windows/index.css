@@ -1,4 +1,4 @@
-/* YAJA Animator v0.075 canonical stylesheet. Keep the cascade in this file. */
+/* YAJA Animator v1.0.0 canonical stylesheet. Keep the cascade in this file. */
 
 @font-face {
   font-family: "Orbitron";
@@ -4277,6 +4277,32 @@ dialog.color-block-editor-popover[open] {
   box-shadow: none !important;
   cursor: pointer;
   transition: background .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+
+/* YAJA 2600 Animator v1.0.0 - Painter-style Edit subsection dividers. */
+.edit-section > .edit-subsection {
+  display: grid;
+  gap: 6px;
+  margin-top: 0;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.edit-section > .edit-subsection:first-of-type {
+  padding-top: 4px;
+}
+
+.edit-section > .edit-subsection + .edit-subsection {
+  padding-top: 10px;
+}
+
+.edit-section > .edit-subsection.rotation-tools {
+  display: flex;
+  margin-top: 0;
+}
+
+.edit-section > .clear-frame {
+  margin-top: 10px;
 }
 
 .frames-actions .composer-loop-toggle .loop-icon {

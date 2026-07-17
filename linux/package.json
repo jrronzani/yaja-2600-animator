@@ -1,7 +1,7 @@
 {
   "name": "yaja-2600-animator-linux",
   "productName": "YAJA 2600 Animator",
-  "version": "0.075.0",
+  "version": "1.0.0",
   "description": "Linux desktop build of YAJA 2600 Animator.",
   "main": "electron-main.js",
   "private": true,

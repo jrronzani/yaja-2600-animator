@@ -60,7 +60,7 @@ function parseGenerated(text) {
     i = end;
   }
   if (!frames.length || frames.some(frame => !frame)) throw new Error("Generated YAJA bB data has missing or non-contiguous frames.");
-  return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "0.075", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
+  return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "1.0.0", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
 }
 
 export function parseBatariBasicSpriteData(text) {

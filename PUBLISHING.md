@@ -4,7 +4,7 @@ The clean release repository is generated at `.publish/yaja-2600-animator`. Its 
 
 ## Web / itch
 
-Upload `Itch Uploads/yaja-2600-animator-web-v0.075.zip` as the HTML5 build and enable **This file will be played in the browser**.
+Upload `Itch Uploads/yaja-2600-animator-web-v1.0.0.zip` as the HTML5 build and enable **This file will be played in the browser**.
 
 ## Desktop builds
 
@@ -14,7 +14,7 @@ The desktop shell must not replace renderer controls with Unicode, emoji, OS gly
 
 ## Release checklist
 
-- Run `npm ci`, `npm run check`, and `npm run build` in the v0.075 source folder.
+- Run `npm ci`, `npm run check`, and `npm run build` in the v1.0.0 source folder.
 - Test the localhost build and direct-file Chrome build.
 - Test the Electron shell with File, Edit, Animation, View, Window, and Help menus.
 - Confirm all three local fonts load without a network connection.

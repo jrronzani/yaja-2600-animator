@@ -163,7 +163,7 @@ function defaultState() {
   return {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "0.075",
+    version: "1.0.0",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -236,7 +236,7 @@ function restore(snap) {
 
 function normalizeProject() {
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
-  state.version = "0.075";
+  state.version = "1.0.0";
   state.theme = applyTheme(normalizeThemeId(state.theme));
   state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
   state.currentColor = normalizeCode(state.currentColor, "$48");

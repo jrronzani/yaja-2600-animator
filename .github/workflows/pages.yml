@@ -28,6 +28,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web/v0.075
+          path: web/v1.0.0
       - id: deployment
         uses: actions/deploy-pages@v4

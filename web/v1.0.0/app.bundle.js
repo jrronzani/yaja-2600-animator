@@ -56,7 +56,7 @@
     if (sourceVersion > CURRENT_SCHEMA_VERSION) throw new Error(`Project schema ${sourceVersion} is newer than this Animator supports.`);
     if (!Array.isArray(project.frames) || !project.frames.length) throw new Error("Project must contain at least one frame.");
     project.schemaVersion = CURRENT_SCHEMA_VERSION;
-    project.version = "0.075";
+    project.version = "1.0.0";
     project.app = "YAJA 2600 Animator";
     project.projectName = String(project.projectName || "Untitled Project");
     project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -917,7 +917,7 @@ ${emitAnimationModule(ir)}`;
       i = end;
     }
     if (!frames.length || frames.some((frame) => !frame)) throw new Error("Generated YAJA bB data has missing or non-contiguous frames.");
-    return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "0.075", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
+    return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "1.0.0", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
   }
   function parseBatariBasicSpriteData(text) {
     try {
@@ -1488,7 +1488,7 @@ ${emitAnimationModule(ir)}`;
     return {
       app: "YAJA 2600 Animator",
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      version: "0.075",
+      version: "1.0.0",
       theme: getPreferredTheme(),
       projectName: "Untitled Project",
       animationName: "Untitled Animation",
@@ -1555,7 +1555,7 @@ ${emitAnimationModule(ir)}`;
   }
   function normalizeProject() {
     state.schemaVersion = CURRENT_SCHEMA_VERSION;
-    state.version = "0.075";
+    state.version = "1.0.0";
     state.theme = applyTheme(normalizeThemeId(state.theme));
     state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
     state.currentColor = normalizeCode(state.currentColor, "$48");

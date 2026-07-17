@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YAJA 2600 Animator v0.075</title>
+  <title>YAJA 2600 Animator v1.0.0</title>
   <link rel="stylesheet" href="index.css">
 </head>
 <body class="theme-atari">
@@ -82,7 +82,7 @@
   <header class="app-header">
     <div class="brand">
       <div class="logo brand-title">YAJA 2600 Animator</div>
-      <div class="version">v0.075</div>
+      <div class="version">v1.0.0</div>
     </div>
     <div class="project-strip" aria-label="Project actions">
       <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
@@ -186,16 +186,18 @@
 
       <section class="edit-section">
         <h2>Edit</h2>
-        <div class="subcontrol-label">Nudge</div>
-        <div class="nudge-pad">
-          <span></span><button data-nudge="up" title="Nudge up"><svg><use href="#icon-up"></use></svg></button><span></span>
-          <button data-nudge="left" title="Nudge left"><svg class="rotate-left"><use href="#icon-up"></use></svg></button>
-          <button data-nudge="down" title="Nudge down"><svg><use href="#icon-down"></use></svg></button>
-          <button data-nudge="right" title="Nudge right"><svg class="rotate-right"><use href="#icon-up"></use></svg></button>
-        </div>
-        <div class="nudge-options">
-          <label class="check-row"><input id="nudgePixels" type="checkbox" checked> Nudge Pixels</label>
-          <label class="check-row"><input id="nudgeColors" type="checkbox" checked> Nudge Colors</label>
+        <div class="edit-subsection nudge-tools" aria-label="Nudge">
+          <div class="subcontrol-label">Nudge</div>
+          <div class="nudge-pad">
+            <span></span><button data-nudge="up" title="Nudge up"><svg><use href="#icon-up"></use></svg></button><span></span>
+            <button data-nudge="left" title="Nudge left"><svg class="rotate-left"><use href="#icon-up"></use></svg></button>
+            <button data-nudge="down" title="Nudge down"><svg><use href="#icon-down"></use></svg></button>
+            <button data-nudge="right" title="Nudge right"><svg class="rotate-right"><use href="#icon-up"></use></svg></button>
+          </div>
+          <div class="nudge-options">
+            <label class="check-row"><input id="nudgePixels" type="checkbox" checked> Nudge Pixels</label>
+            <label class="check-row"><input id="nudgeColors" type="checkbox" checked> Nudge Colors</label>
+          </div>
         </div>
         <div class="edit-subsection scale-tools" aria-label="Scale">
           <div class="subcontrol-label">Scale</div>
@@ -205,7 +207,7 @@
           <div class="transform-pair"><span>Uniform</span><button id="scaleUniformDown" title="Scale down uniformly">−</button><button id="scaleUniformUp" title="Scale up uniformly">+</button></div>
           <div class="two-col"><button id="grow">Grow</button><button id="shrink">Shrink</button></div>
         </div>
-        <div class="rotation-tools" aria-label="Sprite rotation">
+        <div class="edit-subsection rotation-tools" aria-label="Sprite rotation">
           <div class="rotation-label">Rotation</div>
           <label>Rotation Step <span><input id="rotateAngle" type="number" min="1" max="180" step="1" value="45">&deg;</span></label>
           <div class="two-col rotation-buttons"><button id="rotateL" title="Rotate left">Rot L</button><button id="rotateR" title="Rotate right">Rot R</button></div>
