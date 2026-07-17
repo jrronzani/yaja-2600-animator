@@ -27,4 +27,5 @@ jobs:
       - name: Create draft release and upload platform ZIPs
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: gh release create "${{ inputs.tag }}" release-assets/* --draft --title "YAJA 2600 Animator ${{ inputs.tag }}" --notes "Publishable web and desktop release candidate."
