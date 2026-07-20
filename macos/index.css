@@ -2128,7 +2128,7 @@ button {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(250px, 32vw);
+  width: min(160px, 32vw);
   margin: 0;
   transform: translate(-50%, -50%);
   display: inline-flex;
@@ -2158,7 +2158,7 @@ button {
 @media (max-width: 900px) {
   .timeline-heading { min-height: 70px; }
   .timeline-heading #timelineSummary { top: 18px; }
-  .animation-name-control { top: auto; bottom: 3px; width: min(250px, 80%); transform: translateX(-50%); }
+  .animation-name-control { top: auto; bottom: 3px; width: min(160px, 80%); transform: translateX(-50%); }
 }
 
 /* Consolidated from v018.css. */
@@ -3363,7 +3363,7 @@ body {
   .animation-name-control {
     position: static;
     justify-self: center;
-    width: min(320px, 100%);
+    width: min(160px, 100%);
     margin: 0;
     transform: none;
   }
@@ -4294,6 +4294,91 @@ dialog.color-block-editor-popover[open] {
 
 .edit-section > .edit-subsection + .edit-subsection {
   padding-top: 10px;
+}
+
+/* YAJA 2600 Animator v1.0.4 - intersection-aware circle pivots. */
+
+.fullscreen-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding-left: 5px;
+}
+
+#btn-fullscreen {
+  width: 38px;
+  min-width: 38px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+#btn-fullscreen svg {
+  width: 20px;
+  height: 20px;
+  transition: transform .2s;
+}
+
+#btn-fullscreen:hover svg { transform: scale(1.1); }
+#btn-fullscreen.active { border-color: var(--theme-primary); color: var(--theme-primary); }
+.brand-title {
+  white-space: nowrap !important;
+  line-height: 1.15;
+}
+
+.brand {
+  flex: 0 0 400px;
+  min-width: 400px;
+}
+
+.project-name-control,
+.theme-control,
+.export-actions {
+  flex: 0 0 auto;
+}
+
+.canvas-stage-scroll {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: auto;
+}
+
+.canvas-stage-scroll > .sprite-stage {
+  flex: 0 0 auto;
+  max-width: none;
+  margin: auto;
+}
+
+.onion-control-group .onion-count {
+  margin-left: 10px !important;
+  margin-right: 10px !important;
+}
+
+@media (max-width: 1680px) {
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-strip {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-content: center;
+    overflow: visible;
+  }
 }
 
 .edit-section > .edit-subsection.rotation-tools {

@@ -56,7 +56,7 @@
     if (sourceVersion > CURRENT_SCHEMA_VERSION) throw new Error(`Project schema ${sourceVersion} is newer than this Animator supports.`);
     if (!Array.isArray(project.frames) || !project.frames.length) throw new Error("Project must contain at least one frame.");
     project.schemaVersion = CURRENT_SCHEMA_VERSION;
-    project.version = "1.0.0";
+    project.version = "1.0.5";
     project.app = "YAJA 2600 Animator";
     project.projectName = String(project.projectName || "Untitled Project");
     project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -531,6 +531,71 @@ ${emitAnimationModule(ir)}`;
     }
     return cells;
   }
+  function visualCircleGeometry(x0, y0, x1, y1, cellWidth = 1, cellHeight = 1) {
+    const cw = Math.max(1e-4, Math.abs(Number(cellWidth) || 1));
+    const ch = Math.max(1e-4, Math.abs(Number(cellHeight) || 1));
+    const visualRadius = Math.hypot((Number(x1) - Number(x0)) * cw, (Number(y1) - Number(y0)) * ch);
+    return {
+      cx: Number(x0) || 0,
+      cy: Number(y0) || 0,
+      visualRadius,
+      rx: visualRadius / cw,
+      ry: visualRadius / ch,
+      cellWidth: cw,
+      cellHeight: ch
+    };
+  }
+  function circlePivotFromPointer(localX, localY, cellWidth, cellHeight, width, height, snapRatio = 0.18) {
+    const cw = Math.max(1e-4, Math.abs(Number(cellWidth) || 1));
+    const ch = Math.max(1e-4, Math.abs(Number(cellHeight) || 1));
+    const columns = Math.max(1, Math.floor(Number(width) || 1));
+    const rows = Math.max(1, Math.floor(Number(height) || 1));
+    const gridX = Number(localX) / cw;
+    const gridY = Number(localY) / ch;
+    const lineX = Math.round(gridX);
+    const lineY = Math.round(gridY);
+    const threshold = Math.max(0.05, Math.min(0.3, Number(snapRatio) || 0.18));
+    const atInternalIntersection = lineX > 0 && lineX < columns && lineY > 0 && lineY < rows && Math.abs(gridX - lineX) <= threshold && Math.abs(gridY - lineY) <= threshold;
+    if (atInternalIntersection) return { x: lineX - 0.5, y: lineY - 0.5, mode: "intersection" };
+    return {
+      x: Math.max(0, Math.min(columns - 1, Math.floor(gridX))),
+      y: Math.max(0, Math.min(rows - 1, Math.floor(gridY))),
+      mode: "cell"
+    };
+  }
+  function visualCircleCells(x0, y0, x1, y1, cellWidth = 1, cellHeight = 1, filled = false) {
+    const geometry = visualCircleGeometry(x0, y0, x1, y1, cellWidth, cellHeight);
+    const { cx, cy, rx, ry } = geometry;
+    if (geometry.visualRadius < 1e-4) return { geometry, cells: [[Math.round(cx), Math.round(cy)]] };
+    const centerX = Math.round(cx * 2) / 2;
+    const centerY = Math.round(cy * 2) / 2;
+    const cells = /* @__PURE__ */ new Map();
+    const add = (x, y) => cells.set(`${x},${y}`, [x, y]);
+    const addMirrors = (positiveX, positiveY) => {
+      const negativeX = Math.round(2 * centerX - positiveX);
+      const negativeY = Math.round(2 * centerY - positiveY);
+      add(positiveX, positiveY);
+      add(negativeX, positiveY);
+      add(positiveX, negativeY);
+      add(negativeX, negativeY);
+    };
+    if (filled) {
+      for (let y = Math.ceil(centerY); y <= Math.ceil(centerY + ry); y++) {
+        for (let x = Math.ceil(centerX); x <= Math.ceil(centerX + rx); x++) {
+          if ((x - centerX) ** 2 / rx ** 2 + (y - centerY) ** 2 / ry ** 2 <= 1) addMirrors(x, y);
+        }
+      }
+    } else {
+      const steps = Math.max(8, Math.ceil(Math.max(rx, ry) * 8));
+      for (let index = 0; index <= steps; index++) {
+        const angle = index / steps * Math.PI / 2;
+        const x = Math.floor(centerX + Math.abs(rx * Math.cos(angle)) + 0.5);
+        const y = Math.floor(centerY + Math.abs(ry * Math.sin(angle)) + 0.5);
+        addMirrors(x, y);
+      }
+    }
+    return { geometry, cells: [...cells.values()] };
+  }
   function fullSelectionMask(width, height, value = true) {
     return Array.from({ length: Math.max(0, height) }, () => Array(Math.max(0, width)).fill(value));
   }
@@ -917,7 +982,7 @@ ${emitAnimationModule(ir)}`;
       i = end;
     }
     if (!frames.length || frames.some((frame) => !frame)) throw new Error("Generated YAJA bB data has missing or non-contiguous frames.");
-    return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "1.0.0", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
+    return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "1.0.5", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
   }
   function parseBatariBasicSpriteData(text) {
     try {
@@ -1400,6 +1465,10 @@ ${emitAnimationModule(ir)}`;
   var el = {};
   var state;
   var desktopCurrentProjectPath = null;
+  var PROJECT_PICKER_ID = "yaja-animator-project-files";
+  var SHARED_PICKER_HANDLE_KEY = "__yajaAnimatorLastProjectPickerHandle";
+  var currentProjectFileHandle = null;
+  var lastProjectPickerHandle = null;
   var currentBbExportMode = "data";
   var history = [];
   var redoStack = [];
@@ -1442,6 +1511,30 @@ ${emitAnimationModule(ir)}`;
   var paletteEyedropperArmed = false;
   var referenceImages = /* @__PURE__ */ new Map();
   var rotationSession = null;
+  function rememberSharedPickerHandle(fileHandle) {
+    if (!fileHandle) return;
+    window[SHARED_PICKER_HANDLE_KEY] = fileHandle;
+  }
+  function getSharedPickerHandle() {
+    return window[SHARED_PICKER_HANDLE_KEY] || null;
+  }
+  function rememberProjectPickerHandle(fileHandle) {
+    if (!fileHandle) return;
+    lastProjectPickerHandle = fileHandle;
+    rememberSharedPickerHandle(fileHandle);
+  }
+  function bindCurrentProjectFileHandle(fileHandle = null) {
+    currentProjectFileHandle = fileHandle || null;
+    if (fileHandle) rememberProjectPickerHandle(fileHandle);
+  }
+  function getProjectPickerStartHandle() {
+    return currentProjectFileHandle || lastProjectPickerHandle || getSharedPickerHandle() || null;
+  }
+  function addProjectPickerStart(options) {
+    const startHandle = getProjectPickerStartHandle();
+    if (startHandle) options.startIn = startHandle;
+    return options;
+  }
   var pendingSequenceFiles = [];
   var referenceTransformActive = false;
   var referenceDrag = null;
@@ -1488,7 +1581,7 @@ ${emitAnimationModule(ir)}`;
     return {
       app: "YAJA 2600 Animator",
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      version: "1.0.0",
+      version: "1.0.5",
       theme: getPreferredTheme(),
       projectName: "Untitled Project",
       animationName: "Untitled Animation",
@@ -1555,7 +1648,7 @@ ${emitAnimationModule(ir)}`;
   }
   function normalizeProject() {
     state.schemaVersion = CURRENT_SCHEMA_VERSION;
-    state.version = "1.0.0";
+    state.version = "1.0.5";
     state.theme = applyTheme(normalizeThemeId(state.theme));
     state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
     state.currentColor = normalizeCode(state.currentColor, "$48");
@@ -1917,10 +2010,14 @@ ${emitAnimationModule(ir)}`;
     const canvas = event.currentTarget?.dataset?.player !== void 0 ? event.currentTarget : event.target.closest?.("canvas[data-player]");
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((event.clientX - rect.left) / (rect.width / state.width));
-    const y = Math.floor((event.clientY - rect.top) / (rect.height / l.rows));
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const cellWidth = rect.width / state.width;
+    const cellHeight = rect.height / l.rows;
+    const x = Math.floor(localX / cellWidth);
+    const y = Math.floor(localY / cellHeight);
     if (x < 0 || x >= state.width || y < 0 || y >= state.height) return null;
-    return { col: x, row: y, player: Number(canvas.dataset.player), canvas };
+    return { col: x, row: y, player: Number(canvas.dataset.player), canvas, localX, localY, cellWidth, cellHeight };
   }
   function updateCanvasSelectionCursor(event) {
     const canvas = event?.currentTarget?.dataset?.player !== void 0 ? event.currentTarget : event?.target?.closest?.("canvas[data-player]");
@@ -1987,6 +2084,10 @@ ${emitAnimationModule(ir)}`;
       return;
     }
     isPointerDown = true;
+    if (state.tool === "circle") {
+      cell.circlePivot = circlePivotFromPointer(cell.localX, cell.localY, cell.cellWidth, cell.cellHeight, state.width, state.height);
+      el.statusMessage.textContent = cell.circlePivot.mode === "intersection" ? "Circle: four-pixel intersection pivot" : "Circle: pixel-center pivot";
+    }
     dragStart = cell;
     toggledDuringStroke.clear();
     if (shouldMoveSelection) {
@@ -2166,9 +2267,11 @@ ${emitAnimationModule(ir)}`;
     if (state.tool === "rect") drawRect(rectFromPoints(a, b), state.fillShapes);
     if (state.tool === "oval") drawOval(rectFromPoints(a, b), state.fillShapes);
     if (state.tool === "circle") {
-      const side = Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row));
-      const end = { col: a.col + Math.sign(b.col - a.col || 1) * side, row: a.row + Math.sign(b.row - a.row || 1) * side };
-      drawOval(rectFromPoints(a, end), state.fillShapes);
+      const base = layout();
+      const cellWidth = base.cellW * NUSIZ_MODES[currentPlayer().nusiz].scale;
+      const pivot = a.circlePivot || { x: a.col, y: a.row };
+      const { cells } = visualCircleCells(pivot.x, pivot.y, b.col, b.row, cellWidth, base.cellH, state.fillShapes);
+      cells.forEach(([x, y]) => (state.fillShapes ? setPixel2 : setBrushPixel)(x, y, 1));
     }
     if (state.tool === "triangle") drawTriangle(rectFromPoints(a, b), false, state.fillShapes);
     if (state.tool === "triangle-side") drawTriangle(rectFromPoints(a, b), true, state.fillShapes);
@@ -2982,9 +3085,13 @@ ${emitAnimationModule(ir)}`;
   }
   function stampEditorCell(event) {
     const rect = el.stampEditorCanvas.getBoundingClientRect();
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
     return {
-      x: Math.floor((event.clientX - rect.left) / stampEditorCellWidth),
-      y: Math.floor((event.clientY - rect.top) / stampEditorCellHeight)
+      x: Math.floor(localX / stampEditorCellWidth),
+      y: Math.floor(localY / stampEditorCellHeight),
+      localX,
+      localY
     };
   }
   function stampCellInside(cell) {
@@ -3055,9 +3162,10 @@ ${emitAnimationModule(ir)}`;
       return;
     }
     if (state.tool === "circle") {
-      const size = Math.min(x1 - x0, y1 - y0);
-      x1 = x0 + size;
-      y1 = y0 + size;
+      const pivot = start.circlePivot || { x: start.x, y: start.y };
+      const { cells } = visualCircleCells(pivot.x, pivot.y, end.x, end.y, stampEditorCellWidth, stampEditorCellHeight, state.fillShapes);
+      cells.forEach(([x, y]) => plotStampEditorPoint(x, y, value));
+      return;
     }
     if (state.tool === "rect") {
       if (state.fillShapes) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) plotStampEditorPoint(x, y, value);
@@ -3069,7 +3177,7 @@ ${emitAnimationModule(ir)}`;
       }
       return;
     }
-    if (state.tool === "oval" || state.tool === "circle") {
+    if (state.tool === "oval") {
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
       const rx = Math.max(0.5, (x1 - x0) / 2), ry = Math.max(0.5, (y1 - y0) / 2);
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -3098,6 +3206,10 @@ ${emitAnimationModule(ir)}`;
     const erase = event.button === 2 || state.tool === "eraser";
     const hasModifiers = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
     const moving = state.tool === "select" && !hasModifiers && selectionContains(stampEditorSelection, cell.x, cell.y);
+    if (state.tool === "circle") {
+      cell.circlePivot = circlePivotFromPointer(cell.localX, cell.localY, stampEditorCellWidth, stampEditorCellHeight, stampEditorData[0].length, stampEditorData.length);
+      el.statusMessage.textContent = cell.circlePivot.mode === "intersection" ? "Circle: four-pixel intersection pivot" : "Circle: pixel-center pivot";
+    }
     pushStampEditorHistory();
     stampEditorPointer = { pointerId: event.pointerId, start: cell, last: cell, source: cloneData(stampEditorData), erase, mode: moving ? "move" : state.tool };
     if (moving) {
@@ -3994,10 +4106,26 @@ ${emitAnimationModule(ir)}`;
     delete project.__selection;
     return JSON.stringify(project, null, 2);
   }
+  function projectNameFromFilename(filename, fallback = "Untitled Project") {
+    let base = String(filename || "").trim().replace(/\.json$/i, "");
+    const generatedName = /_yaja2600animator$/i.test(base);
+    base = base.replace(/_yaja2600animator$/i, "");
+    if (generatedName) base = base.replace(/_+/g, " ");
+    return base.trim() || fallback;
+  }
+  function normalizeJsonSaveName(rawName, fallbackProjectName) {
+    const fallback = `${safeName(fallbackProjectName || "Untitled Project")}_yaja2600animator.json`;
+    const entered = String(rawName || "").trim() || fallback;
+    const filename = /\.json$/i.test(entered) ? entered : `${entered}.json`;
+    return {
+      filename,
+      projectName: projectNameFromFilename(filename, fallbackProjectName)
+    };
+  }
   async function saveProject(forceSaveAs = false) {
-    const content = serializedProject();
     const filename = `${safeName(state.projectName)}_yaja2600animator.json`;
     if (window.YaJaDesktop?.isDesktop) {
+      const content = serializedProject();
       const bridge = window.YaJaDesktop;
       const options = {
         title: forceSaveAs ? "Save Animator Project As" : "Save Animator Project",
@@ -4009,7 +4137,36 @@ ${emitAnimationModule(ir)}`;
       if (!result?.canceled) desktopCurrentProjectPath = result.filePath || desktopCurrentProjectPath;
       return;
     }
-    await downloadBlob(new Blob([content], { type: "application/json" }), filename);
+    if ("showSaveFilePicker" in window && !document.fullscreenElement) {
+      try {
+        const handle = await window.showSaveFilePicker(addProjectPickerStart({
+          id: PROJECT_PICKER_ID,
+          suggestedName: filename,
+          types: [{
+            description: "YAJA Animator Project",
+            accept: { "application/json": [".json"] }
+          }]
+        }));
+        const chosenName = projectNameFromFilename(handle.name, state.projectName);
+        state.projectName = chosenName;
+        el.projectName.value = chosenName;
+        bindCurrentProjectFileHandle(handle);
+        const writable = await handle.createWritable();
+        await writable.write(serializedProject());
+        await writable.close();
+        setStatus(`Saved ${handle.name}`);
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        console.warn("Save picker failed, falling back to filename prompt.", error);
+      }
+    }
+    const enteredName = window.prompt("Save Animator project as (.json):", filename);
+    if (enteredName === null) return;
+    const normalized = normalizeJsonSaveName(enteredName, state.projectName);
+    state.projectName = normalized.projectName;
+    el.projectName.value = normalized.projectName;
+    await downloadBlob(new Blob([serializedProject()], { type: "application/json" }), normalized.filename);
   }
   function loadProjectContent(content) {
     try {
@@ -4041,6 +4198,27 @@ ${emitAnimationModule(ir)}`;
         desktopCurrentProjectPath = result.filePath || null;
       }
       return;
+    }
+    if ("showOpenFilePicker" in window) {
+      try {
+        const handles = await window.showOpenFilePicker(addProjectPickerStart({
+          id: PROJECT_PICKER_ID,
+          multiple: false,
+          types: [{
+            description: "YAJA Animator Project",
+            accept: { "application/json": [".json"] }
+          }]
+        }));
+        if (!Array.isArray(handles) || !handles[0]) return;
+        const file = await handles[0].getFile();
+        if (loadProjectContent(await file.text())) {
+          bindCurrentProjectFileHandle(handles[0]);
+        }
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        console.warn("Open picker failed, falling back to file input.", error);
+      }
     }
     el.projectFile.click();
   }
@@ -4415,7 +4593,24 @@ ${emitAnimationModule(ir)}`;
     el.textDialog.close();
     renderAll();
   }
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (error) {
+      setStatus(`Fullscreen unavailable: ${error.message}`);
+    }
+  }
+  function syncFullscreenButton() {
+    const active = Boolean(document.fullscreenElement);
+    el.fullscreenButton.classList.toggle("active", active);
+    el.fullscreenButton.setAttribute("aria-pressed", String(active));
+    el.fullscreenButton.title = active ? "Exit Fullscreen" : "Toggle Fullscreen";
+    el.fullscreenButton.setAttribute("aria-label", el.fullscreenButton.title);
+  }
   function bindEvents() {
+    el.fullscreenButton.addEventListener("click", toggleFullscreen);
+    document.addEventListener("fullscreenchange", syncFullscreenButton);
     bindValue(el.selectTheme, (value) => {
       state.theme = applyTheme(normalizeThemeId(value));
     }, true);
@@ -4671,11 +4866,17 @@ ${emitAnimationModule(ir)}`;
     el.confirmExportPng.addEventListener("click", confirmExportPng);
     el.saveProject.addEventListener("click", () => saveProject(false));
     el.loadProject.addEventListener("click", openProject);
-    el.projectFile.addEventListener("change", (e) => e.target.files[0] && loadProjectFile(e.target.files[0]));
+    el.projectFile.addEventListener("change", (e) => {
+      if (!e.target.files[0]) return;
+      bindCurrentProjectFileHandle(null);
+      loadProjectFile(e.target.files[0]);
+      e.target.value = "";
+    });
     el.newProject.addEventListener("click", () => {
       if (!confirm("Start a new project?")) return;
       state = defaultState();
       desktopCurrentProjectPath = null;
+      bindCurrentProjectFileHandle(null);
       history = [];
       redoStack = [];
       referenceImages.clear();
@@ -4899,6 +5100,7 @@ ${emitAnimationModule(ir)}`;
       "exportCode",
       "importCode",
       "exportSheet",
+      "fullscreenButton",
       "toolGrid",
       "spriteWidth",
       "spriteHeight",
@@ -5086,7 +5288,7 @@ ${emitAnimationModule(ir)}`;
       "statusKernel",
       "statusFrame",
       "statusMessage"
-    ].forEach((id) => el[id] = document.getElementById(id));
+    ].forEach((id) => el[id] = document.getElementById(id === "fullscreenButton" ? "btn-fullscreen" : id));
   }
   function init() {
     cacheElements();

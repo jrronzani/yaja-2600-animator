@@ -28,11 +28,11 @@ jobs:
         run: |
           Copy-Item "windows/README.md" "windows/dist/YAJA 2600 Animator-win32-x64/README.md" -Force
           Copy-Item "windows/DOCUMENTATION.md" "windows/dist/YAJA 2600 Animator-win32-x64/DOCUMENTATION.md" -Force
-          Compress-Archive -Path "windows/dist/YAJA 2600 Animator-win32-x64/*" -DestinationPath "windows/dist/yaja-2600-animator-windows-v1.0.0.zip" -Force
+          Compress-Archive -Path "windows/dist/YAJA 2600 Animator-win32-x64/*" -DestinationPath "windows/dist/yaja-2600-animator-windows-v1.0.5.zip" -Force
       - uses: actions/upload-artifact@v4
         with:
           name: yaja-animator-windows
-          path: windows/dist/yaja-2600-animator-windows-v1.0.0.zip
+          path: windows/dist/yaja-2600-animator-windows-v1.0.5.zip
 
   macos:
     runs-on: macos-latest
@@ -73,11 +73,11 @@ jobs:
           cp macos/DOCUMENTATION.md "$temp_dir/DOCUMENTATION.md"
           cp "macos/HOW TO INSTALL ON MACOS.md" "$temp_dir/HOW TO INSTALL ON MACOS.md"
           rm -f "$source_zip"
-          (cd "$temp_dir" && zip -qry "$GITHUB_WORKSPACE/macos/dist/yaja-2600-animator-macos-v1.0.0.zip" .)
+          (cd "$temp_dir" && zip -qry "$GITHUB_WORKSPACE/macos/dist/yaja-2600-animator-macos-v1.0.5.zip" .)
       - uses: actions/upload-artifact@v4
         with:
           name: yaja-animator-macos
-          path: macos/dist/yaja-2600-animator-macos-v1.0.0.zip
+          path: macos/dist/yaja-2600-animator-macos-v1.0.5.zip
 
   linux:
     runs-on: ubuntu-latest
@@ -96,11 +96,11 @@ jobs:
         run: |
           appimage="$(find linux/dist -maxdepth 1 -name '*.AppImage' | head -n 1)"
           mkdir -p linux/dist/portable
-          cp "$appimage" linux/dist/portable/yaja-2600-animator-linux-v1.0.0.AppImage
+          cp "$appimage" linux/dist/portable/yaja-2600-animator-linux-v1.0.5.AppImage
           cp linux/README.md linux/dist/portable/README.md
           cp linux/DOCUMENTATION.md linux/dist/portable/DOCUMENTATION.md
-          (cd linux/dist/portable && zip -qry "$GITHUB_WORKSPACE/linux/dist/yaja-2600-animator-linux-v1.0.0.zip" .)
+          (cd linux/dist/portable && zip -qry "$GITHUB_WORKSPACE/linux/dist/yaja-2600-animator-linux-v1.0.5.zip" .)
       - uses: actions/upload-artifact@v4
         with:
           name: yaja-animator-linux
-          path: linux/dist/yaja-2600-animator-linux-v1.0.0.zip
+          path: linux/dist/yaja-2600-animator-linux-v1.0.5.zip
