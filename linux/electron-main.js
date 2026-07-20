@@ -230,7 +230,12 @@ function createAppMenu() {
         { label: "Toggle Color Columns", click: () => sendMenuCommand("colors-toggle") },
         { label: "Toggle Onion Skin", click: () => sendMenuCommand("onion-toggle") },
         { type: "separator" },
-        { role: "reload" }, { role: "togglefullscreen" }
+        { role: "reload" },
+        {
+          role: "togglefullscreen",
+          label: "Full Screen",
+          accelerator: isMac ? "Ctrl+Command+F" : "F11"
+        }
       ]
     },
     {
@@ -253,7 +258,7 @@ function createAppMenu() {
             type: "info",
             title: "About YAJA 2600 Animator",
             message: "YAJA 2600 Animator",
-            detail: "Version 1.0.0\nAtari 2600 sprite animation editor by Nebulords."
+            detail: "Version 1.0.5\nAtari 2600 sprite animation editor by Nebulords."
           })
         }
       ]

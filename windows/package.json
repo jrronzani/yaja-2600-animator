@@ -1,7 +1,7 @@
 {
   "name": "yaja-2600-animator-windows",
   "productName": "YAJA 2600 Animator",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Windows desktop build of YAJA 2600 Animator.",
   "main": "electron-main.js",
   "private": true,

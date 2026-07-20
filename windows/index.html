@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YAJA 2600 Animator v1.0.0</title>
+  <title>YAJA 2600 Animator v1.0.5</title>
   <link rel="stylesheet" href="index.css">
 </head>
 <body class="theme-atari">
@@ -77,12 +77,15 @@
       <symbol id="icon-reverse-order" viewBox="0 0 24 24">
         <path d="M7 6h12l-3-3 1.4-1.4L22.8 7l-5.4 5.4L16 11l3-3H7V6zm10 12H5l3 3-1.4 1.4L1.2 17l5.4-5.4L8 13l-3 3h12v2z"/>
       </symbol>
+      <symbol id="icon-fullscreen" viewBox="0 0 24 24">
+        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+      </symbol>
     </defs>
   </svg>
   <header class="app-header">
     <div class="brand">
       <div class="logo brand-title">YAJA 2600 Animator</div>
-      <div class="version">v1.0.0</div>
+      <div class="version">v1.0.5</div>
     </div>
     <div class="project-strip" aria-label="Project actions">
       <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
@@ -106,6 +109,11 @@
         <button id="exportCode" class="btn-primary primary" title="Validate and export bB code">Export bB</button>
         <button id="importCode" title="Import a YAJA bB scene or ordinary bB sprite data">Import bB</button>
         <button id="exportSheet" title="Export animation frames as PNG">Export PNG</button>
+      </span>
+      <span class="fullscreen-action">
+        <button id="btn-fullscreen" class="btn-icon" title="Toggle Fullscreen" aria-pressed="false">
+          <svg aria-hidden="true"><use href="#icon-fullscreen"></use></svg>
+        </button>
       </span>
     </div>
   </header>
@@ -185,7 +193,7 @@
       </section>
 
       <section class="edit-section">
-        <h2>Edit</h2>
+        <h2>Transform</h2>
         <div class="edit-subsection nudge-tools" aria-label="Nudge">
           <div class="subcontrol-label">Nudge</div>
           <div class="nudge-pad">

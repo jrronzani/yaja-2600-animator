@@ -1,6 +1,39 @@
-# YAJA 2600 Animator v1.0.0
+# YAJA 2600 Animator v1.0.5
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
+
+## v1.0.5 working notes
+
+- Opens a native Save As picker in supported browsers instead of silently downloading projects to the default folder.
+- Shares the most recently used project folder between Save and Open, matching YAJA Painter.
+- Retains prompt/download and file-input fallbacks when File System Access APIs are unavailable.
+- Reduces the centered Animation Name field to 160px at every timeline breakpoint.
+
+## v1.0.4 working notes
+
+- Snaps Circle pivots to the shared center of four pixels when pointer-down occurs near an internal grid intersection.
+- Retains the existing single-pixel-center pivot when pointer-down occurs away from an intersection.
+- Supports exact half-cell circle symmetry in both the main canvas and Stamp Editor.
+
+## v1.0.3 working notes
+
+- Adds Painter's visible fullscreen icon button to the web and desktop app header.
+- Keeps the button theme-aware, keyboard accessible, and synchronized with enter/exit fullscreen state.
+- Preserves the native desktop View > Full Screen menu command.
+
+## v1.0.2 working notes
+
+- Makes small circle outlines mirror-symmetric across both axes, including the half-cell ties that previously produced one-sided bulges at odd/even sizes.
+- Uses the same corrected aspect-aware circle rasterizer in the main canvas and Stamp Editor.
+- Preserves the center-first Circle interaction, fill/outline behavior, active kernel ratio, and NUSIZ-aware geometry.
+
+## v1.0.1 release notes
+
+- Makes Circle visually round across every kernel, Atari pixel aspect, and active NUSIZ mode on both the main canvas and Stamp Editor.
+- Keeps every canvas edge reachable at high zoom and tall frame sizes.
+- Stacks the header before project/theme controls collide while keeping the title on one line.
+- Renames the creative Edit panel to Transform and adds an explicit desktop View > Full Screen command.
+- Packages Itch web builds directly from this version with portable ZIP paths and verified local fonts.
 
 ## v1.0.0 stable notes
 

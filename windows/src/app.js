@@ -1,7 +1,7 @@
 import { animationExportFilename, generateAnimationCode } from "./core/codegen.js";
 import { CURRENT_SCHEMA_VERSION, migrateProject, normalizePlayerAssignments, playerLimitForKernel } from "./core/project-model.js";
 import { createRotationSession } from "./core/sprite-transform.js";
-import { applyOffsetsToAllFrames, brushCells, combineRasterSelections, compositeSelectionGrid, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels } from "./core/editor-ops.js";
+import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
 import { parseBatariBasicSpriteData } from "./core/bb-parser.js";
 import { applyTheme, getPreferredTheme, normalizeThemeId } from "./themes.js";
 import { buildStoredZip } from "./core/zip.js";
@@ -71,6 +71,10 @@ const FONT_3X5 = {
 const el = {};
 let state;
 let desktopCurrentProjectPath = null;
+const PROJECT_PICKER_ID = "yaja-animator-project-files";
+const SHARED_PICKER_HANDLE_KEY = "__yajaAnimatorLastProjectPickerHandle";
+let currentProjectFileHandle = null;
+let lastProjectPickerHandle = null;
 let currentBbExportMode = "data";
 let history = [];
 let redoStack = [];
@@ -113,6 +117,36 @@ let colorBlockEditorPointer = null;
 let paletteEyedropperArmed = false;
 const referenceImages = new Map();
 let rotationSession = null;
+
+function rememberSharedPickerHandle(fileHandle) {
+  if (!fileHandle) return;
+  window[SHARED_PICKER_HANDLE_KEY] = fileHandle;
+}
+
+function getSharedPickerHandle() {
+  return window[SHARED_PICKER_HANDLE_KEY] || null;
+}
+
+function rememberProjectPickerHandle(fileHandle) {
+  if (!fileHandle) return;
+  lastProjectPickerHandle = fileHandle;
+  rememberSharedPickerHandle(fileHandle);
+}
+
+function bindCurrentProjectFileHandle(fileHandle = null) {
+  currentProjectFileHandle = fileHandle || null;
+  if (fileHandle) rememberProjectPickerHandle(fileHandle);
+}
+
+function getProjectPickerStartHandle() {
+  return currentProjectFileHandle || lastProjectPickerHandle || getSharedPickerHandle() || null;
+}
+
+function addProjectPickerStart(options) {
+  const startHandle = getProjectPickerStartHandle();
+  if (startHandle) options.startIn = startHandle;
+  return options;
+}
 let pendingSequenceFiles = [];
 let referenceTransformActive = false;
 let referenceDrag = null;
@@ -163,7 +197,7 @@ function defaultState() {
   return {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "1.0.0",
+    version: "1.0.5",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -236,7 +270,7 @@ function restore(snap) {
 
 function normalizeProject() {
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
-  state.version = "1.0.0";
+  state.version = "1.0.5";
   state.theme = applyTheme(normalizeThemeId(state.theme));
   state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
   state.currentColor = normalizeCode(state.currentColor, "$48");
@@ -624,10 +658,14 @@ function cellFromPointer(event) {
   const canvas = event.currentTarget?.dataset?.player !== undefined ? event.currentTarget : event.target.closest?.("canvas[data-player]");
   if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((event.clientX - rect.left) / (rect.width / state.width));
-  const y = Math.floor((event.clientY - rect.top) / (rect.height / l.rows));
+  const localX = event.clientX - rect.left;
+  const localY = event.clientY - rect.top;
+  const cellWidth = rect.width / state.width;
+  const cellHeight = rect.height / l.rows;
+  const x = Math.floor(localX / cellWidth);
+  const y = Math.floor(localY / cellHeight);
   if (x < 0 || x >= state.width || y < 0 || y >= state.height) return null;
-  return { col: x, row: y, player: Number(canvas.dataset.player), canvas };
+  return { col: x, row: y, player: Number(canvas.dataset.player), canvas, localX, localY, cellWidth, cellHeight };
 }
 
 function updateCanvasSelectionCursor(event) {
@@ -688,6 +726,10 @@ function beginPointer(event) {
     return;
   }
   isPointerDown = true;
+  if (state.tool === "circle") {
+    cell.circlePivot = circlePivotFromPointer(cell.localX, cell.localY, cell.cellWidth, cell.cellHeight, state.width, state.height);
+    el.statusMessage.textContent = cell.circlePivot.mode === "intersection" ? "Circle: four-pixel intersection pivot" : "Circle: pixel-center pivot";
+  }
   dragStart = cell;
   toggledDuringStroke.clear();
   if (shouldMoveSelection) {
@@ -877,9 +919,11 @@ function drawShape(a, b) {
   if (state.tool === "rect") drawRect(rectFromPoints(a, b), state.fillShapes);
   if (state.tool === "oval") drawOval(rectFromPoints(a, b), state.fillShapes);
   if (state.tool === "circle") {
-    const side = Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row));
-    const end = { col: a.col + Math.sign(b.col - a.col || 1) * side, row: a.row + Math.sign(b.row - a.row || 1) * side };
-    drawOval(rectFromPoints(a, end), state.fillShapes);
+    const base = layout();
+    const cellWidth = base.cellW * NUSIZ[currentPlayer().nusiz].scale;
+    const pivot = a.circlePivot || { x: a.col, y: a.row };
+    const { cells } = visualCircleCells(pivot.x, pivot.y, b.col, b.row, cellWidth, base.cellH, state.fillShapes);
+    cells.forEach(([x, y]) => (state.fillShapes ? setPixel : setBrushPixel)(x, y, 1));
   }
   if (state.tool === "triangle") drawTriangle(rectFromPoints(a, b), false, state.fillShapes);
   if (state.tool === "triangle-side") drawTriangle(rectFromPoints(a, b), true, state.fillShapes);
@@ -1706,9 +1750,13 @@ function stampSliderToZoom(value) {
 
 function stampEditorCell(event) {
   const rect = el.stampEditorCanvas.getBoundingClientRect();
+  const localX = event.clientX - rect.left;
+  const localY = event.clientY - rect.top;
   return {
-    x: Math.floor((event.clientX - rect.left) / stampEditorCellWidth),
-    y: Math.floor((event.clientY - rect.top) / stampEditorCellHeight)
+    x: Math.floor(localX / stampEditorCellWidth),
+    y: Math.floor(localY / stampEditorCellHeight),
+    localX,
+    localY
   };
 }
 
@@ -1772,8 +1820,10 @@ function applyStampEditorShape(start, end, erase = false) {
   let y0 = Math.min(start.y, end.y), y1 = Math.max(start.y, end.y);
   if (state.tool === "line") { drawStampEditorLine(start.x, start.y, end.x, end.y, value); return; }
   if (state.tool === "circle") {
-    const size = Math.min(x1 - x0, y1 - y0);
-    x1 = x0 + size; y1 = y0 + size;
+    const pivot = start.circlePivot || { x: start.x, y: start.y };
+    const { cells } = visualCircleCells(pivot.x, pivot.y, end.x, end.y, stampEditorCellWidth, stampEditorCellHeight, state.fillShapes);
+    cells.forEach(([x, y]) => plotStampEditorPoint(x, y, value));
+    return;
   }
   if (state.tool === "rect") {
     if (state.fillShapes) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) plotStampEditorPoint(x, y, value);
@@ -1783,7 +1833,7 @@ function applyStampEditorShape(start, end, erase = false) {
     }
     return;
   }
-  if (state.tool === "oval" || state.tool === "circle") {
+  if (state.tool === "oval") {
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     const rx = Math.max(.5, (x1 - x0) / 2), ry = Math.max(.5, (y1 - y0) / 2);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -1813,6 +1863,10 @@ function beginStampEditorPointer(event) {
   const erase = event.button === 2 || state.tool === "eraser";
   const hasModifiers = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
   const moving = state.tool === "select" && !hasModifiers && selectionContains(stampEditorSelection, cell.x, cell.y);
+  if (state.tool === "circle") {
+    cell.circlePivot = circlePivotFromPointer(cell.localX, cell.localY, stampEditorCellWidth, stampEditorCellHeight, stampEditorData[0].length, stampEditorData.length);
+    el.statusMessage.textContent = cell.circlePivot.mode === "intersection" ? "Circle: four-pixel intersection pivot" : "Circle: pixel-center pivot";
+  }
   pushStampEditorHistory();
   stampEditorPointer = { pointerId: event.pointerId, start: cell, last: cell, source: cloneData(stampEditorData), erase, mode: moving ? "move" : state.tool };
   if (moving) {
@@ -2735,10 +2789,28 @@ function serializedProject() {
   return JSON.stringify(project, null, 2);
 }
 
+function projectNameFromFilename(filename, fallback = "Untitled Project") {
+  let base = String(filename || "").trim().replace(/\.json$/i, "");
+  const generatedName = /_yaja2600animator$/i.test(base);
+  base = base.replace(/_yaja2600animator$/i, "");
+  if (generatedName) base = base.replace(/_+/g, " ");
+  return base.trim() || fallback;
+}
+
+function normalizeJsonSaveName(rawName, fallbackProjectName) {
+  const fallback = `${safeName(fallbackProjectName || "Untitled Project")}_yaja2600animator.json`;
+  const entered = String(rawName || "").trim() || fallback;
+  const filename = /\.json$/i.test(entered) ? entered : `${entered}.json`;
+  return {
+    filename,
+    projectName: projectNameFromFilename(filename, fallbackProjectName)
+  };
+}
+
 async function saveProject(forceSaveAs = false) {
-  const content = serializedProject();
   const filename = `${safeName(state.projectName)}_yaja2600animator.json`;
   if (window.YaJaDesktop?.isDesktop) {
+    const content = serializedProject();
     const bridge = window.YaJaDesktop;
     const options = {
       title: forceSaveAs ? "Save Animator Project As" : "Save Animator Project",
@@ -2752,7 +2824,38 @@ async function saveProject(forceSaveAs = false) {
     if (!result?.canceled) desktopCurrentProjectPath = result.filePath || desktopCurrentProjectPath;
     return;
   }
-  await downloadBlob(new Blob([content], { type: "application/json" }), filename);
+
+  if ("showSaveFilePicker" in window && !document.fullscreenElement) {
+    try {
+      const handle = await window.showSaveFilePicker(addProjectPickerStart({
+        id: PROJECT_PICKER_ID,
+        suggestedName: filename,
+        types: [{
+          description: "YAJA Animator Project",
+          accept: { "application/json": [".json"] }
+        }]
+      }));
+      const chosenName = projectNameFromFilename(handle.name, state.projectName);
+      state.projectName = chosenName;
+      el.projectName.value = chosenName;
+      bindCurrentProjectFileHandle(handle);
+      const writable = await handle.createWritable();
+      await writable.write(serializedProject());
+      await writable.close();
+      setStatus(`Saved ${handle.name}`);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      console.warn("Save picker failed, falling back to filename prompt.", error);
+    }
+  }
+
+  const enteredName = window.prompt("Save Animator project as (.json):", filename);
+  if (enteredName === null) return;
+  const normalized = normalizeJsonSaveName(enteredName, state.projectName);
+  state.projectName = normalized.projectName;
+  el.projectName.value = normalized.projectName;
+  await downloadBlob(new Blob([serializedProject()], { type: "application/json" }), normalized.filename);
 }
 
 function loadProjectContent(content) {
@@ -2787,6 +2890,28 @@ async function openProject() {
       desktopCurrentProjectPath = result.filePath || null;
     }
     return;
+  }
+
+  if ("showOpenFilePicker" in window) {
+    try {
+      const handles = await window.showOpenFilePicker(addProjectPickerStart({
+        id: PROJECT_PICKER_ID,
+        multiple: false,
+        types: [{
+          description: "YAJA Animator Project",
+          accept: { "application/json": [".json"] }
+        }]
+      }));
+      if (!Array.isArray(handles) || !handles[0]) return;
+      const file = await handles[0].getFile();
+      if (loadProjectContent(await file.text())) {
+        bindCurrentProjectFileHandle(handles[0]);
+      }
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      console.warn("Open picker failed, falling back to file input.", error);
+    }
   }
   el.projectFile.click();
 }
@@ -3118,7 +3243,26 @@ function placeText() {
   renderAll();
 }
 
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch (error) {
+    setStatus(`Fullscreen unavailable: ${error.message}`);
+  }
+}
+
+function syncFullscreenButton() {
+  const active = Boolean(document.fullscreenElement);
+  el.fullscreenButton.classList.toggle("active", active);
+  el.fullscreenButton.setAttribute("aria-pressed", String(active));
+  el.fullscreenButton.title = active ? "Exit Fullscreen" : "Toggle Fullscreen";
+  el.fullscreenButton.setAttribute("aria-label", el.fullscreenButton.title);
+}
+
 function bindEvents() {
+  el.fullscreenButton.addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", syncFullscreenButton);
   bindValue(el.selectTheme, value => {
     state.theme = applyTheme(normalizeThemeId(value));
   }, true);
@@ -3307,11 +3451,17 @@ function bindEvents() {
   el.confirmExportPng.addEventListener("click", confirmExportPng);
   el.saveProject.addEventListener("click", () => saveProject(false));
   el.loadProject.addEventListener("click", openProject);
-  el.projectFile.addEventListener("change", e => e.target.files[0] && loadProjectFile(e.target.files[0]));
+  el.projectFile.addEventListener("change", e => {
+    if (!e.target.files[0]) return;
+    bindCurrentProjectFileHandle(null);
+    loadProjectFile(e.target.files[0]);
+    e.target.value = "";
+  });
   el.newProject.addEventListener("click", () => {
     if (!confirm("Start a new project?")) return;
     state = defaultState();
     desktopCurrentProjectPath = null;
+    bindCurrentProjectFileHandle(null);
     history = [];
     redoStack = [];
     referenceImages.clear();
@@ -3458,7 +3608,7 @@ function handleKeys(e) {
 
 function cacheElements() {
   [
-    "selectTheme", "projectName", "animationName", "newProject", "saveProject", "loadProject", "projectFile", "exportCode", "importCode", "exportSheet",
+    "selectTheme", "projectName", "animationName", "newProject", "saveProject", "loadProject", "projectFile", "exportCode", "importCode", "exportSheet", "fullscreenButton",
     "toolGrid", "spriteWidth", "spriteHeight", "kernelMode", "bgColor", "twoSpriteMode", "twoSpriteControls", "activeSpriteTabs", "selectSpriteA", "selectSpriteB", "offsetControls", "spriteOffsetXRow", "spriteOffsetYRow", "timelineFrameRepeat", "applyRepeatAll",
     "playerAssignment0", "playerAssignment0Row", "playerAssignment0Label", "playerAssignment1", "playerAssignment1Row", "spriteNusizLabel", "spriteNusiz", "spriteSolidColorRow", "spriteSolidColor", "spriteOffsetX", "spriteOffsetY", "applySizeAll", "applyOffsetsAll", "swapPlayers", "copyP0P1", "copyColorsP0P1", "mirrorP0P1", "fillShapes", "mirrorDraw", "brushWidth", "brushHeight", "undo", "redo",
     "nudgePixels", "nudgeColors", "scaleStep", "stretchHDown", "stretchHUp", "stretchVDown", "stretchVUp", "scaleUniformDown", "scaleUniformUp", "flipH", "flipV", "flipColor", "rotateL", "rotateR", "rotateAngle", "grow", "shrink", "clearFrame",
@@ -3471,7 +3621,7 @@ function cacheElements() {
     "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "bbExportMode", "exportBbData", "exportBbDemo", "bbImportHelp", "codeText", "copyCode", "downloadBas",
     "importFromText", "codeDiagnostics", "textDialog", "textToolText", "textToolX", "textToolY", "textDirection", "placeText",
     "statusKernel", "statusFrame", "statusMessage"
-  ].forEach(id => el[id] = document.getElementById(id));
+  ].forEach(id => el[id] = document.getElementById(id === "fullscreenButton" ? "btn-fullscreen" : id));
 }
 
 function init() {

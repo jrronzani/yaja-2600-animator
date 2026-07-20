@@ -36,6 +36,85 @@ export function brushCells(x, y, brushWidth, brushHeight, width = 8, height = 25
   return cells;
 }
 
+// Painter-parity circle geometry: the pointer-down cell is the visual center,
+// while the drag vector determines a radius in rendered (not logical) pixels.
+// Converting that radius back through each cell axis keeps the result circular
+// after Atari pixel aspect, kernel vertical stretch, and NUSIZ are applied.
+export function visualCircleGeometry(x0, y0, x1, y1, cellWidth = 1, cellHeight = 1) {
+  const cw = Math.max(.0001, Math.abs(Number(cellWidth) || 1));
+  const ch = Math.max(.0001, Math.abs(Number(cellHeight) || 1));
+  const visualRadius = Math.hypot((Number(x1) - Number(x0)) * cw, (Number(y1) - Number(y0)) * ch);
+  return {
+    cx: Number(x0) || 0,
+    cy: Number(y0) || 0,
+    visualRadius,
+    rx: visualRadius / cw,
+    ry: visualRadius / ch,
+    cellWidth: cw,
+    cellHeight: ch
+  };
+}
+
+export function circlePivotFromPointer(localX, localY, cellWidth, cellHeight, width, height, snapRatio = .18) {
+  const cw = Math.max(.0001, Math.abs(Number(cellWidth) || 1));
+  const ch = Math.max(.0001, Math.abs(Number(cellHeight) || 1));
+  const columns = Math.max(1, Math.floor(Number(width) || 1));
+  const rows = Math.max(1, Math.floor(Number(height) || 1));
+  const gridX = Number(localX) / cw;
+  const gridY = Number(localY) / ch;
+  const lineX = Math.round(gridX);
+  const lineY = Math.round(gridY);
+  const threshold = Math.max(.05, Math.min(.3, Number(snapRatio) || .18));
+  const atInternalIntersection = lineX > 0 && lineX < columns && lineY > 0 && lineY < rows
+    && Math.abs(gridX - lineX) <= threshold && Math.abs(gridY - lineY) <= threshold;
+  if (atInternalIntersection) return { x: lineX - .5, y: lineY - .5, mode: "intersection" };
+  return {
+    x: Math.max(0, Math.min(columns - 1, Math.floor(gridX))),
+    y: Math.max(0, Math.min(rows - 1, Math.floor(gridY))),
+    mode: "cell"
+  };
+}
+
+export function visualCircleCells(x0, y0, x1, y1, cellWidth = 1, cellHeight = 1, filled = false) {
+  const geometry = visualCircleGeometry(x0, y0, x1, y1, cellWidth, cellHeight);
+  const { cx, cy, rx, ry } = geometry;
+  if (geometry.visualRadius < .0001) return { geometry, cells: [[Math.round(cx), Math.round(cy)]] };
+
+  const centerX = Math.round(cx * 2) / 2;
+  const centerY = Math.round(cy * 2) / 2;
+  const cells = new Map();
+  const add = (x, y) => cells.set(`${x},${y}`, [x, y]);
+  const addMirrors = (positiveX, positiveY) => {
+    const negativeX = Math.round(2 * centerX - positiveX);
+    const negativeY = Math.round(2 * centerY - positiveY);
+    add(positiveX, positiveY);
+    add(negativeX, positiveY);
+    add(positiveX, negativeY);
+    add(negativeX, negativeY);
+  };
+  if (filled) {
+    for (let y = Math.ceil(centerY); y <= Math.ceil(centerY + ry); y++) {
+      for (let x = Math.ceil(centerX); x <= Math.ceil(centerX + rx); x++) {
+        if (((x - centerX) ** 2) / (rx ** 2) + ((y - centerY) ** 2) / (ry ** 2) <= 1) addMirrors(x, y);
+      }
+    }
+  } else {
+    // Rasterize one quadrant and reflect every result. Math.round() resolves
+    // negative half-cell ties toward zero, so sampling all four quadrants
+    // independently can put an extra cell on the positive side at small odd/
+    // even diameters. Quantizing unsigned offsets before mirroring makes every
+    // outline exactly symmetric while preserving the rendered-pixel aspect.
+    const steps = Math.max(8, Math.ceil(Math.max(rx, ry) * 8));
+    for (let index = 0; index <= steps; index++) {
+      const angle = index / steps * Math.PI / 2;
+      const x = Math.floor(centerX + Math.abs(rx * Math.cos(angle)) + .5);
+      const y = Math.floor(centerY + Math.abs(ry * Math.sin(angle)) + .5);
+      addMirrors(x, y);
+    }
+  }
+  return { geometry, cells: [...cells.values()] };
+}
+
 export function fullSelectionMask(width, height, value = true) {
   return Array.from({ length: Math.max(0, height) }, () => Array(Math.max(0, width)).fill(value));
 }
