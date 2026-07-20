@@ -2,6 +2,31 @@
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
 
+It is the third application in the YAJA creative suite for the Atari 2600 homebrew community, joining YAJA Painter for background artwork and YAJA Composer for music. The suite makes creating Atari games less technical and more intuitive while preserving hardware-aware control.
+
+## Built with OpenAI Codex and GPT-5.6
+
+YAJA 2600 Animator was developed through an extended human–AI collaboration using OpenAI Codex with GPT-5.6. Codex worked directly with the real local project, browser, tests, Atari toolchain, and versioned source folders rather than generating a one-time prototype.
+
+Codex and GPT-5.6 helped us:
+
+- Translate detailed design feedback and browser annotations into focused implementation passes.
+- Port proven interactions from YAJA Painter and Composer while keeping the suite visually consistent.
+- Design and refactor the project model, raster tools, timeline, selection engine, reference-image workflow, and responsive interface.
+- Build kernel-aware Standard, Multisprite, DPC+, and PXE batari Basic export and round-trip import systems.
+- Diagnose pixel-aspect, rotation, NUSIZ-centering, two-sprite composition, and scanline-color problems.
+- Run automated tests, compile generated Atari programs, inspect browser behavior, and package web and desktop releases.
+
+The human creator directed the product, visual language, Atari behavior, and acceptance criteria. Codex accelerated implementation, testing, debugging, and documentation while each change remained subject to hands-on review and iteration.
+
+## What it does
+
+- Draws and colors hardware-aware Atari 2600 sprites.
+- Animates frame timing, dimensions, offsets, NUSIZ, and scanline colors.
+- Supports one- and two-sprite compositions, onion skinning, stamps, color blocks, and image references.
+- Exports PNG frames, reusable batari Basic animation data, or compilable demonstration programs.
+- Re-imports YAJA-generated bB code to reconstruct editable animation projects.
+
 ## v1.0.5 working notes
 
 - Opens a native Save As picker in supported browsers instead of silently downloading projects to the default folder.
