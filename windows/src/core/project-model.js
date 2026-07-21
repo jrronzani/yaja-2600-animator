@@ -1,4 +1,6 @@
-export const CURRENT_SCHEMA_VERSION = 9;
+import { ensureAnimationCollection, loadAnimationWorkspace } from "./animation-collection.js";
+
+export const CURRENT_SCHEMA_VERSION = 10;
 
 const SUPPORTED_THEMES = new Set(["atari-console", "atari-controller", "synthwave", "synthwave-bright", "blue", "classic-dark", "classic-light"]);
 
@@ -58,10 +60,12 @@ export function migrateProject(input) {
   const project = structuredClone(input);
   const sourceVersion = Number(project.schemaVersion || 1);
   if (sourceVersion > CURRENT_SCHEMA_VERSION) throw new Error(`Project schema ${sourceVersion} is newer than this Animator supports.`);
-  if (!Array.isArray(project.frames) || !project.frames.length) throw new Error("Project must contain at least one frame.");
+  const hasLegacyFrames = Array.isArray(project.frames) && project.frames.length;
+  const hasAnimations = Array.isArray(project.animations) && project.animations.some(animation => Array.isArray(animation?.frames) && animation.frames.length);
+  if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
 
   project.schemaVersion = CURRENT_SCHEMA_VERSION;
-  project.version = "1.0.5";
+  project.version = "1.1.0";
   project.app = "YAJA 2600 Animator";
   project.projectName = String(project.projectName || "Untitled Project");
   project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -86,7 +90,7 @@ export function migrateProject(input) {
   const legacyNusiz = Array.isArray(project.nusiz) ? project.nusiz : ["normal", "normal"];
   const legacyP1Offset = Number.isFinite(Number(project.p1Offset)) ? Number(project.p1Offset) : 0;
   project.verticalStretch = ["STANDARD", "MULTISPRITE"].includes(project.kernel) ? 2 : 1;
-  project.frames = project.frames.map((frame, index) => {
+  const normalizeFrames = frames => frames.map((frame, index) => {
     const payloadHeight = Math.max(frame?.players?.[0]?.pixels?.length || 0, frame?.players?.[1]?.pixels?.length || 0);
     const height = Math.max(1, Math.min(255, Number.parseInt(frame?.height, 10) || payloadHeight || project.height || 16));
     const width = Math.max(1, Math.min(8, Number.parseInt(frame?.width, 10) || project.width || 8));
@@ -100,13 +104,36 @@ export function migrateProject(input) {
       players
     };
   });
+  if (!hasAnimations) {
+    project.animations = [{
+      id: "animation-1",
+      name: project.animationName,
+      frames: project.frames,
+      currentFrame: project.currentFrame || 0,
+      twoSpriteMode: !!project.twoSpriteMode,
+      activePlayer: project.activePlayer === 1 ? 1 : 0,
+      playerAssignments: project.playerAssignments
+    }];
+    project.activeAnimationId = "animation-1";
+  }
+  ensureAnimationCollection(project);
+  project.animations = project.animations.map((animation, index) => ({
+    ...animation,
+    name: String(animation.name || `Untitled Animation${index ? ` ${index + 1}` : ""}`),
+    frames: normalizeFrames(animation.frames),
+    currentFrame: Math.max(0, Math.min(Number.parseInt(animation.currentFrame, 10) || 0, animation.frames.length - 1)),
+    twoSpriteMode: !!animation.twoSpriteMode,
+    activePlayer: animation.activePlayer === 1 ? 1 : 0,
+    playerAssignments: normalizePlayerAssignments(animation.playerAssignments, project.kernel)
+  }));
   if (project.compositionModel === "legacy-absolute") {
     const scales = { normal: 1, double: 2, quad: 4 };
-    project.frames.forEach(frame => {
+    project.animations.forEach(animation => animation.frames.forEach(frame => {
       frame.players[1].xOffset -= frame.width * (scales[frame.players[0].nusiz] || 1);
-    });
+    }));
     project.compositionModel = "adjacent";
   }
+  loadAnimationWorkspace(project, project.activeAnimationId);
   delete project.nusiz;
   delete project.p1Offset;
   delete project.frameRepeat;
@@ -118,6 +145,7 @@ export function projectCompatibility(project) {
     schemaVersion: Number(project?.schemaVersion || 1),
     currentSchemaVersion: CURRENT_SCHEMA_VERSION,
     canLoad: Number(project?.schemaVersion || 1) <= CURRENT_SCHEMA_VERSION,
-    frameCount: Array.isArray(project?.frames) ? project.frames.length : 0
+    frameCount: Array.isArray(project?.frames) ? project.frames.length : 0,
+    animationCount: Array.isArray(project?.animations) ? project.animations.length : (Array.isArray(project?.frames) ? 1 : 0)
   };
 }

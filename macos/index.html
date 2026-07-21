@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YAJA 2600 Animator v1.0.5</title>
+  <title>YAJA 2600 Animator v1.1.8</title>
   <link rel="stylesheet" href="index.css">
 </head>
 <body class="theme-atari">
@@ -85,7 +85,7 @@
   <header class="app-header">
     <div class="brand">
       <div class="logo brand-title">YAJA 2600 Animator</div>
-      <div class="version">v1.0.5</div>
+      <div class="version">v1.1.8</div>
     </div>
     <div class="project-strip" aria-label="Project actions">
       <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
@@ -281,7 +281,16 @@
       <div class="frames-strip">
         <div class="timeline-heading" id="timelineHeading" title="Click to clear frame selection">
           <div><strong>Animation Timeline</strong><span id="timelineSummary">1 frame</span></div>
-          <label class="animation-name-control"><input id="animationName" aria-label="Animation name" value="Untitled Animation" maxlength="48" spellcheck="false"></label>
+          <div class="animation-library-control" aria-label="Animation library">
+            <div class="animation-combobox">
+              <input id="animationName" role="combobox" aria-label="Animation name" aria-controls="animationMenu" aria-expanded="false" value="Untitled Animation" maxlength="48" spellcheck="false">
+              <button id="toggleAnimationMenu" class="animation-menu-toggle" type="button" title="Choose animation" aria-label="Choose animation" aria-haspopup="listbox" aria-expanded="false"><svg aria-hidden="true"><use href="#icon-down"></use></svg></button>
+              <div id="animationMenu" class="animation-menu hidden" role="listbox" aria-label="Animations"></div>
+            </div>
+            <button id="newAnimation" class="timeline-tool" type="button" title="New blank animation"><svg><use href="#icon-plus"></use></svg></button>
+            <button id="duplicateAnimation" class="timeline-tool" type="button" title="Duplicate animation"><svg><use href="#icon-duplicate"></use></svg></button>
+            <button id="deleteAnimation" class="timeline-tool danger" type="button" title="Delete animation"><svg><use href="#icon-delete"></use></svg></button>
+          </div>
         </div>
         <div class="frames-actions" id="framesActions">
           <button id="playAnim" class="timeline-play timeline-tool" title="Play animation"><span>PLAY</span><svg><use href="#icon-play"></use></svg></button>
@@ -383,6 +392,11 @@
         <legend>Export Format</legend>
         <label class="check-row"><input id="exportBbData" name="bbExportMode" type="radio" value="data" checked> Data Only</label>
         <label class="check-row"><input id="exportBbDemo" name="bbExportMode" type="radio" value="demo"> Compilable Demo</label>
+      </fieldset>
+      <fieldset id="bbExportScope" class="import-mode-options">
+        <legend>Export Scope</legend>
+        <label class="check-row"><input id="exportBbCurrent" name="bbExportScope" type="radio" value="current" checked> Current Animation</label>
+        <label class="check-row"><input id="exportBbAll" name="bbExportScope" type="radio" value="all"> All Animations</label>
       </fieldset>
       <div id="bbImportHelp" class="bb-import-help" hidden>
         <strong>Paste an exported YAJA scene or ordinary bB sprite data.</strong>

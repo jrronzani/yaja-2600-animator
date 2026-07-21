@@ -1,6 +1,94 @@
 (() => {
+  // src/core/animation-collection.js
+  function clone(value) {
+    return structuredClone(value);
+  }
+  function animationRecordFromWorkspace(project, id = project.activeAnimationId || "animation-1") {
+    return {
+      id: String(id),
+      name: String(project.animationName || "Untitled Animation"),
+      frames: clone(project.frames || []),
+      currentFrame: Math.max(0, Number.parseInt(project.currentFrame, 10) || 0),
+      twoSpriteMode: !!project.twoSpriteMode,
+      activePlayer: project.activePlayer === 1 ? 1 : 0,
+      playerAssignments: clone(project.playerAssignments || [0, 1])
+    };
+  }
+  function ensureAnimationCollection(project) {
+    if (!Array.isArray(project.animations) || !project.animations.length) {
+      project.animations = [animationRecordFromWorkspace(project, "animation-1")];
+    }
+    const usedIds = /* @__PURE__ */ new Set();
+    project.animations.forEach((animation, index) => {
+      let id = String(animation?.id || `animation-${index + 1}`);
+      if (usedIds.has(id)) {
+        let suffix = index + 1;
+        while (usedIds.has(`animation-${suffix}`)) suffix++;
+        id = `animation-${suffix}`;
+      }
+      usedIds.add(id);
+      animation.id = id;
+      animation.name = String(animation.name || `Untitled Animation${index ? ` ${index + 1}` : ""}`);
+      animation.frames = Array.isArray(animation.frames) ? animation.frames : [];
+      animation.currentFrame = Math.max(0, Number.parseInt(animation.currentFrame, 10) || 0);
+      animation.twoSpriteMode = !!animation.twoSpriteMode;
+      animation.activePlayer = animation.activePlayer === 1 ? 1 : 0;
+      animation.playerAssignments = Array.isArray(animation.playerAssignments) ? animation.playerAssignments : [0, 1];
+    });
+    if (!project.animations.some((animation) => animation.id === project.activeAnimationId)) {
+      project.activeAnimationId = project.animations[0].id;
+    }
+    return project.animations;
+  }
+  function syncActiveAnimation(project) {
+    ensureAnimationCollection(project);
+    const index = project.animations.findIndex((animation) => animation.id === project.activeAnimationId);
+    const record = animationRecordFromWorkspace(project, project.activeAnimationId);
+    project.animations[index] = record;
+    return record;
+  }
+  function loadAnimationWorkspace(project, animationId) {
+    ensureAnimationCollection(project);
+    const animation = project.animations.find((item) => item.id === animationId) || project.animations[0];
+    project.activeAnimationId = animation.id;
+    project.animationName = animation.name;
+    project.frames = clone(animation.frames);
+    project.currentFrame = Math.max(0, Math.min(animation.currentFrame || 0, project.frames.length - 1));
+    project.twoSpriteMode = !!animation.twoSpriteMode;
+    project.activePlayer = animation.activePlayer === 1 ? 1 : 0;
+    project.playerAssignments = clone(animation.playerAssignments || [0, 1]);
+    return animation;
+  }
+  function nextAnimationId(project) {
+    ensureAnimationCollection(project);
+    const used = new Set(project.animations.map((animation) => animation.id));
+    let index = 1;
+    while (used.has(`animation-${index}`)) index++;
+    return `animation-${index}`;
+  }
+  function uniqueAnimationName(project, requested, excludeId = null) {
+    ensureAnimationCollection(project);
+    const names = new Set(project.animations.filter((animation) => animation.id !== excludeId).map((animation) => animation.name.trim().toLocaleLowerCase()));
+    const raw = String(requested || "Untitled Animation").trim() || "Untitled Animation";
+    if (!names.has(raw.toLocaleLowerCase())) return raw;
+    const match = raw.match(/^(.*?)(?:\s+(\d+))?$/);
+    const root = (match?.[1] || raw).trim() || "Untitled Animation";
+    let suffix = match?.[2] ? Math.max(2, Number(match[2]) + 1) : 2;
+    while (names.has(`${root} ${suffix}`.toLocaleLowerCase())) suffix++;
+    return `${root} ${suffix}`;
+  }
+  function duplicateAnimationRecord(project, animationId = project.activeAnimationId) {
+    syncActiveAnimation(project);
+    const source = project.animations.find((animation) => animation.id === animationId) || project.animations[0];
+    const duplicate = clone(source);
+    duplicate.id = nextAnimationId(project);
+    duplicate.name = uniqueAnimationName(project, source.name);
+    duplicate.currentFrame = Math.max(0, Math.min(source.currentFrame || 0, duplicate.frames.length - 1));
+    return duplicate;
+  }
+
   // src/core/project-model.js
-  var CURRENT_SCHEMA_VERSION = 9;
+  var CURRENT_SCHEMA_VERSION = 10;
   var SUPPORTED_THEMES = /* @__PURE__ */ new Set(["atari-console", "atari-controller", "synthwave", "synthwave-bright", "blue", "classic-dark", "classic-light"]);
   function playerLimitForKernel(kernel) {
     if (kernel === "STANDARD") return 1;
@@ -54,9 +142,11 @@
     const project = structuredClone(input);
     const sourceVersion = Number(project.schemaVersion || 1);
     if (sourceVersion > CURRENT_SCHEMA_VERSION) throw new Error(`Project schema ${sourceVersion} is newer than this Animator supports.`);
-    if (!Array.isArray(project.frames) || !project.frames.length) throw new Error("Project must contain at least one frame.");
+    const hasLegacyFrames = Array.isArray(project.frames) && project.frames.length;
+    const hasAnimations = Array.isArray(project.animations) && project.animations.some((animation) => Array.isArray(animation?.frames) && animation.frames.length);
+    if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
     project.schemaVersion = CURRENT_SCHEMA_VERSION;
-    project.version = "1.0.5";
+    project.version = "1.1.0";
     project.app = "YAJA 2600 Animator";
     project.projectName = String(project.projectName || "Untitled Project");
     project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -81,7 +171,7 @@
     const legacyNusiz = Array.isArray(project.nusiz) ? project.nusiz : ["normal", "normal"];
     const legacyP1Offset = Number.isFinite(Number(project.p1Offset)) ? Number(project.p1Offset) : 0;
     project.verticalStretch = ["STANDARD", "MULTISPRITE"].includes(project.kernel) ? 2 : 1;
-    project.frames = project.frames.map((frame, index) => {
+    const normalizeFrames = (frames) => frames.map((frame, index) => {
       const payloadHeight = Math.max(frame?.players?.[0]?.pixels?.length || 0, frame?.players?.[1]?.pixels?.length || 0);
       const height = Math.max(1, Math.min(255, Number.parseInt(frame?.height, 10) || payloadHeight || project.height || 16));
       const width = Math.max(1, Math.min(8, Number.parseInt(frame?.width, 10) || project.width || 8));
@@ -95,13 +185,36 @@
         players
       };
     });
+    if (!hasAnimations) {
+      project.animations = [{
+        id: "animation-1",
+        name: project.animationName,
+        frames: project.frames,
+        currentFrame: project.currentFrame || 0,
+        twoSpriteMode: !!project.twoSpriteMode,
+        activePlayer: project.activePlayer === 1 ? 1 : 0,
+        playerAssignments: project.playerAssignments
+      }];
+      project.activeAnimationId = "animation-1";
+    }
+    ensureAnimationCollection(project);
+    project.animations = project.animations.map((animation, index) => ({
+      ...animation,
+      name: String(animation.name || `Untitled Animation${index ? ` ${index + 1}` : ""}`),
+      frames: normalizeFrames(animation.frames),
+      currentFrame: Math.max(0, Math.min(Number.parseInt(animation.currentFrame, 10) || 0, animation.frames.length - 1)),
+      twoSpriteMode: !!animation.twoSpriteMode,
+      activePlayer: animation.activePlayer === 1 ? 1 : 0,
+      playerAssignments: normalizePlayerAssignments(animation.playerAssignments, project.kernel)
+    }));
     if (project.compositionModel === "legacy-absolute") {
       const scales = { normal: 1, double: 2, quad: 4 };
-      project.frames.forEach((frame) => {
+      project.animations.forEach((animation) => animation.frames.forEach((frame) => {
         frame.players[1].xOffset -= frame.width * (scales[frame.players[0].nusiz] || 1);
-      });
+      }));
       project.compositionModel = "adjacent";
     }
+    loadAnimationWorkspace(project, project.activeAnimationId);
     delete project.nusiz;
     delete project.p1Offset;
     delete project.frameRepeat;
@@ -151,6 +264,7 @@
   var KERNELS = ["STANDARD", "MULTISPRITE", "DPC+", "PXE"];
   var DISPLAY_ROWS = { STANDARD: 96, MULTISPRITE: 88, "DPC+": 178, PXE: 180 };
   var YAJA_BB_FORMAT_VERSION = 1;
+  var YAJA_BB_COLLECTION_FORMAT_VERSION = 2;
   var YAJA_COORDINATE_SYSTEM = Object.freeze({ screenYAxis: "down", spriteAnchor: "bottom-left" });
   function spriteBottomAnchorYDelta(height, yOffset = 0) {
     const rows = Math.max(1, Math.trunc(Number(height) || 1));
@@ -187,7 +301,7 @@
     const assignments = normalizePlayerAssignments(project.playerAssignments, kernel);
     const activeSlots = activeSlotsFor(project);
     const animationName = String(project.animationName || project.projectName || "Untitled Animation");
-    const namespace = animationNamespace(animationName);
+    const namespace = options.namespace || animationNamespace(animationName);
     const displayRows = DISPLAY_ROWS[kernel];
     const frames = (project.frames || []).map((frame, frameIndex) => {
       const width = Math.max(1, Math.min(8, Number.parseInt(frame.width, 10) || 8));
@@ -375,11 +489,136 @@
 ${emitAnimationModule(ir)}`;
   }
   function generateAnimationCode(project, options = {}) {
+    if (options.scope === "all" && Array.isArray(project.animations) && project.animations.length) {
+      return generateAnimationCollectionCode(project, options);
+    }
     const mode = options.mode === "demo" ? "demo" : "data";
     const ir = createAnimationIR(project, { mode });
     const diagnostics = validateAnimationIR(ir);
     const output = diagnostics.some((item) => item.severity === "error") ? "" : mode === "demo" ? emitAnimationDemo(ir) : emitAnimationModule(ir);
     return { ir, diagnostics, output, filename: animationExportFilename(ir.animationName, mode) };
+  }
+  function animationProjectView(project, animation) {
+    return {
+      ...project,
+      animationName: animation.name,
+      frames: animation.frames,
+      currentFrame: animation.currentFrame,
+      twoSpriteMode: animation.twoSpriteMode,
+      activePlayer: animation.activePlayer,
+      playerAssignments: animation.playerAssignments
+    };
+  }
+  function collectionFilename(projectName, mode) {
+    return `${normalizeAnimationBase(projectName)}_AllAnimations_${mode === "demo" ? "Demo" : "Data"}.bas`;
+  }
+  function collectionMetadata(project, irs, mode, namespace) {
+    return JSON.stringify({
+      formatVersion: YAJA_BB_COLLECTION_FORMAT_VERSION,
+      app: "YAJA 2600 Animator",
+      kind: mode,
+      projectName: String(project.projectName || "Untitled Project"),
+      symbol: namespace,
+      kernel: irs[0].kernel,
+      region: irs[0].region,
+      background: irs[0].background,
+      compositionModel: "adjacent",
+      activeAnimationId: project.activeAnimationId,
+      animations: irs.map((ir, index) => ({ id: project.animations[index].id, name: ir.animationName, symbol: ir.namespace }))
+    });
+  }
+  function collectionAnimationMetadata(animation, ir) {
+    return JSON.stringify({
+      id: animation.id,
+      name: ir.animationName,
+      symbol: ir.namespace,
+      assignments: ir.assignments,
+      activeSlots: ir.activeSlots,
+      twoSpriteMode: ir.twoSpriteMode
+    });
+  }
+  function emitCollectionSelector(project, irs, collectionNamespace) {
+    const uniquePlayers = [...new Set(irs.flatMap((ir) => ir.activePlayers))].sort((a, b) => a - b);
+    const initLabels = irs.map((ir) => ir.namespace + "_Init");
+    const updateLabels = irs.map((ir) => ir.namespace + "_Update");
+    const lines = [
+      "; Shared collection runtime: a=frame, b=timer, c/d=pivot, e=active animation.",
+      `  dim ${collectionNamespace}_Active = e`,
+      `  dim ${collectionNamespace}_PivotX = c`,
+      `  dim ${collectionNamespace}_PivotY = d`,
+      "",
+      `${collectionNamespace}_Init`,
+      `  ${collectionNamespace}_Active = 0`,
+      `  goto ${collectionNamespace}_Select`,
+      "",
+      `${collectionNamespace}_Select`,
+      `  if ${collectionNamespace}_Active < ${irs.length} then goto ${collectionNamespace}_SelectValid`,
+      `  ${collectionNamespace}_Active = 0`,
+      `${collectionNamespace}_SelectValid`,
+      `  gosub ${collectionNamespace}_HideAll`,
+      `  on ${collectionNamespace}_Active goto ${initLabels.join(" ")}`,
+      "",
+      `${collectionNamespace}_Update`,
+      `  on ${collectionNamespace}_Active goto ${updateLabels.join(" ")}`,
+      "",
+      `${collectionNamespace}_Next`,
+      `  ${collectionNamespace}_Active = ${collectionNamespace}_Active + 1`,
+      `  if ${collectionNamespace}_Active < ${irs.length} then goto ${collectionNamespace}_Select`,
+      `  ${collectionNamespace}_Active = 0`,
+      `  goto ${collectionNamespace}_Select`,
+      "",
+      `${collectionNamespace}_Previous`,
+      `  if ${collectionNamespace}_Active > 0 then goto ${collectionNamespace}_PreviousDecrement`,
+      `  ${collectionNamespace}_Active = ${irs.length}`,
+      `${collectionNamespace}_PreviousDecrement`,
+      `  ${collectionNamespace}_Active = ${collectionNamespace}_Active - 1`,
+      `  goto ${collectionNamespace}_Select`,
+      "",
+      `${collectionNamespace}_HideAll`
+    ];
+    uniquePlayers.forEach((player) => lines.push(`  player${player}y = 255`));
+    lines.push("  return", "");
+    return lines.join("\n");
+  }
+  function emitCollectionModules(project, irs, collectionNamespace, mode) {
+    const lines = [`;@YAJA COLLECTION ${collectionMetadata(project, irs, mode, collectionNamespace)}`, emitCollectionSelector(project, irs, collectionNamespace)];
+    irs.forEach((ir, index) => {
+      lines.push(`;@YAJA ANIMATION_BEGIN ${index} ${collectionAnimationMetadata(project.animations[index], ir)}`);
+      lines.push(emitAnimationModule(ir));
+      lines.push(`;@YAJA ANIMATION_END ${index}`, "");
+    });
+    return lines.join("\n");
+  }
+  function emitCollectionDemo(project, irs, collectionNamespace) {
+    const first = irs[0];
+    const callBank = first.kernel === "DPC+" ? " bank2" : "";
+    const lines = ["; Compilable centered YAJA multi-animation demo", "  const noscore = 1", `  set tv ${first.region.toLowerCase()}`];
+    if (first.kernel === "DPC+") lines.push("  set smartbranching on");
+    if (first.kernel === "MULTISPRITE") lines.push("  set kernel multisprite");
+    else if (first.kernel !== "STANDARD") lines.push(`  set kernel ${first.kernel}`);
+    lines.push("", `  dim ${collectionNamespace}_JoystickLatch = f`, "", "__YAJA_Demo_Start", `  ${collectionNamespace}_PivotX = ${first.defaultOrigin.x}`, `  ${collectionNamespace}_PivotY = ${first.defaultOrigin.y}`, `  ${collectionNamespace}_JoystickLatch = 0`, `  gosub ${collectionNamespace}_Init${callBank}`, "__YAJA_Demo_Loop");
+    if (isSolidKernel(first.kernel)) lines.push(`  COLUBK = ${first.background}`);
+    lines.push("  drawscreen", "  if joy0up then goto __YAJA_Demo_Previous", "  if joy0down then goto __YAJA_Demo_Next", `  ${collectionNamespace}_JoystickLatch = 0`, "  goto __YAJA_Demo_Update", "__YAJA_Demo_Previous", `  if ${collectionNamespace}_JoystickLatch then goto __YAJA_Demo_Update`, `  ${collectionNamespace}_JoystickLatch = 1`, `  gosub ${collectionNamespace}_Previous${callBank}`, "  goto __YAJA_Demo_Update", "__YAJA_Demo_Next", `  if ${collectionNamespace}_JoystickLatch then goto __YAJA_Demo_Update`, `  ${collectionNamespace}_JoystickLatch = 1`, `  gosub ${collectionNamespace}_Next${callBank}`, "__YAJA_Demo_Update", `  gosub ${collectionNamespace}_Update${callBank}`, "  goto __YAJA_Demo_Loop", "");
+    const moduleBank = first.kernel === "DPC+" ? "\n  bank 2\n" : "\n";
+    return `${lines.join("\n")}${moduleBank}${demoBackground(first)}
+${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
+  }
+  function generateAnimationCollectionCode(project, options = {}) {
+    const mode = options.mode === "demo" ? "demo" : "data";
+    const collectionNamespace = animationNamespace(project.projectName || "Untitled Project");
+    const used = /* @__PURE__ */ new Set();
+    const irs = project.animations.map((animation) => {
+      const base = `${collectionNamespace}_${normalizeAnimationBase(animation.name)}`;
+      let namespace = base;
+      let suffix = 2;
+      while (used.has(namespace.toLowerCase())) namespace = `${base}${suffix++}`;
+      used.add(namespace.toLowerCase());
+      return createAnimationIR(animationProjectView(project, animation), { mode, namespace });
+    });
+    const diagnostics = irs.flatMap((ir, index) => validateAnimationIR(ir).map((item) => ({ ...item, animationIndex: index, message: `${ir.animationName}: ${item.message}` })));
+    diagnostics.push({ severity: "info", code: "COLLECTION_RUNTIME", message: `All Animations uses one selected runtime: a-d for frame/timer/pivot, e for the active animation${mode === "demo" ? ", and f for joystick edge input" : ""}.` });
+    const output = diagnostics.some((item) => item.severity === "error") ? "" : mode === "demo" ? emitCollectionDemo(project, irs, collectionNamespace) : emitCollectionModules(project, irs, collectionNamespace, mode);
+    return { ir: { kind: "collection", namespace: collectionNamespace, animations: irs }, diagnostics, output, filename: collectionFilename(project.projectName, mode) };
   }
 
   // src/core/sprite-transform.js
@@ -530,6 +769,31 @@ ${emitAnimationModule(ir)}`;
       if (tx >= 0 && tx < width && ty >= 0 && ty < height) cells.push([tx, ty]);
     }
     return cells;
+  }
+  function rasterLineCells(x0, y0, x1, y1) {
+    let x = Math.round(Number(x0) || 0);
+    let y = Math.round(Number(y0) || 0);
+    const endX = Math.round(Number(x1) || 0);
+    const endY = Math.round(Number(y1) || 0);
+    const dx = Math.abs(endX - x);
+    const sx = x < endX ? 1 : -1;
+    const dy = -Math.abs(endY - y);
+    const sy = y < endY ? 1 : -1;
+    const cells = [];
+    let error = dx + dy;
+    while (true) {
+      cells.push([x, y]);
+      if (x === endX && y === endY) return cells;
+      const twiceError = 2 * error;
+      if (twiceError >= dy) {
+        error += dy;
+        x += sx;
+      }
+      if (twiceError <= dx) {
+        error += dx;
+        y += sy;
+      }
+    }
   }
   function visualCircleGeometry(x0, y0, x1, y1, cellWidth = 1, cellHeight = 1) {
     const cw = Math.max(1e-4, Math.abs(Number(cellWidth) || 1));
@@ -943,15 +1207,12 @@ ${emitAnimationModule(ir)}`;
     }
     return players;
   }
-  function parseGenerated(text) {
-    const lines = String(text).split(/\r?\n/);
-    const projectLine = lines.find((line) => line.startsWith(";@YAJA PROJECT "));
-    if (!projectLine) return null;
-    const meta = parseJsonMarker(projectLine, ";@YAJA PROJECT ");
-    if (meta.formatVersion !== YAJA_BB_FORMAT_VERSION) throw new Error(`YAJA bB format ${meta.formatVersion} is not supported; this version reads format ${YAJA_BB_FORMAT_VERSION}.`);
+  function validateCoordinateSystem(meta) {
     if (meta.coordinateSystem && (meta.coordinateSystem.screenYAxis !== YAJA_COORDINATE_SYSTEM.screenYAxis || meta.coordinateSystem.spriteAnchor !== YAJA_COORDINATE_SYSTEM.spriteAnchor)) {
       throw new Error("YAJA bB coordinates must use downward-positive screen Y with a bottom-left sprite anchor.");
     }
+  }
+  function parseGeneratedFrames(lines, meta) {
     const frames = [];
     for (let i = 0; i < lines.length; i++) {
       if (!lines[i].startsWith(";@YAJA FRAME_BEGIN ")) continue;
@@ -982,6 +1243,82 @@ ${emitAnimationModule(ir)}`;
       i = end;
     }
     if (!frames.length || frames.some((frame) => !frame)) throw new Error("Generated YAJA bB data has missing or non-contiguous frames.");
+    return frames;
+  }
+  function parseGeneratedCollection(lines) {
+    const collectionLine = lines.find((line) => line.startsWith(";@YAJA COLLECTION "));
+    if (!collectionLine) return null;
+    const collection = parseJsonMarker(collectionLine, ";@YAJA COLLECTION ");
+    if (collection.formatVersion !== YAJA_BB_COLLECTION_FORMAT_VERSION) throw new Error(`YAJA collection format ${collection.formatVersion} is not supported; this version reads format ${YAJA_BB_COLLECTION_FORMAT_VERSION}.`);
+    const animations = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i].startsWith(";@YAJA ANIMATION_BEGIN ")) continue;
+      const marker = lines[i].match(/^;@YAJA ANIMATION_BEGIN\s+(\d+)\s+(.+)$/);
+      if (!marker) throw new Error(`Malformed YAJA animation marker on line ${i + 1}.`);
+      const index = Number(marker[1]);
+      let animationMeta;
+      try {
+        animationMeta = JSON.parse(marker[2]);
+      } catch (error) {
+        throw new Error(`Animation ${index} metadata is invalid JSON: ${error.message}`);
+      }
+      const end = lines.findIndex((line, n) => n > i && line === `;@YAJA ANIMATION_END ${index}`);
+      if (end < 0) throw new Error(`Animation ${index} is missing its YAJA animation-end marker.`);
+      const animationLines = lines.slice(i + 1, end);
+      const nestedProjectLine = animationLines.find((line) => line.startsWith(";@YAJA PROJECT "));
+      const nested = nestedProjectLine ? parseJsonMarker(nestedProjectLine, ";@YAJA PROJECT ") : {};
+      const meta = {
+        ...nested,
+        kernel: collection.kernel,
+        region: collection.region,
+        background: collection.background,
+        animationName: animationMeta.name,
+        assignments: animationMeta.assignments,
+        activeSlots: animationMeta.activeSlots,
+        twoSpriteMode: animationMeta.twoSpriteMode,
+        compositionModel: collection.compositionModel || "adjacent"
+      };
+      validateCoordinateSystem(meta);
+      animations[index] = {
+        id: String(animationMeta.id || `animation-${index + 1}`),
+        name: String(animationMeta.name || `Untitled Animation${index ? ` ${index + 1}` : ""}`),
+        frames: parseGeneratedFrames(animationLines, meta),
+        currentFrame: 0,
+        twoSpriteMode: !!animationMeta.twoSpriteMode,
+        activePlayer: animationMeta.activeSlots?.[0] === 1 ? 1 : 0,
+        playerAssignments: animationMeta.assignments || [0, 1]
+      };
+      i = end;
+    }
+    if (!animations.length || animations.some((animation) => !animation)) throw new Error("Generated YAJA collection has missing or non-contiguous animations.");
+    const activeAnimationId = animations.some((animation) => animation.id === collection.activeAnimationId) ? collection.activeAnimationId : animations[0].id;
+    return {
+      generated: true,
+      players: [],
+      project: {
+        app: "YAJA 2600 Animator",
+        schemaVersion: 10,
+        version: "1.1.0",
+        projectName: collection.projectName,
+        kernel: collection.kernel,
+        region: collection.region,
+        background: collection.background,
+        compositionModel: collection.compositionModel || "adjacent",
+        activeAnimationId,
+        animations
+      }
+    };
+  }
+  function parseGenerated(text) {
+    const lines = String(text).split(/\r?\n/);
+    const collection = parseGeneratedCollection(lines);
+    if (collection) return collection;
+    const projectLine = lines.find((line) => line.startsWith(";@YAJA PROJECT "));
+    if (!projectLine) return null;
+    const meta = parseJsonMarker(projectLine, ";@YAJA PROJECT ");
+    if (meta.formatVersion !== YAJA_BB_FORMAT_VERSION) throw new Error(`YAJA bB format ${meta.formatVersion} is not supported; this version reads format ${YAJA_BB_FORMAT_VERSION}.`);
+    validateCoordinateSystem(meta);
+    const frames = parseGeneratedFrames(lines, meta);
     return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "1.0.5", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
   }
   function parseBatariBasicSpriteData(text) {
@@ -1470,6 +1807,8 @@ ${emitAnimationModule(ir)}`;
   var currentProjectFileHandle = null;
   var lastProjectPickerHandle = null;
   var currentBbExportMode = "data";
+  var currentBbExportScope = "current";
+  var currentBbExportFilename = "UntitledAnimation_Data.bas";
   var history = [];
   var redoStack = [];
   var isPointerDown = false;
@@ -1578,10 +1917,10 @@ ${emitAnimationModule(ir)}`;
   }
   function defaultState() {
     const height = 16, width = 8;
-    return {
+    const project = {
       app: "YAJA 2600 Animator",
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      version: "1.0.5",
+      version: "1.1.0",
       theme: getPreferredTheme(),
       projectName: "Untitled Project",
       animationName: "Untitled Animation",
@@ -1613,6 +1952,9 @@ ${emitAnimationModule(ir)}`;
       colorBlocks: [],
       stamps: []
     };
+    project.activeAnimationId = "animation-1";
+    project.animations = [animationRecordFromWorkspace(project, project.activeAnimationId)];
+    return project;
   }
   function currentFrame() {
     return state.frames[state.currentFrame];
@@ -1627,6 +1969,7 @@ ${emitAnimationModule(ir)}`;
     return JSON.parse(JSON.stringify(value));
   }
   function snapshot() {
+    syncActiveAnimation(state);
     const snap = cloneData(state);
     if (selection) snap.__selection = cloneData(selection);
     return snap;
@@ -1648,7 +1991,8 @@ ${emitAnimationModule(ir)}`;
   }
   function normalizeProject() {
     state.schemaVersion = CURRENT_SCHEMA_VERSION;
-    state.version = "1.0.5";
+    state.version = "1.1.0";
+    ensureAnimationCollection(state);
     state.theme = applyTheme(normalizeThemeId(state.theme));
     state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
     state.currentColor = normalizeCode(state.currentColor, "$48");
@@ -2127,6 +2471,7 @@ ${emitAnimationModule(ir)}`;
   function movePointer(event) {
     const cell = cellFromPointer(event);
     if (!cell) return;
+    const previousCell = lastCell;
     lastCell = cell;
     if (!isPointerDown) {
       updateCanvasSelectionCursor(event);
@@ -2164,7 +2509,13 @@ ${emitAnimationModule(ir)}`;
         drawShape(dragStart, cell);
       }
     } else {
-      applyToolAt(cell, false);
+      const strokeTool = rightEraseStroke && state.tool === "pencil" ? "eraser" : state.tool;
+      if (["pencil", "eraser"].includes(strokeTool) && previousCell?.player === cell.player) {
+        const value = strokeTool === "eraser" ? 0 : 1;
+        rasterLineCells(previousCell.col, previousCell.row, cell.col, cell.row).forEach(([x, y]) => setBrushPixel(x, y, value));
+      } else {
+        applyToolAt(cell, false);
+      }
     }
     renderCanvasSurfaces();
     renderFrames();
@@ -2277,22 +2628,7 @@ ${emitAnimationModule(ir)}`;
     if (state.tool === "triangle-side") drawTriangle(rectFromPoints(a, b), true, state.fillShapes);
   }
   function drawLine(x0, y0, x1, y1, value) {
-    let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-    let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-    let err = dx + dy;
-    while (true) {
-      setBrushPixel(x0, y0, value);
-      if (x0 === x1 && y0 === y1) break;
-      const e2 = 2 * err;
-      if (e2 >= dy) {
-        err += dy;
-        x0 += sx;
-      }
-      if (e2 <= dx) {
-        err += dx;
-        y0 += sy;
-      }
-    }
+    rasterLineCells(x0, y0, x1, y1).forEach(([x, y]) => setBrushPixel(x, y, value));
   }
   function drawRect(r, filled) {
     for (let y = r.y; y < r.y + r.h; y++) {
@@ -2507,6 +2843,143 @@ ${emitAnimationModule(ir)}`;
       }
     }
   }
+  function resetAnimationWorkspaceTransientState() {
+    if (playbackRunning) {
+      clearTimeout(playTimer);
+      playTimer = null;
+      playbackRunning = false;
+      syncPlaybackButton();
+    }
+    selection = null;
+    colorSelection = null;
+    rotationSession = null;
+    referenceTransformActive = false;
+    framePointerSession = null;
+    suppressFrameClick = false;
+    selectedFrames = /* @__PURE__ */ new Set([state.currentFrame]);
+    frameSelectionAnchor = state.currentFrame;
+  }
+  function switchAnimation(animationId) {
+    if (!animationId || animationId === state.activeAnimationId) {
+      el.animationMenu.classList.add("hidden");
+      el.animationName.setAttribute("aria-expanded", "false");
+      el.toggleAnimationMenu.setAttribute("aria-expanded", "false");
+      return;
+    }
+    syncActiveAnimation(state);
+    loadAnimationWorkspace(state, animationId);
+    normalizeProject();
+    resetAnimationWorkspaceTransientState();
+    el.animationMenu.classList.add("hidden");
+    el.animationName.setAttribute("aria-expanded", "false");
+    el.toggleAnimationMenu.setAttribute("aria-expanded", "false");
+    syncControls();
+    renderAll();
+  }
+  function commitAnimationName() {
+    const requested = el.animationName.value;
+    const current = state.animations.find((animation) => animation.id === state.activeAnimationId);
+    const nextName = uniqueAnimationName(state, requested, state.activeAnimationId);
+    if (nextName === state.animationName) {
+      el.animationName.value = nextName;
+      return;
+    }
+    pushHistory();
+    state.animationName = nextName;
+    if (current) current.name = nextName;
+    syncActiveAnimation(state);
+    syncControls();
+    renderAll();
+  }
+  function blankAnimationRecord() {
+    const source = currentFrame();
+    const frame = makeFrame(source.height, 0, source.width, source.duration);
+    frame.players.forEach((player, slot) => {
+      const sourcePlayer = source.players[slot];
+      player.nusiz = sourcePlayer.nusiz;
+      player.xOffset = sourcePlayer.xOffset;
+      player.yOffset = sourcePlayer.yOffset;
+      player.solidColor = state.currentColor;
+      player.colors = Array(frame.height).fill(state.currentColor);
+    });
+    return {
+      id: nextAnimationId(state),
+      name: uniqueAnimationName(state, "Untitled Animation"),
+      frames: [frame],
+      currentFrame: 0,
+      twoSpriteMode: state.twoSpriteMode,
+      activePlayer: state.activePlayer,
+      playerAssignments: cloneData(state.playerAssignments)
+    };
+  }
+  function addAnimation() {
+    pushHistory();
+    const animation = blankAnimationRecord();
+    state.animations.push(animation);
+    loadAnimationWorkspace(state, animation.id);
+    resetAnimationWorkspaceTransientState();
+    syncControls();
+    renderAll();
+    requestAnimationFrame(() => {
+      el.animationName.focus();
+      el.animationName.select();
+    });
+  }
+  function duplicateAnimation() {
+    pushHistory();
+    const duplicate = duplicateAnimationRecord(state);
+    state.animations.push(duplicate);
+    loadAnimationWorkspace(state, duplicate.id);
+    resetAnimationWorkspaceTransientState();
+    syncControls();
+    renderAll();
+  }
+  function deleteAnimation() {
+    ensureAnimationCollection(state);
+    if (state.animations.length <= 1) return;
+    const index = state.animations.findIndex((animation) => animation.id === state.activeAnimationId);
+    if (!confirm(`Delete animation \u201C${state.animationName}\u201D?`)) return;
+    pushHistory();
+    state.animations.splice(index, 1);
+    const replacement = state.animations[Math.min(index, state.animations.length - 1)];
+    loadAnimationWorkspace(state, replacement.id);
+    resetAnimationWorkspaceTransientState();
+    syncControls();
+    renderAll();
+  }
+  function renderAnimationMenu() {
+    ensureAnimationCollection(state);
+    el.animationMenu.replaceChildren();
+    state.animations.forEach((animation) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.role = "option";
+      button.dataset.animationId = animation.id;
+      button.textContent = animation.name;
+      button.setAttribute("aria-selected", String(animation.id === state.activeAnimationId));
+      button.addEventListener("click", () => switchAnimation(animation.id));
+      el.animationMenu.appendChild(button);
+    });
+    el.deleteAnimation.disabled = state.animations.length <= 1;
+  }
+  function selectTimelineFrame(index, modifiers = {}) {
+    if (modifiers.shiftKey) {
+      const start = Math.min(frameSelectionAnchor, index), end = Math.max(frameSelectionAnchor, index);
+      selectedFrames = new Set(Array.from({ length: end - start + 1 }, (_, offset) => start + offset));
+    } else if (modifiers.ctrlKey || modifiers.metaKey) {
+      if (selectedFrames.has(index) && selectedFrames.size > 1) selectedFrames.delete(index);
+      else selectedFrames.add(index);
+      frameSelectionAnchor = index;
+    } else {
+      selectedFrames = /* @__PURE__ */ new Set([index]);
+      frameSelectionAnchor = index;
+    }
+    state.currentFrame = index;
+    rotationSession = null;
+    selection = null;
+    syncControls();
+    renderAll();
+  }
   function renderFrames() {
     el.framesList.innerHTML = "";
     selectedFrames = new Set([...selectedFrames].filter((index) => index >= 0 && index < state.frames.length));
@@ -2524,22 +2997,7 @@ ${emitAnimationModule(ir)}`;
       item.append(canvas, label);
       item.addEventListener("click", (event) => {
         if (suppressFrameClick) return;
-        if (event.shiftKey) {
-          const start = Math.min(frameSelectionAnchor, index), end = Math.max(frameSelectionAnchor, index);
-          selectedFrames = new Set(Array.from({ length: end - start + 1 }, (_, offset) => start + offset));
-        } else if (event.ctrlKey || event.metaKey) {
-          if (selectedFrames.has(index) && selectedFrames.size > 1) selectedFrames.delete(index);
-          else selectedFrames.add(index);
-          frameSelectionAnchor = index;
-        } else {
-          selectedFrames = /* @__PURE__ */ new Set([index]);
-          frameSelectionAnchor = index;
-        }
-        state.currentFrame = index;
-        rotationSession = null;
-        selection = null;
-        syncControls();
-        renderAll();
+        selectTimelineFrame(index, event);
       });
       el.framesList.appendChild(item);
     });
@@ -2593,7 +3051,7 @@ ${emitAnimationModule(ir)}`;
     const point = timelineContentPoint(event);
     el.framesList.setPointerCapture(event.pointerId);
     if (item) {
-      framePointerSession = { type: "reorder", pointerId: event.pointerId, index: Number(item.dataset.index), startX: event.clientX, startY: event.clientY, active: false, targetSlot: null };
+      framePointerSession = { type: "reorder", pointerId: event.pointerId, index: Number(item.dataset.index), startX: event.clientX, startY: event.clientY, active: false, targetSlot: null, shiftKey: event.shiftKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey };
       return;
     }
     event.preventDefault();
@@ -2655,6 +3113,14 @@ ${emitAnimationModule(ir)}`;
         suppressFrameClick = false;
       }, 0);
       reorderSelectedFrames(session.targetSlot ?? state.frames.length);
+      return;
+    }
+    if (session.type === "reorder") {
+      suppressFrameClick = true;
+      setTimeout(() => {
+        suppressFrameClick = false;
+      }, 0);
+      selectTimelineFrame(session.index, session);
       return;
     }
     if (session.type === "marquee") {
@@ -3136,22 +3602,7 @@ ${emitAnimationModule(ir)}`;
     }
   }
   function drawStampEditorLine(x0, y0, x1, y1, value) {
-    const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-    const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-    let error = dx + dy;
-    while (true) {
-      plotStampEditorPoint(x0, y0, value);
-      if (x0 === x1 && y0 === y1) break;
-      const e2 = 2 * error;
-      if (e2 >= dy) {
-        error += dy;
-        x0 += sx;
-      }
-      if (e2 <= dx) {
-        error += dx;
-        y0 += sy;
-      }
-    }
+    rasterLineCells(x0, y0, x1, y1).forEach(([x, y]) => plotStampEditorPoint(x, y, value));
   }
   function applyStampEditorShape(start, end, erase = false) {
     const value = erase ? 0 : 1;
@@ -3334,7 +3785,8 @@ ${emitAnimationModule(ir)}`;
     syncFrameSize();
     el.selectTheme.value = state.theme;
     el.projectName.value = state.projectName;
-    el.animationName.value = state.animationName;
+    if (document.activeElement !== el.animationName) el.animationName.value = state.animationName;
+    renderAnimationMenu();
     el.spriteHeight.value = state.height;
     el.spriteWidth.value = state.width;
     el.kernelMode.value = state.kernel;
@@ -4024,10 +4476,13 @@ ${emitAnimationModule(ir)}`;
   }
   function exportBB() {
     state.projectName = el.projectName.value || state.projectName;
-    const result = generateAnimationCode(state, { mode: currentBbExportMode });
+    syncActiveAnimation(state);
+    const result = generateAnimationCode(state, { mode: currentBbExportMode, scope: currentBbExportScope });
+    currentBbExportFilename = result.filename;
     const notes = result.diagnostics.map((item) => `; ${item.severity.toUpperCase()}: ${item.message}`);
     el.codeDiagnostics.innerHTML = result.diagnostics.map((item) => `<div class="diagnostic ${item.severity}"><strong>${item.severity}</strong><span>${item.message}</span></div>`).join("");
-    openCodeDialog(currentBbExportMode === "demo" ? "Export Compilable bB Demo" : "Export bB Data Only", [...notes, "", result.output].join("\n"), false);
+    const scopeLabel = currentBbExportScope === "all" ? "All Animations" : "Current Animation";
+    openCodeDialog(`${currentBbExportMode === "demo" ? "Export Compilable bB Demo" : "Export bB Data Only"} \u2014 ${scopeLabel}`, [...notes, "", result.output].join("\n"), false);
   }
   function openCodeDialog(title, text, importMode) {
     el.codeDialogTitle.textContent = title;
@@ -4036,9 +4491,10 @@ ${emitAnimationModule(ir)}`;
     el.importFromText.style.display = importMode ? "inline-block" : "none";
     el.bbImportHelp.hidden = !importMode;
     el.bbExportMode.style.display = importMode ? "none" : "grid";
+    el.bbExportScope.style.display = importMode ? "none" : "grid";
     el.downloadBas.style.display = importMode ? "none" : "inline-flex";
     if (importMode) el.codeDiagnostics.innerHTML = "";
-    el.codeDialog.showModal();
+    if (!el.codeDialog.open) el.codeDialog.showModal();
   }
   function importBBText(text) {
     const parsed = parseBB(text);
@@ -4063,9 +4519,8 @@ ${emitAnimationModule(ir)}`;
       }
       pushHistory();
       state = { ...defaultState(), ...candidate, currentFrame: 0, activePlayer: candidate.activePlayer === 1 ? 1 : 0 };
-      selectedFrames = /* @__PURE__ */ new Set([0]);
-      frameSelectionAnchor = 0;
       normalizeProject();
+      resetAnimationWorkspaceTransientState();
       syncControls();
       renderAll();
       return true;
@@ -4175,6 +4630,7 @@ ${emitAnimationModule(ir)}`;
       referenceImages.clear();
       rotationSession = null;
       normalizeProject();
+      resetAnimationWorkspaceTransientState();
       syncControls();
       renderAll();
       return true;
@@ -4651,8 +5107,33 @@ ${emitAnimationModule(ir)}`;
       renderAll();
     });
     bindValue(el.projectName, (v) => state.projectName = v);
-    bindValue(el.animationName, (v) => {
-      state.animationName = v || "Untitled Animation";
+    el.animationName.addEventListener("change", commitAnimationName);
+    el.animationName.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commitAnimationName();
+        el.animationName.blur();
+      }
+      if (event.key === "ArrowDown" && el.animationMenu.classList.contains("hidden")) {
+        event.preventDefault();
+        el.toggleAnimationMenu.click();
+        el.animationMenu.querySelector("button")?.focus();
+      }
+    });
+    el.toggleAnimationMenu.addEventListener("click", () => {
+      const willOpen = el.animationMenu.classList.contains("hidden");
+      el.animationMenu.classList.toggle("hidden", !willOpen);
+      el.animationName.setAttribute("aria-expanded", String(willOpen));
+      el.toggleAnimationMenu.setAttribute("aria-expanded", String(willOpen));
+    });
+    el.newAnimation.addEventListener("click", addAnimation);
+    el.duplicateAnimation.addEventListener("click", duplicateAnimation);
+    el.deleteAnimation.addEventListener("click", deleteAnimation);
+    document.addEventListener("pointerdown", (event) => {
+      if (event.target.closest(".animation-library-control")) return;
+      el.animationMenu.classList.add("hidden");
+      el.animationName.setAttribute("aria-expanded", "false");
+      el.toggleAnimationMenu.setAttribute("aria-expanded", "false");
     });
     bindValue(el.currentColor, (v) => {
       state.currentColor = normalizeCode(v, state.currentColor);
@@ -4860,7 +5341,12 @@ ${emitAnimationModule(ir)}`;
       currentBbExportMode = control.value;
       exportBB();
     }));
-    el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), animationExportFilename(state.animationName, currentBbExportMode)));
+    [el.exportBbCurrent, el.exportBbAll].forEach((control) => control.addEventListener("change", () => {
+      if (!control.checked) return;
+      currentBbExportScope = control.value;
+      exportBB();
+    }));
+    el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), currentBbExportFilename || animationExportFilename(state.animationName, currentBbExportMode)));
     el.exportSheet.addEventListener("click", openExportPngDialog);
     [el.exportPngSelected, el.exportPngAll].forEach((control) => control.addEventListener("change", updateExportPngSummary));
     el.confirmExportPng.addEventListener("click", confirmExportPng);
@@ -4907,7 +5393,7 @@ ${emitAnimationModule(ir)}`;
       }
     });
     el.timelineHeading.addEventListener("click", (event) => {
-      if (event.target.closest(".animation-name-control")) return;
+      if (event.target.closest(".animation-library-control")) return;
       selectedFrames.clear();
       renderFrames();
     });
@@ -5093,6 +5579,11 @@ ${emitAnimationModule(ir)}`;
       "selectTheme",
       "projectName",
       "animationName",
+      "toggleAnimationMenu",
+      "animationMenu",
+      "newAnimation",
+      "duplicateAnimation",
+      "deleteAnimation",
       "newProject",
       "saveProject",
       "loadProject",
@@ -5271,8 +5762,11 @@ ${emitAnimationModule(ir)}`;
       "codeDialog",
       "codeDialogTitle",
       "bbExportMode",
+      "bbExportScope",
       "exportBbData",
       "exportBbDemo",
+      "exportBbCurrent",
+      "exportBbAll",
       "bbImportHelp",
       "codeText",
       "copyCode",

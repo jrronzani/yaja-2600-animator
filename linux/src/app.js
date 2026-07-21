@@ -1,12 +1,13 @@
 import { animationExportFilename, generateAnimationCode } from "./core/codegen.js";
 import { CURRENT_SCHEMA_VERSION, migrateProject, normalizePlayerAssignments, playerLimitForKernel } from "./core/project-model.js";
 import { createRotationSession } from "./core/sprite-transform.js";
-import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
+import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, rasterLineCells, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
 import { parseBatariBasicSpriteData } from "./core/bb-parser.js";
 import { applyTheme, getPreferredTheme, normalizeThemeId } from "./themes.js";
 import { buildStoredZip } from "./core/zip.js";
 import { canvasCellSize, NUSIZ_MODES as NUSIZ, rasterCellRect } from "./core/display-geometry.js";
 import { averageReferenceGridRow, estimateUniformBorderColor, fittedReferenceRect, nearestPaletteColor, referenceCellGrid, referenceCellIsForeground } from "./core/reference-image.js";
+import { animationRecordFromWorkspace, duplicateAnimationRecord, ensureAnimationCollection, loadAnimationWorkspace, nextAnimationId, syncActiveAnimation, uniqueAnimationName } from "./core/animation-collection.js";
 
 const ATARI_NTSC = {
   "$00": "#000000", "$02": "#444444", "$04": "#707070", "$06": "#949494", "$08": "#B4B4B4", "$0A": "#D0D0D0", "$0C": "#E8E8E8", "$0E": "#F0F0F0",
@@ -76,6 +77,8 @@ const SHARED_PICKER_HANDLE_KEY = "__yajaAnimatorLastProjectPickerHandle";
 let currentProjectFileHandle = null;
 let lastProjectPickerHandle = null;
 let currentBbExportMode = "data";
+let currentBbExportScope = "current";
+let currentBbExportFilename = "UntitledAnimation_Data.bas";
 let history = [];
 let redoStack = [];
 let isPointerDown = false;
@@ -194,10 +197,10 @@ function makeFrame(height, index = 0, width = 8, duration = 3) {
 
 function defaultState() {
   const height = 16, width = 8;
-  return {
+  const project = {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "1.0.5",
+    version: "1.1.0",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -229,6 +232,9 @@ function defaultState() {
     colorBlocks: [],
     stamps: []
   };
+  project.activeAnimationId = "animation-1";
+  project.animations = [animationRecordFromWorkspace(project, project.activeAnimationId)];
+  return project;
 }
 
 function currentFrame() {
@@ -246,6 +252,7 @@ function cloneData(value) {
 }
 
 function snapshot() {
+  syncActiveAnimation(state);
   const snap = cloneData(state);
   if (selection) snap.__selection = cloneData(selection);
   return snap;
@@ -270,7 +277,8 @@ function restore(snap) {
 
 function normalizeProject() {
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
-  state.version = "1.0.5";
+  state.version = "1.1.0";
+  ensureAnimationCollection(state);
   state.theme = applyTheme(normalizeThemeId(state.theme));
   state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
   state.currentColor = normalizeCode(state.currentColor, "$48");
@@ -770,6 +778,7 @@ function beginPointer(event) {
 function movePointer(event) {
   const cell = cellFromPointer(event);
   if (!cell) return;
+  const previousCell = lastCell;
   lastCell = cell;
   if (!isPointerDown) { updateCanvasSelectionCursor(event); return; }
   if (referenceDrag && currentReference()) {
@@ -802,7 +811,13 @@ function movePointer(event) {
       drawShape(dragStart, cell);
     }
   } else {
-    applyToolAt(cell, false);
+    const strokeTool = rightEraseStroke && state.tool === "pencil" ? "eraser" : state.tool;
+    if (["pencil", "eraser"].includes(strokeTool) && previousCell?.player === cell.player) {
+      const value = strokeTool === "eraser" ? 0 : 1;
+      rasterLineCells(previousCell.col, previousCell.row, cell.col, cell.row).forEach(([x, y]) => setBrushPixel(x, y, value));
+    } else {
+      applyToolAt(cell, false);
+    }
   }
   renderCanvasSurfaces();
   renderFrames();
@@ -930,16 +945,7 @@ function drawShape(a, b) {
 }
 
 function drawLine(x0, y0, x1, y1, value) {
-  let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-  let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-  let err = dx + dy;
-  while (true) {
-    setBrushPixel(x0, y0, value);
-    if (x0 === x1 && y0 === y1) break;
-    const e2 = 2 * err;
-    if (e2 >= dy) { err += dy; x0 += sx; }
-    if (e2 <= dx) { err += dx; y0 += sy; }
-  }
+  rasterLineCells(x0, y0, x1, y1).forEach(([x, y]) => setBrushPixel(x, y, value));
 }
 
 function drawRect(r, filled) {
@@ -1164,6 +1170,146 @@ function renderPalette() {
   }
 }
 
+function resetAnimationWorkspaceTransientState() {
+  if (playbackRunning) {
+    clearTimeout(playTimer);
+    playTimer = null;
+    playbackRunning = false;
+    syncPlaybackButton();
+  }
+  selection = null;
+  colorSelection = null;
+  rotationSession = null;
+  referenceTransformActive = false;
+  framePointerSession = null;
+  suppressFrameClick = false;
+  selectedFrames = new Set([state.currentFrame]);
+  frameSelectionAnchor = state.currentFrame;
+}
+
+function switchAnimation(animationId) {
+  if (!animationId || animationId === state.activeAnimationId) {
+    el.animationMenu.classList.add("hidden");
+    el.animationName.setAttribute("aria-expanded", "false");
+    el.toggleAnimationMenu.setAttribute("aria-expanded", "false");
+    return;
+  }
+  syncActiveAnimation(state);
+  loadAnimationWorkspace(state, animationId);
+  normalizeProject();
+  resetAnimationWorkspaceTransientState();
+  el.animationMenu.classList.add("hidden");
+  el.animationName.setAttribute("aria-expanded", "false");
+  el.toggleAnimationMenu.setAttribute("aria-expanded", "false");
+  syncControls();
+  renderAll();
+}
+
+function commitAnimationName() {
+  const requested = el.animationName.value;
+  const current = state.animations.find(animation => animation.id === state.activeAnimationId);
+  const nextName = uniqueAnimationName(state, requested, state.activeAnimationId);
+  if (nextName === state.animationName) { el.animationName.value = nextName; return; }
+  pushHistory();
+  state.animationName = nextName;
+  if (current) current.name = nextName;
+  syncActiveAnimation(state);
+  syncControls();
+  renderAll();
+}
+
+function blankAnimationRecord() {
+  const source = currentFrame();
+  const frame = makeFrame(source.height, 0, source.width, source.duration);
+  frame.players.forEach((player, slot) => {
+    const sourcePlayer = source.players[slot];
+    player.nusiz = sourcePlayer.nusiz;
+    player.xOffset = sourcePlayer.xOffset;
+    player.yOffset = sourcePlayer.yOffset;
+    player.solidColor = state.currentColor;
+    player.colors = Array(frame.height).fill(state.currentColor);
+  });
+  return {
+    id: nextAnimationId(state),
+    name: uniqueAnimationName(state, "Untitled Animation"),
+    frames: [frame],
+    currentFrame: 0,
+    twoSpriteMode: state.twoSpriteMode,
+    activePlayer: state.activePlayer,
+    playerAssignments: cloneData(state.playerAssignments)
+  };
+}
+
+function addAnimation() {
+  pushHistory();
+  const animation = blankAnimationRecord();
+  state.animations.push(animation);
+  loadAnimationWorkspace(state, animation.id);
+  resetAnimationWorkspaceTransientState();
+  syncControls();
+  renderAll();
+  requestAnimationFrame(() => { el.animationName.focus(); el.animationName.select(); });
+}
+
+function duplicateAnimation() {
+  pushHistory();
+  const duplicate = duplicateAnimationRecord(state);
+  state.animations.push(duplicate);
+  loadAnimationWorkspace(state, duplicate.id);
+  resetAnimationWorkspaceTransientState();
+  syncControls();
+  renderAll();
+}
+
+function deleteAnimation() {
+  ensureAnimationCollection(state);
+  if (state.animations.length <= 1) return;
+  const index = state.animations.findIndex(animation => animation.id === state.activeAnimationId);
+  if (!confirm(`Delete animation “${state.animationName}”?`)) return;
+  pushHistory();
+  state.animations.splice(index, 1);
+  const replacement = state.animations[Math.min(index, state.animations.length - 1)];
+  loadAnimationWorkspace(state, replacement.id);
+  resetAnimationWorkspaceTransientState();
+  syncControls();
+  renderAll();
+}
+
+function renderAnimationMenu() {
+  ensureAnimationCollection(state);
+  el.animationMenu.replaceChildren();
+  state.animations.forEach(animation => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.role = "option";
+    button.dataset.animationId = animation.id;
+    button.textContent = animation.name;
+    button.setAttribute("aria-selected", String(animation.id === state.activeAnimationId));
+    button.addEventListener("click", () => switchAnimation(animation.id));
+    el.animationMenu.appendChild(button);
+  });
+  el.deleteAnimation.disabled = state.animations.length <= 1;
+}
+
+function selectTimelineFrame(index, modifiers = {}) {
+  if (modifiers.shiftKey) {
+    const start = Math.min(frameSelectionAnchor, index), end = Math.max(frameSelectionAnchor, index);
+    selectedFrames = new Set(Array.from({ length: end - start + 1 }, (_, offset) => start + offset));
+  } else if (modifiers.ctrlKey || modifiers.metaKey) {
+    if (selectedFrames.has(index) && selectedFrames.size > 1) selectedFrames.delete(index);
+    else selectedFrames.add(index);
+    frameSelectionAnchor = index;
+  } else {
+    selectedFrames = new Set([index]);
+    frameSelectionAnchor = index;
+  }
+  state.currentFrame = index;
+  rotationSession = null;
+  selection = null;
+  syncControls();
+  renderAll();
+}
+
 function renderFrames() {
   el.framesList.innerHTML = "";
   selectedFrames = new Set([...selectedFrames].filter(index => index >= 0 && index < state.frames.length));
@@ -1181,22 +1327,7 @@ function renderFrames() {
     item.append(canvas, label);
     item.addEventListener("click", event => {
       if (suppressFrameClick) return;
-      if (event.shiftKey) {
-        const start = Math.min(frameSelectionAnchor, index), end = Math.max(frameSelectionAnchor, index);
-        selectedFrames = new Set(Array.from({ length: end - start + 1 }, (_, offset) => start + offset));
-      } else if (event.ctrlKey || event.metaKey) {
-        if (selectedFrames.has(index) && selectedFrames.size > 1) selectedFrames.delete(index);
-        else selectedFrames.add(index);
-        frameSelectionAnchor = index;
-      } else {
-        selectedFrames = new Set([index]);
-        frameSelectionAnchor = index;
-      }
-      state.currentFrame = index;
-      rotationSession = null;
-      selection = null;
-      syncControls();
-      renderAll();
+      selectTimelineFrame(index, event);
     });
     el.framesList.appendChild(item);
   });
@@ -1257,7 +1388,7 @@ function beginTimelinePointer(event) {
   const point = timelineContentPoint(event);
   el.framesList.setPointerCapture(event.pointerId);
   if (item) {
-    framePointerSession = { type: "reorder", pointerId: event.pointerId, index: Number(item.dataset.index), startX: event.clientX, startY: event.clientY, active: false, targetSlot: null };
+    framePointerSession = { type: "reorder", pointerId: event.pointerId, index: Number(item.dataset.index), startX: event.clientX, startY: event.clientY, active: false, targetSlot: null, shiftKey: event.shiftKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey };
     return;
   }
   event.preventDefault();
@@ -1315,6 +1446,15 @@ function endTimelinePointer(event) {
     suppressFrameClick = true;
     setTimeout(() => { suppressFrameClick = false; }, 0);
     reorderSelectedFrames(session.targetSlot ?? state.frames.length);
+    return;
+  }
+  if (session.type === "reorder") {
+    // Pointer capture can retarget the synthetic click to the list after a
+    // rerender (notably after duplication). Select here so individual frame
+    // clicks remain reliable, then suppress the redundant click event.
+    suppressFrameClick = true;
+    setTimeout(() => { suppressFrameClick = false; }, 0);
+    selectTimelineFrame(session.index, session);
     return;
   }
   if (session.type === "marquee") {
@@ -1802,16 +1942,7 @@ function plotStampEditorPoint(x, y, value) {
 }
 
 function drawStampEditorLine(x0, y0, x1, y1, value) {
-  const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-  const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-  let error = dx + dy;
-  while (true) {
-    plotStampEditorPoint(x0, y0, value);
-    if (x0 === x1 && y0 === y1) break;
-    const e2 = 2 * error;
-    if (e2 >= dy) { error += dy; x0 += sx; }
-    if (e2 <= dx) { error += dx; y0 += sy; }
-  }
+  rasterLineCells(x0, y0, x1, y1).forEach(([x, y]) => plotStampEditorPoint(x, y, value));
 }
 
 function applyStampEditorShape(start, end, erase = false) {
@@ -1995,7 +2126,8 @@ function syncControls() {
   syncFrameSize();
   el.selectTheme.value = state.theme;
   el.projectName.value = state.projectName;
-  el.animationName.value = state.animationName;
+  if (document.activeElement !== el.animationName) el.animationName.value = state.animationName;
+  renderAnimationMenu();
   el.spriteHeight.value = state.height;
   el.spriteWidth.value = state.width;
   el.kernelMode.value = state.kernel;
@@ -2706,10 +2838,13 @@ function schedulePlaybackStep() {
 
 function exportBB() {
   state.projectName = el.projectName.value || state.projectName;
-  const result = generateAnimationCode(state, { mode: currentBbExportMode });
+  syncActiveAnimation(state);
+  const result = generateAnimationCode(state, { mode: currentBbExportMode, scope: currentBbExportScope });
+  currentBbExportFilename = result.filename;
   const notes = result.diagnostics.map(item => `; ${item.severity.toUpperCase()}: ${item.message}`);
   el.codeDiagnostics.innerHTML = result.diagnostics.map(item => `<div class="diagnostic ${item.severity}"><strong>${item.severity}</strong><span>${item.message}</span></div>`).join("");
-  openCodeDialog(currentBbExportMode === "demo" ? "Export Compilable bB Demo" : "Export bB Data Only", [...notes, "", result.output].join("\n"), false);
+  const scopeLabel = currentBbExportScope === "all" ? "All Animations" : "Current Animation";
+  openCodeDialog(`${currentBbExportMode === "demo" ? "Export Compilable bB Demo" : "Export bB Data Only"} — ${scopeLabel}`, [...notes, "", result.output].join("\n"), false);
 }
 
 function openCodeDialog(title, text, importMode) {
@@ -2719,9 +2854,10 @@ function openCodeDialog(title, text, importMode) {
   el.importFromText.style.display = importMode ? "inline-block" : "none";
   el.bbImportHelp.hidden = !importMode;
   el.bbExportMode.style.display = importMode ? "none" : "grid";
+  el.bbExportScope.style.display = importMode ? "none" : "grid";
   el.downloadBas.style.display = importMode ? "none" : "inline-flex";
   if (importMode) el.codeDiagnostics.innerHTML = "";
-  el.codeDialog.showModal();
+  if (!el.codeDialog.open) el.codeDialog.showModal();
 }
 
 function importBBText(text) {
@@ -2743,9 +2879,8 @@ function importBBText(text) {
     try { candidate = migrateProject(parsed.project); } catch (error) { return showImportError(`Could not import generated YAJA bB: ${error.message}`); }
     pushHistory();
     state = { ...defaultState(), ...candidate, currentFrame: 0, activePlayer: candidate.activePlayer === 1 ? 1 : 0 };
-    selectedFrames = new Set([0]);
-    frameSelectionAnchor = 0;
     normalizeProject();
+    resetAnimationWorkspaceTransientState();
     syncControls();
     renderAll();
     return true;
@@ -2865,6 +3000,7 @@ function loadProjectContent(content) {
     referenceImages.clear();
     rotationSession = null;
     normalizeProject();
+    resetAnimationWorkspaceTransientState();
     syncControls();
     renderAll();
     return true;
@@ -3295,7 +3431,30 @@ function bindEvents() {
     renderAll();
   });
   bindValue(el.projectName, v => state.projectName = v);
-  bindValue(el.animationName, v => { state.animationName = v || "Untitled Animation"; });
+  el.animationName.addEventListener("change", commitAnimationName);
+  el.animationName.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); commitAnimationName(); el.animationName.blur(); }
+    if (event.key === "ArrowDown" && el.animationMenu.classList.contains("hidden")) {
+      event.preventDefault();
+      el.toggleAnimationMenu.click();
+      el.animationMenu.querySelector("button")?.focus();
+    }
+  });
+  el.toggleAnimationMenu.addEventListener("click", () => {
+    const willOpen = el.animationMenu.classList.contains("hidden");
+    el.animationMenu.classList.toggle("hidden", !willOpen);
+    el.animationName.setAttribute("aria-expanded", String(willOpen));
+    el.toggleAnimationMenu.setAttribute("aria-expanded", String(willOpen));
+  });
+  el.newAnimation.addEventListener("click", addAnimation);
+  el.duplicateAnimation.addEventListener("click", duplicateAnimation);
+  el.deleteAnimation.addEventListener("click", deleteAnimation);
+  document.addEventListener("pointerdown", event => {
+    if (event.target.closest(".animation-library-control")) return;
+    el.animationMenu.classList.add("hidden");
+    el.animationName.setAttribute("aria-expanded", "false");
+    el.toggleAnimationMenu.setAttribute("aria-expanded", "false");
+  });
   bindValue(el.currentColor, v => { state.currentColor = normalizeCode(v, state.currentColor); if (usesSolidColor()) currentPlayer().solidColor = state.currentColor; }, true);
   bindValue(el.bgColor, v => state.background = normalizeCode(v, state.background), true);
   bindValue(el.kernelMode, v => { state.kernel = v; state.verticalStretch = ["STANDARD", "MULTISPRITE"].includes(v) ? 2 : 1; state.playerAssignments = normalizePlayerAssignments(state.playerAssignments, v); syncControls(); }, true);
@@ -3445,7 +3604,8 @@ function bindEvents() {
   });
   el.copyCode.addEventListener("click", () => navigator.clipboard?.writeText(el.codeText.value));
   [el.exportBbData, el.exportBbDemo].forEach(control => control.addEventListener("change", () => { if (!control.checked) return; currentBbExportMode = control.value; exportBB(); }));
-  el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), animationExportFilename(state.animationName, currentBbExportMode)));
+  [el.exportBbCurrent, el.exportBbAll].forEach(control => control.addEventListener("change", () => { if (!control.checked) return; currentBbExportScope = control.value; exportBB(); }));
+  el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), currentBbExportFilename || animationExportFilename(state.animationName, currentBbExportMode)));
   el.exportSheet.addEventListener("click", openExportPngDialog);
   [el.exportPngSelected, el.exportPngAll].forEach(control => control.addEventListener("change", updateExportPngSummary));
   el.confirmExportPng.addEventListener("click", confirmExportPng);
@@ -3492,7 +3652,7 @@ function bindEvents() {
     }
   });
   el.timelineHeading.addEventListener("click", event => {
-    if (event.target.closest(".animation-name-control")) return;
+    if (event.target.closest(".animation-library-control")) return;
     selectedFrames.clear();
     renderFrames();
   });
@@ -3608,7 +3768,7 @@ function handleKeys(e) {
 
 function cacheElements() {
   [
-    "selectTheme", "projectName", "animationName", "newProject", "saveProject", "loadProject", "projectFile", "exportCode", "importCode", "exportSheet", "fullscreenButton",
+    "selectTheme", "projectName", "animationName", "toggleAnimationMenu", "animationMenu", "newAnimation", "duplicateAnimation", "deleteAnimation", "newProject", "saveProject", "loadProject", "projectFile", "exportCode", "importCode", "exportSheet", "fullscreenButton",
     "toolGrid", "spriteWidth", "spriteHeight", "kernelMode", "bgColor", "twoSpriteMode", "twoSpriteControls", "activeSpriteTabs", "selectSpriteA", "selectSpriteB", "offsetControls", "spriteOffsetXRow", "spriteOffsetYRow", "timelineFrameRepeat", "applyRepeatAll",
     "playerAssignment0", "playerAssignment0Row", "playerAssignment0Label", "playerAssignment1", "playerAssignment1Row", "spriteNusizLabel", "spriteNusiz", "spriteSolidColorRow", "spriteSolidColor", "spriteOffsetX", "spriteOffsetY", "applySizeAll", "applyOffsetsAll", "swapPlayers", "copyP0P1", "copyColorsP0P1", "mirrorP0P1", "fillShapes", "mirrorDraw", "brushWidth", "brushHeight", "undo", "redo",
     "nudgePixels", "nudgeColors", "scaleStep", "stretchHDown", "stretchHUp", "stretchVDown", "stretchVUp", "scaleUniformDown", "scaleUniformUp", "flipH", "flipV", "flipColor", "rotateL", "rotateR", "rotateAngle", "grow", "shrink", "clearFrame",
@@ -3618,7 +3778,7 @@ function cacheElements() {
     "removeFrame", "moveFrameLeft", "moveFrameRight", "reverseFrames", "framesList", "currentColorSwatch", "currentColor",
     "palettePanel", "palette", "displayRegion", "paletteEyedropper", "colorBlocks", "stamps", "newColorBlock", "newStamp", "colorBlockEditor", "colorBlockEditorTitle", "colorBlockEditorHeight", "colorBlockEditorLines", "colorBlockHueOffset", "colorBlockHueOffsetValue", "colorBlockLightnessOffset", "colorBlockLightnessOffsetValue", "saveColorBlockEdit", "saveColorBlockCopy", "stampEditor", "stampEditorTitle", "stampEditorWidth", "stampEditorHeight", "stampEditorZoom", "stampEditorReadout", "stampEditorCanvasContainer", "stampEditorCanvas", "stampEditorPreviewCanvas", "saveStampEdit", "saveStampCopy",
     "refFile", "loadReference", "loadReferenceA", "loadReferenceB", "referenceImportSingle", "referenceImportDual", "refControls", "refOpacity", "refScale", "refX", "refY", "threshold", "refDither", "refFitMode", "refBrightness", "refContrast", "referenceTransform", "resetReferenceDefaults", "applyReferenceTransformAll", "toggleReference", "extractShape",
-    "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "bbExportMode", "exportBbData", "exportBbDemo", "bbImportHelp", "codeText", "copyCode", "downloadBas",
+    "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "bbExportMode", "bbExportScope", "exportBbData", "exportBbDemo", "exportBbCurrent", "exportBbAll", "bbImportHelp", "codeText", "copyCode", "downloadBas",
     "importFromText", "codeDiagnostics", "textDialog", "textToolText", "textToolX", "textToolY", "textDirection", "placeText",
     "statusKernel", "statusFrame", "statusMessage"
   ].forEach(id => el[id] = document.getElementById(id === "fullscreenButton" ? "btn-fullscreen" : id));

@@ -1,4 +1,4 @@
-import { normalizeAtariCode, YAJA_BB_FORMAT_VERSION, YAJA_COORDINATE_SYSTEM } from "./codegen.js";
+import { normalizeAtariCode, YAJA_BB_COLLECTION_FORMAT_VERSION, YAJA_BB_FORMAT_VERSION, YAJA_COORDINATE_SYSTEM } from "./codegen.js";
 
 function parseJsonMarker(line, prefix) {
   if (!line.startsWith(prefix)) return null;
@@ -25,15 +25,13 @@ function parseBlocks(text) {
   return players;
 }
 
-function parseGenerated(text) {
-  const lines = String(text).split(/\r?\n/);
-  const projectLine = lines.find(line => line.startsWith(";@YAJA PROJECT "));
-  if (!projectLine) return null;
-  const meta = parseJsonMarker(projectLine, ";@YAJA PROJECT ");
-  if (meta.formatVersion !== YAJA_BB_FORMAT_VERSION) throw new Error(`YAJA bB format ${meta.formatVersion} is not supported; this version reads format ${YAJA_BB_FORMAT_VERSION}.`);
+function validateCoordinateSystem(meta) {
   if (meta.coordinateSystem && (meta.coordinateSystem.screenYAxis !== YAJA_COORDINATE_SYSTEM.screenYAxis || meta.coordinateSystem.spriteAnchor !== YAJA_COORDINATE_SYSTEM.spriteAnchor)) {
     throw new Error("YAJA bB coordinates must use downward-positive screen Y with a bottom-left sprite anchor.");
   }
+}
+
+function parseGeneratedFrames(lines, meta) {
   const frames = [];
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].startsWith(";@YAJA FRAME_BEGIN ")) continue;
@@ -60,6 +58,80 @@ function parseGenerated(text) {
     i = end;
   }
   if (!frames.length || frames.some(frame => !frame)) throw new Error("Generated YAJA bB data has missing or non-contiguous frames.");
+  return frames;
+}
+
+function parseGeneratedCollection(lines) {
+  const collectionLine = lines.find(line => line.startsWith(";@YAJA COLLECTION "));
+  if (!collectionLine) return null;
+  const collection = parseJsonMarker(collectionLine, ";@YAJA COLLECTION ");
+  if (collection.formatVersion !== YAJA_BB_COLLECTION_FORMAT_VERSION) throw new Error(`YAJA collection format ${collection.formatVersion} is not supported; this version reads format ${YAJA_BB_COLLECTION_FORMAT_VERSION}.`);
+  const animations = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith(";@YAJA ANIMATION_BEGIN ")) continue;
+    const marker = lines[i].match(/^;@YAJA ANIMATION_BEGIN\s+(\d+)\s+(.+)$/);
+    if (!marker) throw new Error(`Malformed YAJA animation marker on line ${i + 1}.`);
+    const index = Number(marker[1]);
+    let animationMeta;
+    try { animationMeta = JSON.parse(marker[2]); } catch (error) { throw new Error(`Animation ${index} metadata is invalid JSON: ${error.message}`); }
+    const end = lines.findIndex((line, n) => n > i && line === `;@YAJA ANIMATION_END ${index}`);
+    if (end < 0) throw new Error(`Animation ${index} is missing its YAJA animation-end marker.`);
+    const animationLines = lines.slice(i + 1, end);
+    const nestedProjectLine = animationLines.find(line => line.startsWith(";@YAJA PROJECT "));
+    const nested = nestedProjectLine ? parseJsonMarker(nestedProjectLine, ";@YAJA PROJECT ") : {};
+    const meta = {
+      ...nested,
+      kernel: collection.kernel,
+      region: collection.region,
+      background: collection.background,
+      animationName: animationMeta.name,
+      assignments: animationMeta.assignments,
+      activeSlots: animationMeta.activeSlots,
+      twoSpriteMode: animationMeta.twoSpriteMode,
+      compositionModel: collection.compositionModel || "adjacent"
+    };
+    validateCoordinateSystem(meta);
+    animations[index] = {
+      id: String(animationMeta.id || `animation-${index + 1}`),
+      name: String(animationMeta.name || `Untitled Animation${index ? ` ${index + 1}` : ""}`),
+      frames: parseGeneratedFrames(animationLines, meta),
+      currentFrame: 0,
+      twoSpriteMode: !!animationMeta.twoSpriteMode,
+      activePlayer: animationMeta.activeSlots?.[0] === 1 ? 1 : 0,
+      playerAssignments: animationMeta.assignments || [0, 1]
+    };
+    i = end;
+  }
+  if (!animations.length || animations.some(animation => !animation)) throw new Error("Generated YAJA collection has missing or non-contiguous animations.");
+  const activeAnimationId = animations.some(animation => animation.id === collection.activeAnimationId) ? collection.activeAnimationId : animations[0].id;
+  return {
+    generated: true,
+    players: [],
+    project: {
+      app: "YAJA 2600 Animator",
+      schemaVersion: 10,
+      version: "1.1.0",
+      projectName: collection.projectName,
+      kernel: collection.kernel,
+      region: collection.region,
+      background: collection.background,
+      compositionModel: collection.compositionModel || "adjacent",
+      activeAnimationId,
+      animations
+    }
+  };
+}
+
+function parseGenerated(text) {
+  const lines = String(text).split(/\r?\n/);
+  const collection = parseGeneratedCollection(lines);
+  if (collection) return collection;
+  const projectLine = lines.find(line => line.startsWith(";@YAJA PROJECT "));
+  if (!projectLine) return null;
+  const meta = parseJsonMarker(projectLine, ";@YAJA PROJECT ");
+  if (meta.formatVersion !== YAJA_BB_FORMAT_VERSION) throw new Error(`YAJA bB format ${meta.formatVersion} is not supported; this version reads format ${YAJA_BB_FORMAT_VERSION}.`);
+  validateCoordinateSystem(meta);
+  const frames = parseGeneratedFrames(lines, meta);
   return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "1.0.5", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
 }
 

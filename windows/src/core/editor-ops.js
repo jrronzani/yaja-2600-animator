@@ -36,6 +36,29 @@ export function brushCells(x, y, brushWidth, brushHeight, width = 8, height = 25
   return cells;
 }
 
+// Returns every logical raster cell crossed by a pointer segment. Keeping this
+// independent of browser event frequency makes fast strokes continuous on both
+// the main canvas and the Stamp Editor.
+export function rasterLineCells(x0, y0, x1, y1) {
+  let x = Math.round(Number(x0) || 0);
+  let y = Math.round(Number(y0) || 0);
+  const endX = Math.round(Number(x1) || 0);
+  const endY = Math.round(Number(y1) || 0);
+  const dx = Math.abs(endX - x);
+  const sx = x < endX ? 1 : -1;
+  const dy = -Math.abs(endY - y);
+  const sy = y < endY ? 1 : -1;
+  const cells = [];
+  let error = dx + dy;
+  while (true) {
+    cells.push([x, y]);
+    if (x === endX && y === endY) return cells;
+    const twiceError = 2 * error;
+    if (twiceError >= dy) { error += dy; x += sx; }
+    if (twiceError <= dx) { error += dx; y += sy; }
+  }
+}
+
 // Painter-parity circle geometry: the pointer-down cell is the visual center,
 // while the drag vector determines a radius in rendered (not logical) pixels.
 // Converting that radius back through each cell axis keeps the result circular

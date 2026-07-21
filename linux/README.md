@@ -1,8 +1,53 @@
-# YAJA 2600 Animator v1.0.5
+# YAJA 2600 Animator v1.1.8
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
 
-## v1.0.5 working notes
+## v1.1.8 working notes
+
+- Replaces the Chrome-clipped Project and Theme focus treatment with a complete inset theme ring.
+
+## v1.1.7 working notes
+
+- Raises Project and Theme controls above adjacent header layers and draws their complete border inset, preventing edge clipping.
+
+## v1.1.6 working notes
+
+- Restores complete, theme-aware borders around the Project and Theme header fields.
+
+## v1.1.5 working notes
+
+- Interpolates every raster cell crossed by rapid Pencil and Eraser strokes, preventing skipped pixels.
+- Shares the same raster-line helper with the Stamp Editor, keeping its brush behavior in parity with the main canvas.
+
+## v1.1.4 working notes
+
+- Places focused brush dimension controls above adjacent controls so their theme focus rings never get clipped.
+- Brings the animation-name field focus ring above the dropdown seam while preserving the arrow’s own active layering.
+
+## v1.1.3 working notes
+
+- Overrides the timeline heading’s inherited baseline and gap so all animation-library controls align as one compact row.
+
+## v1.1.2 working notes
+
+- Aligns the animation picker and library actions with the timeline title baseline.
+- Matches picker entries to the animation-name field’s JetBrains Mono treatment.
+- Enlarges the shared down-chevron and layers its highlighted border cleanly over the name field.
+
+## v1.1.1 working notes
+
+- Refines the multi-animation selector into the established 36px timeline-control language.
+- Enlarges the animation-name field, uses the shared down-chevron icon, and gives the menu an opaque theme-aware input surface.
+- Keeps New, Duplicate, and Delete at standard timeline-tool dimensions with compact, even spacing.
+
+## v1.1.0 working notes
+
+- Projects can contain multiple named animations with editable switching, blank creation, duplication, and deletion.
+- Legacy single-animation projects migrate into the first animation slot without losing frame data or settings.
+- bB export supports the current animation or an all-animation selector library; demos switch animations with joystick Up/Down.
+- Timeline thumbnails remain individually selectable after duplicating one or more frames.
+
+## v1.0.5 notes
 
 - Opens a native Save As picker in supported browsers instead of silently downloading projects to the default folder.
 - Shares the most recently used project folder between Save and Open, matching YAJA Painter.

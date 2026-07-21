@@ -3,6 +3,7 @@ import { centeredCompositionGeometry, NUSIZ_MODES as NUSIZ, nusizMode } from "./
 const KERNELS = ["STANDARD", "MULTISPRITE", "DPC+", "PXE"];
 const DISPLAY_ROWS = { STANDARD: 96, MULTISPRITE: 88, "DPC+": 178, PXE: 180 };
 export const YAJA_BB_FORMAT_VERSION = 1;
+export const YAJA_BB_COLLECTION_FORMAT_VERSION = 2;
 export const YAJA_COORDINATE_SYSTEM = Object.freeze({ screenYAxis: "down", spriteAnchor: "bottom-left" });
 
 export function spriteBottomAnchorYDelta(height, yOffset = 0) {
@@ -38,7 +39,7 @@ export function createAnimationIR(project, options = {}) {
   const assignments = normalizePlayerAssignments(project.playerAssignments, kernel);
   const activeSlots = activeSlotsFor(project);
   const animationName = String(project.animationName || project.projectName || "Untitled Animation");
-  const namespace = animationNamespace(animationName);
+  const namespace = options.namespace || animationNamespace(animationName);
   const displayRows = DISPLAY_ROWS[kernel];
   const frames = (project.frames || []).map((frame, frameIndex) => {
     const width = Math.max(1, Math.min(8, Number.parseInt(frame.width, 10) || 8));
@@ -197,11 +198,137 @@ export function emitAnimationDemo(ir) {
 }
 
 export function generateAnimationCode(project, options = {}) {
+  if (options.scope === "all" && Array.isArray(project.animations) && project.animations.length) {
+    return generateAnimationCollectionCode(project, options);
+  }
   const mode = options.mode === "demo" ? "demo" : "data";
   const ir = createAnimationIR(project, { mode });
   const diagnostics = validateAnimationIR(ir);
   const output = diagnostics.some(item => item.severity === "error") ? "" : (mode === "demo" ? emitAnimationDemo(ir) : emitAnimationModule(ir));
   return { ir, diagnostics, output, filename: animationExportFilename(ir.animationName, mode) };
+}
+
+function animationProjectView(project, animation) {
+  return {
+    ...project,
+    animationName: animation.name,
+    frames: animation.frames,
+    currentFrame: animation.currentFrame,
+    twoSpriteMode: animation.twoSpriteMode,
+    activePlayer: animation.activePlayer,
+    playerAssignments: animation.playerAssignments
+  };
+}
+
+function collectionFilename(projectName, mode) {
+  return `${normalizeAnimationBase(projectName)}_AllAnimations_${mode === "demo" ? "Demo" : "Data"}.bas`;
+}
+
+function collectionMetadata(project, irs, mode, namespace) {
+  return JSON.stringify({
+    formatVersion: YAJA_BB_COLLECTION_FORMAT_VERSION,
+    app: "YAJA 2600 Animator",
+    kind: mode,
+    projectName: String(project.projectName || "Untitled Project"),
+    symbol: namespace,
+    kernel: irs[0].kernel,
+    region: irs[0].region,
+    background: irs[0].background,
+    compositionModel: "adjacent",
+    activeAnimationId: project.activeAnimationId,
+    animations: irs.map((ir, index) => ({ id: project.animations[index].id, name: ir.animationName, symbol: ir.namespace }))
+  });
+}
+
+function collectionAnimationMetadata(animation, ir) {
+  return JSON.stringify({
+    id: animation.id,
+    name: ir.animationName,
+    symbol: ir.namespace,
+    assignments: ir.assignments,
+    activeSlots: ir.activeSlots,
+    twoSpriteMode: ir.twoSpriteMode
+  });
+}
+
+function emitCollectionSelector(project, irs, collectionNamespace) {
+  const uniquePlayers = [...new Set(irs.flatMap(ir => ir.activePlayers))].sort((a, b) => a - b);
+  const initLabels = irs.map(ir => ir.namespace + "_Init");
+  const updateLabels = irs.map(ir => ir.namespace + "_Update");
+  const lines = [
+    "; Shared collection runtime: a=frame, b=timer, c/d=pivot, e=active animation.",
+    `  dim ${collectionNamespace}_Active = e`,
+    `  dim ${collectionNamespace}_PivotX = c`,
+    `  dim ${collectionNamespace}_PivotY = d`, "",
+    `${collectionNamespace}_Init`,
+    `  ${collectionNamespace}_Active = 0`,
+    `  goto ${collectionNamespace}_Select`, "",
+    `${collectionNamespace}_Select`,
+    `  if ${collectionNamespace}_Active < ${irs.length} then goto ${collectionNamespace}_SelectValid`,
+    `  ${collectionNamespace}_Active = 0`,
+    `${collectionNamespace}_SelectValid`,
+    `  gosub ${collectionNamespace}_HideAll`,
+    `  on ${collectionNamespace}_Active goto ${initLabels.join(" ")}`, "",
+    `${collectionNamespace}_Update`,
+    `  on ${collectionNamespace}_Active goto ${updateLabels.join(" ")}`, "",
+    `${collectionNamespace}_Next`,
+    `  ${collectionNamespace}_Active = ${collectionNamespace}_Active + 1`,
+    `  if ${collectionNamespace}_Active < ${irs.length} then goto ${collectionNamespace}_Select`,
+    `  ${collectionNamespace}_Active = 0`,
+    `  goto ${collectionNamespace}_Select`, "",
+    `${collectionNamespace}_Previous`,
+    `  if ${collectionNamespace}_Active > 0 then goto ${collectionNamespace}_PreviousDecrement`,
+    `  ${collectionNamespace}_Active = ${irs.length}`,
+    `${collectionNamespace}_PreviousDecrement`,
+    `  ${collectionNamespace}_Active = ${collectionNamespace}_Active - 1`,
+    `  goto ${collectionNamespace}_Select`, "",
+    `${collectionNamespace}_HideAll`
+  ];
+  uniquePlayers.forEach(player => lines.push(`  player${player}y = 255`));
+  lines.push("  return", "");
+  return lines.join("\n");
+}
+
+function emitCollectionModules(project, irs, collectionNamespace, mode) {
+  const lines = [`;@YAJA COLLECTION ${collectionMetadata(project, irs, mode, collectionNamespace)}`, emitCollectionSelector(project, irs, collectionNamespace)];
+  irs.forEach((ir, index) => {
+    lines.push(`;@YAJA ANIMATION_BEGIN ${index} ${collectionAnimationMetadata(project.animations[index], ir)}`);
+    lines.push(emitAnimationModule(ir));
+    lines.push(`;@YAJA ANIMATION_END ${index}`, "");
+  });
+  return lines.join("\n");
+}
+
+function emitCollectionDemo(project, irs, collectionNamespace) {
+  const first = irs[0];
+  const callBank = first.kernel === "DPC+" ? " bank2" : "";
+  const lines = ["; Compilable centered YAJA multi-animation demo", "  const noscore = 1", `  set tv ${first.region.toLowerCase()}`];
+  if (first.kernel === "DPC+") lines.push("  set smartbranching on");
+  if (first.kernel === "MULTISPRITE") lines.push("  set kernel multisprite");
+  else if (first.kernel !== "STANDARD") lines.push(`  set kernel ${first.kernel}`);
+  lines.push("", `  dim ${collectionNamespace}_JoystickLatch = f`, "", "__YAJA_Demo_Start", `  ${collectionNamespace}_PivotX = ${first.defaultOrigin.x}`, `  ${collectionNamespace}_PivotY = ${first.defaultOrigin.y}`, `  ${collectionNamespace}_JoystickLatch = 0`, `  gosub ${collectionNamespace}_Init${callBank}`, "__YAJA_Demo_Loop");
+  if (isSolidKernel(first.kernel)) lines.push(`  COLUBK = ${first.background}`);
+  lines.push("  drawscreen", "  if joy0up then goto __YAJA_Demo_Previous", "  if joy0down then goto __YAJA_Demo_Next", `  ${collectionNamespace}_JoystickLatch = 0`, "  goto __YAJA_Demo_Update", "__YAJA_Demo_Previous", `  if ${collectionNamespace}_JoystickLatch then goto __YAJA_Demo_Update`, `  ${collectionNamespace}_JoystickLatch = 1`, `  gosub ${collectionNamespace}_Previous${callBank}`, "  goto __YAJA_Demo_Update", "__YAJA_Demo_Next", `  if ${collectionNamespace}_JoystickLatch then goto __YAJA_Demo_Update`, `  ${collectionNamespace}_JoystickLatch = 1`, `  gosub ${collectionNamespace}_Next${callBank}`, "__YAJA_Demo_Update", `  gosub ${collectionNamespace}_Update${callBank}`, "  goto __YAJA_Demo_Loop", "");
+  const moduleBank = first.kernel === "DPC+" ? "\n  bank 2\n" : "\n";
+  return `${lines.join("\n")}${moduleBank}${demoBackground(first)}\n${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
+}
+
+export function generateAnimationCollectionCode(project, options = {}) {
+  const mode = options.mode === "demo" ? "demo" : "data";
+  const collectionNamespace = animationNamespace(project.projectName || "Untitled Project");
+  const used = new Set();
+  const irs = project.animations.map(animation => {
+    const base = `${collectionNamespace}_${normalizeAnimationBase(animation.name)}`;
+    let namespace = base;
+    let suffix = 2;
+    while (used.has(namespace.toLowerCase())) namespace = `${base}${suffix++}`;
+    used.add(namespace.toLowerCase());
+    return createAnimationIR(animationProjectView(project, animation), { mode, namespace });
+  });
+  const diagnostics = irs.flatMap((ir, index) => validateAnimationIR(ir).map(item => ({ ...item, animationIndex: index, message: `${ir.animationName}: ${item.message}` })));
+  diagnostics.push({ severity: "info", code: "COLLECTION_RUNTIME", message: `All Animations uses one selected runtime: a-d for frame/timer/pivot, e for the active animation${mode === "demo" ? ", and f for joystick edge input" : ""}.` });
+  const output = diagnostics.some(item => item.severity === "error") ? "" : (mode === "demo" ? emitCollectionDemo(project, irs, collectionNamespace) : emitCollectionModules(project, irs, collectionNamespace, mode));
+  return { ir: { kind: "collection", namespace: collectionNamespace, animations: irs }, diagnostics, output, filename: collectionFilename(project.projectName, mode) };
 }
 
 // Backward-compatible name retained for older integrations/tests.
