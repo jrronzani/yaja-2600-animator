@@ -1,6 +1,19 @@
-# YAJA 2600 Animator v1.1.9
+# YAJA 2600 Animator v1.1.12
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
+
+## v1.1.12 working notes
+
+- Prevents palette swatches from expanding into adjacent cells on hover; hover and active states now use stable inset outlines within fixed grid cells.
+
+## v1.1.11 working notes
+
+- Left-click Fill now fills contiguous empty canvas pixels without erasing existing art; right-click Fill erases a contiguous painted region.
+- Left-click Fill in a scanline color column now fills the connected matching color run, instead of changing only one row.
+
+## v1.1.10 working notes
+
+- Stabilizes scanline-color painting while selecting a new palette color by reconciling only the live color-column row and completing its stroke before palette rerenders.
 
 ## v1.1.9 working notes
 

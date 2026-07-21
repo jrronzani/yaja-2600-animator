@@ -1,0 +1,19 @@
+{
+  "name": "yaja-2600-animator-windows",
+  "productName": "YAJA 2600 Animator",
+  "version": "1.1.9",
+  "description": "Windows desktop build of YAJA 2600 Animator.",
+  "main": "electron-main.js",
+  "private": true,
+  "author": "Nebulords",
+  "license": "MIT",
+  "scripts": {
+    "desktop:start": "electron .",
+    "desktop:portable": "electron-packager . \"YAJA 2600 Animator\" --platform=win32 --arch=x64 --out=dist --overwrite --asar --prune=true --icon=build/icon.ico"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  }
+}

@@ -59,6 +59,41 @@ export function rasterLineCells(x0, y0, x1, y1) {
   }
 }
 
+export function floodFillPixels(pixels, startX, startY, replacement = 1) {
+  const out = (pixels || []).map(row => row.map(value => value ? 1 : 0));
+  const height = out.length;
+  const width = out[0]?.length || 0;
+  const x = Math.trunc(Number(startX));
+  const y = Math.trunc(Number(startY));
+  const fill = replacement ? 1 : 0;
+  if (x < 0 || y < 0 || x >= width || y >= height) return { pixels: out, changed: false };
+  const target = out[y][x];
+  if (target === fill) return { pixels: out, changed: false };
+  const queue = [[x, y]];
+  while (queue.length) {
+    const [cx, cy] = queue.pop();
+    if (cx < 0 || cy < 0 || cx >= width || cy >= height || out[cy][cx] !== target) continue;
+    out[cy][cx] = fill;
+    queue.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+  return { pixels: out, changed: true };
+}
+
+export function floodFillScanlines(colors, startIndex, replacement) {
+  const out = Array.isArray(colors) ? colors.slice() : [];
+  const index = Math.trunc(Number(startIndex));
+  const fill = String(replacement || "$00").toUpperCase();
+  if (index < 0 || index >= out.length) return { colors: out, changed: false };
+  const target = out[index];
+  if (target === fill) return { colors: out, changed: false };
+  let start = index;
+  let end = index;
+  while (start > 0 && out[start - 1] === target) start--;
+  while (end < out.length - 1 && out[end + 1] === target) end++;
+  for (let row = start; row <= end; row++) out[row] = fill;
+  return { colors: out, changed: true, start, end };
+}
+
 // Painter-parity circle geometry: the pointer-down cell is the visual center,
 // while the drag vector determines a radius in rendered (not logical) pixels.
 // Converting that radius back through each cell axis keeps the result circular

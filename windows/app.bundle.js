@@ -795,6 +795,39 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       }
     }
   }
+  function floodFillPixels(pixels, startX, startY, replacement = 1) {
+    const out = (pixels || []).map((row) => row.map((value) => value ? 1 : 0));
+    const height = out.length;
+    const width = out[0]?.length || 0;
+    const x = Math.trunc(Number(startX));
+    const y = Math.trunc(Number(startY));
+    const fill = replacement ? 1 : 0;
+    if (x < 0 || y < 0 || x >= width || y >= height) return { pixels: out, changed: false };
+    const target = out[y][x];
+    if (target === fill) return { pixels: out, changed: false };
+    const queue = [[x, y]];
+    while (queue.length) {
+      const [cx, cy] = queue.pop();
+      if (cx < 0 || cy < 0 || cx >= width || cy >= height || out[cy][cx] !== target) continue;
+      out[cy][cx] = fill;
+      queue.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+    }
+    return { pixels: out, changed: true };
+  }
+  function floodFillScanlines(colors, startIndex, replacement) {
+    const out = Array.isArray(colors) ? colors.slice() : [];
+    const index = Math.trunc(Number(startIndex));
+    const fill = String(replacement || "$00").toUpperCase();
+    if (index < 0 || index >= out.length) return { colors: out, changed: false };
+    const target = out[index];
+    if (target === fill) return { colors: out, changed: false };
+    let start = index;
+    let end = index;
+    while (start > 0 && out[start - 1] === target) start--;
+    while (end < out.length - 1 && out[end + 1] === target) end++;
+    for (let row = start; row <= end; row++) out[row] = fill;
+    return { colors: out, changed: true, start, end };
+  }
   function visualCircleGeometry(x0, y0, x1, y1, cellWidth = 1, cellHeight = 1) {
     const cw = Math.max(1e-4, Math.abs(Number(cellWidth) || 1));
     const ch = Math.max(1e-4, Math.abs(Number(cellHeight) || 1));
@@ -2558,7 +2591,8 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       return;
     }
     if (tool === "fill" && isStart) {
-      floodFill(cell.col, cell.row, currentPlayer().pixels[cell.row][cell.col] ? 0 : 1);
+      const result = floodFillPixels(currentPlayer().pixels, cell.col, cell.row, rightEraseStroke ? 0 : 1);
+      currentPlayer().pixels = result.pixels;
       return;
     }
     if (tool === "stamp") {
@@ -2676,18 +2710,14 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
   function pointInSelection(cell, rect) {
     return selectionContains(rect, cell.col, cell.row);
   }
-  function floodFill(x, y, value) {
-    const player = currentPlayer();
-    const target = player.pixels[y][x];
-    if (target === value) return;
-    const stack = [[x, y]];
-    while (stack.length) {
-      const [cx, cy] = stack.pop();
-      if (cx < 0 || cx >= state.width || cy < 0 || cy >= state.height) continue;
-      if (player.pixels[cy][cx] !== target) continue;
-      player.pixels[cy][cx] = value;
-      stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
-    }
+  function floodFillColorRows(y, playerIndex = state.activePlayer, erase = false) {
+    const player = currentFrame().players[playerIndex];
+    const result = floodFillScanlines(player.colors, y, erase ? "$00" : state.currentColor);
+    if (!result.changed) return;
+    player.colors = result.colors;
+    renderRowColors();
+    renderEditor();
+    if (el.previewCanvas) renderPreview();
   }
   function renderRowColors() {
     el.editorZone.classList.toggle("show-grid", state.showGrid);
@@ -2741,6 +2771,9 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
           colorSelection = { player: playerIndex, mask, start: y, end: y };
           isSelectingColors = true;
           renderRowColors();
+        } else if (state.tool === "fill" && activeColorBlockIndex === null) {
+          pushHistory();
+          floodFillColorRows(y, playerIndex, e.button === 2);
         } else if (activeColorBlockIndex !== null) {
           pushHistory();
           isPaintingColorBlock = true;
@@ -2772,6 +2805,7 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       });
       row.addEventListener("contextmenu", (e) => {
         e.preventDefault();
+        if (state.tool === "fill" && activeColorBlockIndex === null) return;
         state.currentColor = player.colors[y];
         syncControls();
       });
@@ -2796,13 +2830,29 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
     }
   }
   function paintRowColor(y, playerIndex = state.activePlayer, rowElement = null) {
-    currentFrame().players[playerIndex].colors[y] = state.currentColor;
-    if (rowElement) {
-      rowElement.lastElementChild.style.background = colorHex(state.currentColor);
-      rowElement.title = `Row ${y}: ${state.currentColor}`;
-    } else renderRowColors();
+    const color = normalizeCode(state.currentColor, "$48");
+    currentFrame().players[playerIndex].colors[y] = color;
+    const liveRow = el[`rowColors${playerIndex}`]?.querySelector(`.color-row[data-row="${y}"]`);
+    if (liveRow) {
+      liveRow.lastElementChild.style.background = colorHex(color);
+      liveRow.title = `Row ${y}: ${color}`;
+    } else {
+      renderRowColors();
+    }
     renderEditor();
     if (el.previewCanvas) renderPreview();
+  }
+  function reconcileRenderedRowColors() {
+    if (activeColorBlockIndex !== null) return;
+    [0, 1].forEach((playerIndex) => {
+      const player = currentFrame().players[playerIndex];
+      el[`rowColors${playerIndex}`]?.querySelectorAll(".color-row[data-row]").forEach((row) => {
+        const y = Number(row.dataset.row);
+        const color = normalizeCode(player.colors[y], "$48");
+        row.lastElementChild.style.background = colorHex(color);
+        row.title = `Row ${y}: ${color}`;
+      });
+    });
   }
   function renderPalette() {
     el.palette.innerHTML = "";
@@ -2833,6 +2883,10 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
         btn.style.background = palette[code];
         btn.title = code;
         btn.addEventListener("click", () => {
+          if (isPaintingRowColors) {
+            isPaintingRowColors = false;
+            renderRowColors();
+          }
           state.currentColor = code;
           if (usesSolidColor()) currentPlayer().solidColor = code;
           paletteEyedropperArmed = false;
@@ -5094,6 +5148,8 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       clearSelectionState();
       renderAll();
     });
+    document.addEventListener("pointerup", endPointer, true);
+    document.addEventListener("pointercancel", endPointer, true);
     window.addEventListener("pointerup", endPointer);
     el.toolGrid.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-tool]");
@@ -5282,6 +5338,9 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       state.tool = "picker";
       syncControls();
       renderAll();
+    });
+    el.palette.addEventListener("pointerover", (event) => {
+      if (event.target.closest(".persistent-swatch")) reconcileRenderedRowColors();
     });
     el.colorBlockEditorHeight.addEventListener("change", resizeColorBlockEditor);
     el.colorBlockHueOffset.addEventListener("input", () => {

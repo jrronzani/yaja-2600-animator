@@ -4,3 +4,11 @@ test-results/
 tests/
 .chrome-profile*/
 *.log
+.publish/
+windows/.gitignore
+macos/.gitignore
+linux/.gitignore
+windows/HOW TO INSTALL ON MACOS.md
+windows/HOW TO RUN ON LINUX.md
+macos/HOW TO RUN ON LINUX.md
+linux/HOW TO INSTALL ON MACOS.md

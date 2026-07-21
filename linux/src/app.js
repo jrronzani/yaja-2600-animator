@@ -1,7 +1,7 @@
 import { animationExportFilename, generateAnimationCode } from "./core/codegen.js";
 import { CURRENT_SCHEMA_VERSION, migrateProject, normalizePlayerAssignments, playerLimitForKernel } from "./core/project-model.js";
 import { createRotationSession } from "./core/sprite-transform.js";
-import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, rasterLineCells, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
+import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, floodFillPixels, floodFillScanlines, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, rasterLineCells, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
 import { parseBatariBasicSpriteData } from "./core/bb-parser.js";
 import { applyTheme, getPreferredTheme, normalizeThemeId } from "./themes.js";
 import { buildStoredZip } from "./core/zip.js";
@@ -858,7 +858,8 @@ function applyToolAt(cell, isStart) {
     return;
   }
   if (tool === "fill" && isStart) {
-    floodFill(cell.col, cell.row, currentPlayer().pixels[cell.row][cell.col] ? 0 : 1);
+    const result = floodFillPixels(currentPlayer().pixels, cell.col, cell.row, rightEraseStroke ? 0 : 1);
+    currentPlayer().pixels = result.pixels;
     return;
   }
   if (tool === "stamp") {
@@ -1000,18 +1001,14 @@ function pointInSelection(cell, rect) {
   return selectionContains(rect, cell.col, cell.row);
 }
 
-function floodFill(x, y, value) {
-  const player = currentPlayer();
-  const target = player.pixels[y][x];
-  if (target === value) return;
-  const stack = [[x, y]];
-  while (stack.length) {
-    const [cx, cy] = stack.pop();
-    if (cx < 0 || cx >= state.width || cy < 0 || cy >= state.height) continue;
-    if (player.pixels[cy][cx] !== target) continue;
-    player.pixels[cy][cx] = value;
-    stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
-  }
+function floodFillColorRows(y, playerIndex = state.activePlayer, erase = false) {
+  const player = currentFrame().players[playerIndex];
+  const result = floodFillScanlines(player.colors, y, erase ? "$00" : state.currentColor);
+  if (!result.changed) return;
+  player.colors = result.colors;
+  renderRowColors();
+  renderEditor();
+  if (el.previewCanvas) renderPreview();
 }
 
 function renderRowColors() {
@@ -1067,6 +1064,9 @@ function renderPlayerRowColors(playerIndex, container) {
         colorSelection = { player: playerIndex, mask, start: y, end: y };
         isSelectingColors = true;
         renderRowColors();
+      } else if (state.tool === "fill" && activeColorBlockIndex === null) {
+        pushHistory();
+        floodFillColorRows(y, playerIndex, e.button === 2);
       } else if (activeColorBlockIndex !== null) {
         pushHistory();
         isPaintingColorBlock = true;
@@ -1095,6 +1095,7 @@ function renderPlayerRowColors(playerIndex, container) {
     });
     row.addEventListener("contextmenu", e => {
       e.preventDefault();
+      if (state.tool === "fill" && activeColorBlockIndex === null) return;
       state.currentColor = player.colors[y];
       syncControls();
     });
@@ -1121,13 +1122,37 @@ function renderColorSelectionOverlay(container, playerIndex, cellH) {
 }
 
 function paintRowColor(y, playerIndex = state.activePlayer, rowElement = null) {
-  currentFrame().players[playerIndex].colors[y] = state.currentColor;
-  if (rowElement) {
-    rowElement.lastElementChild.style.background = colorHex(state.currentColor);
-    rowElement.title = `Row ${y}: ${state.currentColor}`;
-  } else renderRowColors();
+  const color = normalizeCode(state.currentColor, "$48");
+  currentFrame().players[playerIndex].colors[y] = color;
+
+  // Rows are rebuilt by several independent UI updates (palette, frames, assets).
+  // Never repaint a retained row reference: it can belong to a previous render and
+  // briefly show stale scanline data when the pointer subsequently crosses the palette.
+  const liveRow = el[`rowColors${playerIndex}`]?.querySelector(`.color-row[data-row="${y}"]`);
+  if (liveRow) {
+    liveRow.lastElementChild.style.background = colorHex(color);
+    liveRow.title = `Row ${y}: ${color}`;
+  } else {
+    renderRowColors();
+  }
   renderEditor();
   if (el.previewCanvas) renderPreview();
+}
+
+function reconcileRenderedRowColors() {
+  // Palette hover must never use the transient paint color as a row preview.
+  // Reconcile the already rendered scanline swatches from the authoritative frame
+  // data without rebuilding them or disturbing an armed Color Block preview.
+  if (activeColorBlockIndex !== null) return;
+  [0, 1].forEach(playerIndex => {
+    const player = currentFrame().players[playerIndex];
+    el[`rowColors${playerIndex}`]?.querySelectorAll(".color-row[data-row]").forEach(row => {
+      const y = Number(row.dataset.row);
+      const color = normalizeCode(player.colors[y], "$48");
+      row.lastElementChild.style.background = colorHex(color);
+      row.title = `Row ${y}: ${color}`;
+    });
+  });
 }
 
 function renderPalette() {
@@ -1159,6 +1184,12 @@ function renderPalette() {
     btn.style.background = palette[code];
     btn.title = code;
     btn.addEventListener("click", () => {
+      // A palette click must always close a completed scanline stroke before any
+      // palette/project rerender replaces the color-column DOM.
+      if (isPaintingRowColors) {
+        isPaintingRowColors = false;
+        renderRowColors();
+      }
       state.currentColor = code;
       if (usesSolidColor()) currentPlayer().solidColor = code;
       paletteEyedropperArmed = false;
@@ -3418,6 +3449,10 @@ function bindEvents() {
     clearSelectionState();
     renderAll();
   });
+  // Capture phase makes stroke cleanup reliable even when a palette swatch or
+  // another control receives the terminating pointer event.
+  document.addEventListener("pointerup", endPointer, true);
+  document.addEventListener("pointercancel", endPointer, true);
   window.addEventListener("pointerup", endPointer);
   el.toolGrid.addEventListener("click", e => {
     const btn = e.target.closest("[data-tool]");
@@ -3561,6 +3596,9 @@ function bindEvents() {
     state.tool = "picker";
     syncControls();
     renderAll();
+  });
+  el.palette.addEventListener("pointerover", event => {
+    if (event.target.closest(".persistent-swatch")) reconcileRenderedRowColors();
   });
   el.colorBlockEditorHeight.addEventListener("change", resizeColorBlockEditor);
   el.colorBlockHueOffset.addEventListener("input", () => { colorBlockEditorHueOffset = Math.max(0, Math.min(15, Number(el.colorBlockHueOffset.value) || 0)); renderColorBlockEditor(); });

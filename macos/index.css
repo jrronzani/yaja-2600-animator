@@ -4714,7 +4714,7 @@ dialog.color-block-editor-popover[open] {
   box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
 }
 
-/* YAJA 2600 Animator v1.1.9 - timeline picker is part of the heading flow.
+/* YAJA 2600 Animator v1.1.10 - timeline picker is part of the heading flow.
    It stays on the title line while space permits and gains its own row before
    it can ever overlap the playback/frame controls. */
 .timeline-heading {
@@ -4775,4 +4775,38 @@ dialog.color-block-editor-popover[open] {
     grid-column: 1 / -1;
     grid-row: 2;
   }
+}
+
+/* YAJA 2600 Animator v1.1.12 - Palette swatches are fixed grid cells.
+   Hover and selection use inset treatments so they cannot expand into, clip,
+   or visually merge with their neighboring palette row. */
+#palette.persistent-palette-grid {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+#palette .persistent-swatch {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 22px;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  transform: none !important;
+  transition: box-shadow .1s ease, border-color .1s ease;
+}
+
+#palette .persistent-swatch:hover {
+  z-index: auto;
+  transform: none !important;
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--theme-text) !important;
+}
+
+#palette .persistent-swatch.active,
+#palette .persistent-swatch.selected,
+#palette .persistent-swatch.active:hover,
+#palette .persistent-swatch.selected:hover {
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
 }
