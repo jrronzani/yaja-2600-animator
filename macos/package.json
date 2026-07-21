@@ -1,7 +1,7 @@
 {
   "name": "yaja-2600-animator-macos",
   "productName": "YAJA 2600 Animator",
-  "version": "1.1.12",
+  "version": "1.1.17",
   "description": "macOS desktop build of YAJA 2600 Animator.",
   "main": "electron-main.js",
   "private": true,

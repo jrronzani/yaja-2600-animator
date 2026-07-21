@@ -252,12 +252,59 @@
     const cellH = Math.max(minimumHeight, scale * stretch);
     return { cellW: scale * ATARI_PIXEL_ASPECT, cellH };
   }
-  function rasterCellRect(cellW, cellH, x, y, offsetX = 0, offsetY = 0) {
-    const left = Math.round(offsetX + x * cellW);
-    const right = Math.round(offsetX + (x + 1) * cellW);
-    const top = Math.round(offsetY + y * cellH);
-    const bottom = Math.round(offsetY + (y + 1) * cellH);
-    return { x: left, y: top, w: Math.max(1, right - left), h: Math.max(1, bottom - top) };
+  function timelineThumbnailGeometry(viewportWidth, viewportHeight, columns, rows, verticalStretch = 1, padding = 4, horizontalScale = 1) {
+    const width = Math.max(1, Number(viewportWidth) || 1);
+    const height = Math.max(1, Number(viewportHeight) || 1);
+    const cols = Math.max(1, Number.parseInt(columns, 10) || 1);
+    const lineCount = Math.max(1, Number.parseInt(rows, 10) || 1);
+    const stretch = Math.max(1, Number(verticalStretch) || 1);
+    const widthScale = Math.max(1, Number(horizontalScale) || 1);
+    const inset = Math.max(0, Math.min(Number(padding) || 0, width / 2, height / 2));
+    const availableWidth = Math.max(1, width - inset * 2);
+    const availableHeight = Math.max(1, height - inset * 2);
+    const scale = Math.min(availableWidth / (cols * ATARI_PIXEL_ASPECT * widthScale), availableHeight / (lineCount * stretch));
+    const cellW = scale * ATARI_PIXEL_ASPECT * widthScale;
+    const cellH = scale * stretch;
+    const surfaceWidth = cols * cellW;
+    const surfaceHeight = lineCount * cellH;
+    return {
+      x: (width - surfaceWidth) / 2,
+      y: (height - surfaceHeight) / 2,
+      cellW,
+      cellH,
+      surfaceWidth,
+      surfaceHeight
+    };
+  }
+  function rasterSurfaceGeometry(cellW, cellH, columns, rows, pixelRatio = 1) {
+    const ratio = Math.max(1, Number(pixelRatio) || 1);
+    const cols = Math.max(1, Number.parseInt(columns, 10) || 1);
+    const lineCount = Math.max(1, Number.parseInt(rows, 10) || 1);
+    const deviceWidth = Math.max(1, Math.round(cellW * cols * ratio));
+    const deviceHeight = Math.max(1, Math.round(cellH * lineCount * ratio));
+    const width = deviceWidth / ratio;
+    const height = deviceHeight / ratio;
+    return {
+      pixelRatio: ratio,
+      deviceWidth,
+      deviceHeight,
+      width,
+      height,
+      cellW: width / cols,
+      cellH: height / lineCount
+    };
+  }
+  function rasterCellBoundary(cellSize, index, offset = 0, pixelRatio = 1) {
+    const ratio = Math.max(1, Number(pixelRatio) || 1);
+    return Math.round((offset + index * cellSize) * ratio) / ratio;
+  }
+  function rasterCellRect(cellW, cellH, x, y, offsetX = 0, offsetY = 0, pixelRatio = 1) {
+    const ratio = Math.max(1, Number(pixelRatio) || 1);
+    const left = rasterCellBoundary(cellW, x, offsetX, ratio);
+    const right = rasterCellBoundary(cellW, x + 1, offsetX, ratio);
+    const top = rasterCellBoundary(cellH, y, offsetY, ratio);
+    const bottom = rasterCellBoundary(cellH, y + 1, offsetY, ratio);
+    return { x: left, y: top, w: Math.max(1 / ratio, right - left), h: Math.max(1 / ratio, bottom - top) };
   }
 
   // src/core/codegen.js
@@ -2106,12 +2153,24 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
     return { w: 1.7, h: 1, label: `${state.kernel} pixel aspect 1.7:1` };
   }
   function layout() {
-    const { cellW, cellH } = canvasCellSize(state.zoom, state.verticalStretch, state.kernel === "STANDARD" ? 2 : 1);
+    const requested = canvasCellSize(state.zoom, state.verticalStretch, state.kernel === "STANDARD" ? 2 : 1);
     const p0 = 0, p1 = 0, cols = state.width;
-    return { cellW, cellH, p0, p1, cols, rows: state.height, w: cols * cellW, h: state.height * cellH };
+    const surface = rasterSurfaceGeometry(requested.cellW, requested.cellH, cols, state.height, window.devicePixelRatio || 1);
+    return {
+      cellW: surface.cellW,
+      cellH: surface.cellH,
+      p0,
+      p1,
+      cols,
+      rows: state.height,
+      w: surface.width,
+      h: surface.height,
+      dpr: surface.pixelRatio,
+      deviceW: surface.deviceWidth,
+      deviceH: surface.deviceHeight
+    };
   }
-  function setCanvasSize(canvas, cssW, cssH) {
-    const dpr = window.devicePixelRatio || 1;
+  function setCanvasSize(canvas, cssW, cssH, dpr = window.devicePixelRatio || 1) {
     canvas.style.width = `${cssW}px`;
     canvas.style.height = `${cssH}px`;
     canvas.width = Math.max(1, Math.round(cssW * dpr));
@@ -2122,7 +2181,7 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
     return ctx;
   }
   function fillRasterCell(ctx, l, x, y, offsetX = 0, offsetY = 0) {
-    const rect = rasterCellRect(l.cellW, l.cellH, x, y, offsetX, offsetY);
+    const rect = rasterCellRect(l.cellW, l.cellH, x, y, offsetX, offsetY, l.dpr);
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     return rect;
   }
@@ -2180,7 +2239,7 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       const scale = NUSIZ_MODES[player.nusiz].scale;
       const l = { ...base, p0: 0, p1: 0, cols: state.width, cellW: base.cellW * scale, w: state.width * base.cellW * scale };
       const canvas = playerIndex ? el.spriteCanvas1 : el.spriteCanvas;
-      const ctx = setCanvasSize(canvas, l.w, l.h);
+      const ctx = setCanvasSize(canvas, l.w, l.h, l.dpr);
       if (!state.twoSpriteMode) {
         ctx.fillStyle = colorHex(state.background);
         ctx.fillRect(0, 0, l.w, l.h);
@@ -2188,12 +2247,12 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       if (playerIndex === state.activePlayer) drawReference(ctx, l, playerIndex);
       if (state.onion && state.frames.length > 1) drawOnion(ctx, l, playerIndex);
       drawPlayer(ctx, l, playerIndex, 1);
+      if (state.showGrid) drawGrid(ctx, l);
       if (playerIndex === state.activePlayer) {
         drawSelection(ctx, l);
         drawStampPlacementPreview(ctx, l);
         drawBrushGhost(ctx, l);
       }
-      if (state.showGrid) drawGrid(ctx, l);
       group.style.transform = `translate(${player.xOffset * base.cellW}px, ${player.yOffset * base.cellH}px)`;
       el[`p${playerIndex}ColorsColumn`].style.transform = `translateY(${player.yOffset * base.cellH}px)`;
       group.style.zIndex = state.playerAssignments[playerIndex] === 0 ? "3" : playerIndex === 0 ? "2" : "1";
@@ -2205,9 +2264,16 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
     ctx.save();
     ctx.fillStyle = erase ? "rgba(255,90,90,.28)" : "rgba(255,255,255,.35)";
     ctx.strokeStyle = erase ? "rgba(255,110,110,.9)" : "rgba(255,255,255,.9)";
+    ctx.lineWidth = 1 / l.dpr;
+    const halfDevicePixel = 0.5 / l.dpr;
     brushCells(lastCell.col, lastCell.row, state.brushWidth, state.brushHeight, state.width, state.height).forEach(([x, y]) => {
       const rect = fillRasterCell(ctx, l, x, y);
-      ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+      ctx.strokeRect(
+        rect.x + halfDevicePixel,
+        rect.y + halfDevicePixel,
+        Math.max(0, rect.w - 1 / l.dpr),
+        Math.max(0, rect.h - 1 / l.dpr)
+      );
     });
     ctx.restore();
   }
@@ -2314,17 +2380,22 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
     ctx.save();
     const gridStyle = getComputedStyle(document.documentElement);
     ctx.strokeStyle = gridStyle.getPropertyValue("--canvas-grid-line").trim() || "rgba(255,255,255,.15)";
-    ctx.lineWidth = Number.parseFloat(gridStyle.getPropertyValue("--canvas-grid-line-width")) || 1;
+    const requestedLineWidth = Number.parseFloat(gridStyle.getPropertyValue("--canvas-grid-line-width")) || 1;
+    const deviceLineWidth = Math.max(1, Math.round(requestedLineWidth * l.dpr));
+    ctx.lineWidth = deviceLineWidth / l.dpr;
+    const halfLine = deviceLineWidth / (2 * l.dpr);
     for (let x = 1; x < l.cols; x++) {
+      const boundary = rasterCellBoundary(l.cellW, x, 0, l.dpr);
       ctx.beginPath();
-      ctx.moveTo(x * l.cellW + 0.5, 0);
-      ctx.lineTo(x * l.cellW + 0.5, l.h);
+      ctx.moveTo(boundary + halfLine, 0);
+      ctx.lineTo(boundary + halfLine, l.h);
       ctx.stroke();
     }
     for (let y = 1; y < l.rows; y++) {
+      const boundary = rasterCellBoundary(l.cellH, y, 0, l.dpr);
       ctx.beginPath();
-      ctx.moveTo(0, y * l.cellH + 0.5);
-      ctx.lineTo(l.w, y * l.cellH + 0.5);
+      ctx.moveTo(0, boundary + halfLine);
+      ctx.lineTo(l.w, boundary + halfLine);
       ctx.stroke();
     }
     ctx.restore();
@@ -3042,8 +3113,8 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
       item.className = `frame-thumb${index === state.currentFrame ? " active" : ""}${selectedFrames.has(index) ? " selected" : ""}`;
       item.dataset.index = index;
       const canvas = document.createElement("canvas");
-      canvas.width = 70;
-      canvas.height = 54;
+      canvas.width = 84;
+      canvas.height = 64;
       drawFrameThumb(canvas, frame);
       const label = document.createElement("div");
       label.className = "frame-thumb-label";
@@ -3194,18 +3265,30 @@ ${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
     ctx.fillStyle = colorHex(state.background);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const rows = frame.height || frame.players[0].pixels.length;
-    const py = Math.max(1, Math.floor((canvas.height - 6) / rows));
-    const px = state.twoSpriteMode ? 3 : 5;
-    const y0 = Math.floor((canvas.height - rows * py) / 2);
+    const columns = Math.max(1, Math.min(8, frame.width || state.width || 8));
     if (state.twoSpriteMode) {
-      drawThumbPlayer(ctx, frame.players[0], 7, y0, 3, py, rows);
-      drawThumbPlayer(ctx, frame.players[1], 39, y0, 3, py, rows);
-    } else drawThumbPlayer(ctx, frame.players[state.activePlayer], 15, y0, px, py, rows);
+      const gap = 4;
+      const slotWidth = (canvas.width - gap) / 2;
+      const first = timelineThumbnailGeometry(slotWidth, canvas.height, columns, rows, state.verticalStretch, 3, NUSIZ_MODES[frame.players[0].nusiz].scale);
+      const second = timelineThumbnailGeometry(slotWidth, canvas.height, columns, rows, state.verticalStretch, 3, NUSIZ_MODES[frame.players[1].nusiz].scale);
+      drawThumbPlayer(ctx, frame.players[0], first.x, first.y, first.cellW, first.cellH, rows, columns);
+      drawThumbPlayer(ctx, frame.players[1], slotWidth + gap + second.x, second.y, second.cellW, second.cellH, rows, columns);
+    } else {
+      const player = frame.players[state.activePlayer];
+      const geometry = timelineThumbnailGeometry(canvas.width, canvas.height, columns, rows, state.verticalStretch, 4, NUSIZ_MODES[player.nusiz].scale);
+      drawThumbPlayer(ctx, player, geometry.x, geometry.y, geometry.cellW, geometry.cellH, rows, columns);
+    }
   }
-  function drawThumbPlayer(ctx, player, ox, oy, px, py, rows = state.height) {
+  function drawThumbPlayer(ctx, player, ox, oy, px, py, rows = state.height, columns = state.width) {
     for (let y = 0; y < rows; y++) {
       ctx.fillStyle = colorHex(["STANDARD", "MULTISPRITE"].includes(state.kernel) ? player.solidColor : player.colors[y]);
-      for (let x = 0; x < 8; x++) if (player.pixels[y][x]) ctx.fillRect(ox + x * px, oy + y * py, px, py);
+      for (let x = 0; x < columns; x++) if (player.pixels[y]?.[x]) {
+        const left = Math.round(ox + x * px);
+        const right = Math.round(ox + (x + 1) * px);
+        const top = Math.round(oy + y * py);
+        const bottom = Math.round(oy + (y + 1) * py);
+        ctx.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
+      }
     }
   }
   function renderAssets() {

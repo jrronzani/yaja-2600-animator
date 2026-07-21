@@ -36,12 +36,68 @@ export function canvasCellSize(zoom, verticalStretch = 1, minimumHeight = 1) {
   return { cellW: scale * ATARI_PIXEL_ASPECT, cellH };
 }
 
-// Round shared cell edges rather than each cell's size independently so
-// adjacent filled pixels meet at exactly the same device-pixel boundary.
-export function rasterCellRect(cellW, cellH, x, y, offsetX = 0, offsetY = 0) {
-  const left = Math.round(offsetX + x * cellW);
-  const right = Math.round(offsetX + (x + 1) * cellW);
-  const top = Math.round(offsetY + y * cellH);
-  const bottom = Math.round(offsetY + (y + 1) * cellH);
-  return { x: left, y: top, w: Math.max(1, right - left), h: Math.max(1, bottom - top) };
+// Fit a sprite into a timeline preview without changing the visual pixel ratio
+// used by the editor canvas. The returned cells may be fractional because the
+// preview is intentionally letterboxed instead of stretched to fill its box.
+export function timelineThumbnailGeometry(viewportWidth, viewportHeight, columns, rows, verticalStretch = 1, padding = 4, horizontalScale = 1) {
+  const width = Math.max(1, Number(viewportWidth) || 1);
+  const height = Math.max(1, Number(viewportHeight) || 1);
+  const cols = Math.max(1, Number.parseInt(columns, 10) || 1);
+  const lineCount = Math.max(1, Number.parseInt(rows, 10) || 1);
+  const stretch = Math.max(1, Number(verticalStretch) || 1);
+  const widthScale = Math.max(1, Number(horizontalScale) || 1);
+  const inset = Math.max(0, Math.min(Number(padding) || 0, width / 2, height / 2));
+  const availableWidth = Math.max(1, width - inset * 2);
+  const availableHeight = Math.max(1, height - inset * 2);
+  const scale = Math.min(availableWidth / (cols * ATARI_PIXEL_ASPECT * widthScale), availableHeight / (lineCount * stretch));
+  const cellW = scale * ATARI_PIXEL_ASPECT * widthScale;
+  const cellH = scale * stretch;
+  const surfaceWidth = cols * cellW;
+  const surfaceHeight = lineCount * cellH;
+  return {
+    x: (width - surfaceWidth) / 2,
+    y: (height - surfaceHeight) / 2,
+    cellW,
+    cellH,
+    surfaceWidth,
+    surfaceHeight
+  };
+}
+
+// Snap the complete surface to its backing store first, then derive its CSS
+// cell dimensions. This prevents fractional browser scaling from creating a
+// midpoint seam between the left and right halves of an eight-pixel sprite.
+export function rasterSurfaceGeometry(cellW, cellH, columns, rows, pixelRatio = 1) {
+  const ratio = Math.max(1, Number(pixelRatio) || 1);
+  const cols = Math.max(1, Number.parseInt(columns, 10) || 1);
+  const lineCount = Math.max(1, Number.parseInt(rows, 10) || 1);
+  const deviceWidth = Math.max(1, Math.round(cellW * cols * ratio));
+  const deviceHeight = Math.max(1, Math.round(cellH * lineCount * ratio));
+  const width = deviceWidth / ratio;
+  const height = deviceHeight / ratio;
+  return {
+    pixelRatio: ratio,
+    deviceWidth,
+    deviceHeight,
+    width,
+    height,
+    cellW: width / cols,
+    cellH: height / lineCount
+  };
+}
+
+// Round in backing-store pixels, then convert back to CSS coordinates. All
+// cell fills, grid lines, and feedback outlines consequently share one edge.
+export function rasterCellBoundary(cellSize, index, offset = 0, pixelRatio = 1) {
+  const ratio = Math.max(1, Number(pixelRatio) || 1);
+  return Math.round((offset + index * cellSize) * ratio) / ratio;
+}
+
+export function rasterCellRect(cellW, cellH, x, y, offsetX = 0, offsetY = 0, pixelRatio = 1) {
+  const ratio = Math.max(1, Number(pixelRatio) || 1);
+  const left = rasterCellBoundary(cellW, x, offsetX, ratio);
+  const right = rasterCellBoundary(cellW, x + 1, offsetX, ratio);
+  const top = rasterCellBoundary(cellH, y, offsetY, ratio);
+  const bottom = rasterCellBoundary(cellH, y + 1, offsetY, ratio);
+  return { x: left, y: top, w: Math.max(1 / ratio, right - left), h: Math.max(1 / ratio, bottom - top) };
 }

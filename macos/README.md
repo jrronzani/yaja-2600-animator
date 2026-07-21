@@ -1,6 +1,28 @@
-# YAJA 2600 Animator v1.1.12
+# YAJA 2600 Animator v1.1.17
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
+
+## v1.1.17 working notes
+
+- The animation picker displays four animation rows at a time and scrolls for larger libraries.
+- Timeline previews now render Normal, Double, and Quad NUSIZ widths accurately.
+- NUSIZ-aware previews retain uniform X/Y fitting and the kernel-specific Atari pixel ratio.
+
+## v1.1.16 working notes
+
+- Timeline frame previews now use the same Atari 1.7 pixel aspect and kernel-specific vertical stretch as the main canvas.
+- Preview sprites are letterboxed and centered without independent horizontal or vertical CSS scaling.
+- Frame width and height are respected in preview rendering, including two-sprite layouts.
+
+## v1.1.15 working notes
+
+- Replaces CSS-pixel-only canvas rounding with one device-pixel-aware backing-store geometry shared by pixels, grid lines, and brush feedback.
+- Removes the 4/4 midpoint seam at fractional browser/display scaling without changing the original one-cell ghost design.
+
+## v1.1.13 working notes
+
+- Aligns every canvas grid stroke to the same rounded cell boundary used by raster rendering, eliminating the faint fractional center grid line.
+- Draws selection, stamp, and brush ghost feedback above the grid so every hover outline remains complete around its cell.
 
 ## v1.1.12 working notes
 

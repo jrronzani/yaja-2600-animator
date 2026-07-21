@@ -1,4 +1,4 @@
-# YAJA 2600 Animator v1.1.12
+# YAJA 2600 Animator v1.1.17
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
 
@@ -26,6 +26,11 @@ The human creator directed the product, visual language, Atari behavior, and acc
 - Supports one- and two-sprite compositions, onion skinning, stamps, color blocks, and image references.
 - Exports PNG frames, reusable batari Basic animation data, or compilable demonstration programs.
 - Re-imports YAJA-generated bB code to reconstruct editable animation projects.
+
+## v1.1.17 release notes
+
+- Adds a four-row scrolling animation picker for projects with multiple animations.
+- Makes timeline previews accurately display Normal, Double, and Quad NUSIZ widths while preserving Atari pixel aspect and kernel stretch.
 
 ## v1.1.12 release notes
 
