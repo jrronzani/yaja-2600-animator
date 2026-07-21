@@ -4713,3 +4713,66 @@ dialog.color-block-editor-popover[open] {
   outline-offset: 0 !important;
   box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
 }
+
+/* YAJA 2600 Animator v1.1.9 - timeline picker is part of the heading flow.
+   It stays on the title line while space permits and gains its own row before
+   it can ever overlap the playback/frame controls. */
+.timeline-heading {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px !important;
+  height: auto !important;
+  padding: 3px 0;
+}
+
+.timeline-heading > strong {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  min-width: 0;
+}
+
+.timeline-heading > .animation-library-control {
+  position: static !important;
+  display: flex;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  justify-self: center;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  transform: none !important;
+}
+
+.timeline-heading #timelineSummary {
+  position: static !important;
+  display: block;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  margin: 0;
+  transform: none !important;
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .timeline-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    min-height: 82px !important;
+    row-gap: 5px;
+  }
+
+  .timeline-heading > strong { grid-column: 1; grid-row: 1; }
+  .timeline-heading #timelineSummary { grid-column: 2; grid-row: 1; }
+
+  .timeline-heading > .animation-library-control {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
