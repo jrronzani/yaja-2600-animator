@@ -194,7 +194,8 @@ function demoBackground(ir) {
 
 export function emitAnimationDemo(ir) {
   const moduleBank = ir.kernel === "DPC+" ? "\n  bank 2\n" : "\n";
-  return `${demoHeader(ir)}${moduleBank}${demoBackground(ir)}\n${emitAnimationModule(ir)}`;
+  const backgroundData = demoBackground(ir);
+  return `${demoHeader(ir)}${moduleBank}${emitAnimationModule(ir)}${backgroundData ? `\n${backgroundData}` : ""}`;
 }
 
 export function generateAnimationCode(project, options = {}) {
@@ -310,7 +311,8 @@ function emitCollectionDemo(project, irs, collectionNamespace) {
   if (isSolidKernel(first.kernel)) lines.push(`  COLUBK = ${first.background}`);
   lines.push("  drawscreen", "  if joy0up then goto __YAJA_Demo_Previous", "  if joy0down then goto __YAJA_Demo_Next", `  ${collectionNamespace}_JoystickLatch = 0`, "  goto __YAJA_Demo_Update", "__YAJA_Demo_Previous", `  if ${collectionNamespace}_JoystickLatch then goto __YAJA_Demo_Update`, `  ${collectionNamespace}_JoystickLatch = 1`, `  gosub ${collectionNamespace}_Previous${callBank}`, "  goto __YAJA_Demo_Update", "__YAJA_Demo_Next", `  if ${collectionNamespace}_JoystickLatch then goto __YAJA_Demo_Update`, `  ${collectionNamespace}_JoystickLatch = 1`, `  gosub ${collectionNamespace}_Next${callBank}`, "__YAJA_Demo_Update", `  gosub ${collectionNamespace}_Update${callBank}`, "  goto __YAJA_Demo_Loop", "");
   const moduleBank = first.kernel === "DPC+" ? "\n  bank 2\n" : "\n";
-  return `${lines.join("\n")}${moduleBank}${demoBackground(first)}\n${emitCollectionModules(project, irs, collectionNamespace, "demo")}`;
+  const backgroundData = demoBackground(first);
+  return `${lines.join("\n")}${moduleBank}${emitCollectionModules(project, irs, collectionNamespace, "demo")}${backgroundData ? `\n${backgroundData}` : ""}`;
 }
 
 export function generateAnimationCollectionCode(project, options = {}) {

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YAJA 2600 Animator v1.1.17</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body class="theme-atari">
+  <svg class="icon-defs" aria-hidden="true">
+    <defs>
+      <symbol id="icon-pencil" viewBox="0 0 24 24">
+        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+      </symbol>
+      <symbol id="icon-eraser" viewBox="0 0 24 24">
+        <path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.01 4.01 0 01-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0zm-1.41 1.41L6.93 12.87l3.18 3.18 7.9-7.9-3.18-3.18z"/>
+      </symbol>
+      <symbol id="icon-line" viewBox="0 0 24 24">
+        <path d="M3 21L21 3" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-rect" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-oval" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="12" rx="9" ry="6" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-circle" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-bucket" viewBox="0 0 24 24">
+        <path d="M12 2C8 6 4 10 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8c0-4-4-8-8-12z"/>
+      </symbol>
+      <symbol id="icon-select" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-undo" viewBox="0 0 24 24">
+        <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+      </symbol>
+      <symbol id="icon-redo" viewBox="0 0 24 24">
+        <path d="M18.4 10.6C16.55 9 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/>
+      </symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+      </symbol>
+      <symbol id="icon-delete" viewBox="0 0 24 24">
+        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+      </symbol>
+      <symbol id="icon-duplicate" viewBox="0 0 24 24">
+        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+      </symbol>
+      <symbol id="icon-up" viewBox="0 0 24 24">
+        <path d="M7 14l5-5 5 5z"/>
+      </symbol>
+      <symbol id="icon-down" viewBox="0 0 24 24">
+        <path d="M7 10l5 5 5-5z"/>
+      </symbol>
+      <symbol id="icon-eyedropper" viewBox="0 0 24 24">
+        <path d="M20.71 5.63l-2.34-2.34a1 1 0 00-1.41 0l-3.12 3.12-1.93-1.91-1.41 1.41 1.92 1.92L2 18.25V22h3.75l10.42-10.42 1.92 1.92 1.41-1.41-1.92-1.92 3.12-3.12a1 1 0 000-1.42zM5.12 20H4v-1.12l9.46-9.46 1.12 1.12L5.12 20z"/>
+      </symbol>
+      <symbol id="icon-image" viewBox="0 0 24 24">
+        <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+      </symbol>
+      <symbol id="icon-transform" viewBox="0 0 24 24">
+        <path d="M3 3h6v2H6.41l4.3 4.29-1.42 1.42L5 6.41V9H3V3zm18 0v6h-2V6.41l-4.29 4.3-1.42-1.42L17.59 5H15V3h6zM3 21v-6h2v2.59l4.29-4.3 1.42 1.42L6.41 19H9v2H3zm18 0h-6v-2h2.59l-4.3-4.29 1.42-1.42L19 17.59V15h2v6z"/>
+      </symbol>
+      <symbol id="icon-paint" viewBox="0 0 24 24">
+        <path d="M12 3C7.03 3 3 6.58 3 11c0 3.87 3.13 7 7 7h1.65c.75 0 1.35-.6 1.35-1.35 0-.35-.14-.69-.39-.94a1.35 1.35 0 01.96-2.31H15c3.31 0 6-2.69 6-6C21 4.42 16.97 3 12 3zM6.5 12A1.5 1.5 0 116.5 9a1.5 1.5 0 010 3zm3-4A1.5 1.5 0 119.5 5a1.5 1.5 0 010 3zm4 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm3 4a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/>
+      </symbol>
+      <symbol id="icon-triangle-v" viewBox="0 0 24 24">
+        <path d="M12 3l9 18H3z" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-triangle-h" viewBox="0 0 24 24">
+        <path d="M3 3l18 9-18 9z" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+      <symbol id="icon-stop" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></symbol>
+      <symbol id="icon-reverse-order" viewBox="0 0 24 24">
+        <path d="M7 6h12l-3-3 1.4-1.4L22.8 7l-5.4 5.4L16 11l3-3H7V6zm10 12H5l3 3-1.4 1.4L1.2 17l5.4-5.4L8 13l-3 3h12v2z"/>
+      </symbol>
+      <symbol id="icon-fullscreen" viewBox="0 0 24 24">
+        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+      </symbol>
+    </defs>
+  </svg>
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo brand-title">YAJA 2600 Animator</div>
+      <div class="version">v1.1.17</div>
+    </div>
+    <div class="project-strip" aria-label="Project actions">
+      <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
+      <label class="theme-control">Theme
+        <select id="selectTheme" aria-label="Theme">
+          <option value="atari-console">2600 Console</option>
+          <option value="atari-controller">2600 Controller</option>
+          <option value="synthwave">Synthwave</option>
+          <option value="synthwave-bright">Synthwave Bright</option>
+          <option value="blue">Blue</option>
+          <option value="classic-dark">Classic Dark</option>
+          <option value="classic-light">Classic Light</option>
+        </select>
+      </label>
+      <button id="newProject" title="New project">New</button>
+      <button id="saveProject" title="Save project JSON">Save</button>
+      <button id="loadProject" title="Load project JSON">Open</button>
+      <input id="projectFile" type="file" accept="application/json,.json" hidden>
+      <span class="project-divider" aria-hidden="true"></span>
+      <span class="export-actions">
+        <button id="exportCode" class="btn-primary primary" title="Validate and export bB code">Export bB</button>
+        <button id="importCode" title="Import a YAJA bB scene or ordinary bB sprite data">Import bB</button>
+        <button id="exportSheet" title="Export animation frames as PNG">Export PNG</button>
+      </span>
+      <span class="fullscreen-action">
+        <button id="btn-fullscreen" class="btn-icon" title="Toggle Fullscreen" aria-pressed="false">
+          <svg aria-hidden="true"><use href="#icon-fullscreen"></use></svg>
+        </button>
+      </span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="panel tools-panel">
+      <section>
+        <h2>Tools</h2>
+        <div class="tool-grid" id="toolGrid">
+          <button data-tool="pencil" class="tool tool-btn active" title="Pencil"><svg><use href="#icon-pencil"></use></svg></button>
+          <button data-tool="eraser" class="tool tool-btn" title="Eraser"><svg><use href="#icon-eraser"></use></svg></button>
+          <!-- Toggle Pixels remains recoverable in app.js but is removed from the toolbar. -->
+          <button data-tool="line" class="tool tool-btn" title="Line"><svg><use href="#icon-line"></use></svg></button>
+          <button data-tool="rect" class="tool tool-btn" title="Rectangle"><svg><use href="#icon-rect"></use></svg></button>
+          <button data-tool="oval" class="tool tool-btn" title="Oval"><svg><use href="#icon-oval"></use></svg></button>
+          <button data-tool="circle" class="tool tool-btn" title="Circle"><svg><use href="#icon-circle"></use></svg></button>
+          <button data-tool="triangle" class="tool tool-btn" title="Vertical triangle"><svg><use href="#icon-triangle-v"></use></svg></button>
+          <button data-tool="triangle-side" class="tool tool-btn" title="Horizontal triangle"><svg><use href="#icon-triangle-h"></use></svg></button>
+          <button data-tool="select" class="tool tool-btn" title="Select"><svg><use href="#icon-select"></use></svg></button>
+          <button data-tool="stamp" class="tool tool-btn" title="Stamp"><svg><use href="#icon-duplicate"></use></svg></button>
+          <button data-tool="fill" class="tool tool-btn" title="Flood fill"><svg><use href="#icon-bucket"></use></svg></button>
+          <button data-tool="color" class="tool tool-btn" title="Paint scanline color"><svg><use href="#icon-paint"></use></svg></button>
+          <!-- Text and canvas eyedropper tools remain recoverable in app.js but are hidden here. -->
+        </div>
+        <label class="check-row"><input id="fillShapes" type="checkbox"> Fill shapes</label>
+        <label class="check-row"><input id="mirrorDraw" type="checkbox"> Mirror draw</label>
+        <label class="dimension-control"><span>Brush Width</span><input id="brushWidth" type="number" min="1" max="8" value="1"></label>
+        <label class="dimension-control"><span>Brush Height</span><input id="brushHeight" type="number" min="1" max="32" value="1"></label>
+        <div class="compact-row history-actions">
+          <button id="undo" class="btn-icon" title="Undo" aria-label="Undo"><svg><use href="#icon-undo"></use></svg></button>
+          <button id="redo" class="btn-icon" title="Redo" aria-label="Redo"><svg><use href="#icon-redo"></use></svg></button>
+        </div>
+      </section>
+
+      <section class="settings-section sprite-settings-section">
+        <h2>Sprite Settings</h2>
+        <label class="check-row"><input id="twoSpriteMode" type="checkbox"> Two Sprite Mode</label>
+        <div id="activeSpriteTabs" class="active-sprite-tabs hidden" aria-label="Choose sprite to edit">
+          <span>Edit Sprite</span>
+          <div class="segmented">
+            <button id="selectSpriteA" type="button" class="active" aria-pressed="true">Sprite A</button>
+            <button id="selectSpriteB" type="button" aria-pressed="false">Sprite B</button>
+          </div>
+        </div>
+        <label id="playerAssignment0Row" class="sprite-assignment-row"><span id="playerAssignment0Label">Sprite #</span><select id="playerAssignment0"></select></label>
+        <label id="playerAssignment1Row" class="sprite-assignment-row hidden"><span id="playerAssignment1Label">Sprite B #</span><select id="playerAssignment1"></select></label>
+        <div class="two-col frame-dimensions"><label>Width <input id="spriteWidth" type="number" min="1" max="8" value="8"></label><label>Height <input id="spriteHeight" type="number" min="1" max="255" value="16"></label></div>
+        <label id="spriteNusizLabel">NUSIZ
+          <select id="spriteNusiz"><option value="normal">Normal</option><option value="double">Double</option><option value="quad">Quad</option></select>
+        </label>
+        <label id="spriteSolidColorRow" class="solid-color-row">Color <input id="spriteSolidColor" class="code-input" value="$48" maxlength="3"></label>
+        <div class="subcontrol-label frame-offset-label">Frame Offsets</div>
+        <div id="offsetControls" class="offset-controls"><label id="spriteOffsetXRow" class="hidden">X Offset <input id="spriteOffsetX" type="number" min="-160" max="160" value="0"></label><label id="spriteOffsetYRow">Y Offset <input id="spriteOffsetY" type="number" min="-255" max="255" value="0"></label></div>
+        <div class="two-col bulk-actions"><button id="applySizeAll">Apply Size to All</button><button id="applyOffsetsAll" title="Copy the active sprite's current-frame X and Y offsets to every frame">Apply Offsets to All</button></div>
+        <div id="twoSpriteControls" class="two-sprite-controls hidden">
+          <div class="player-transfer-grid">
+            <button id="swapPlayers">Swap</button>
+            <button id="copyP0P1">Copy A-&gt;B</button>
+            <button id="copyColorsP0P1" class="span-two">Copy Colors A-&gt;B</button>
+            <button id="mirrorP0P1" class="span-two">Mirror A-&gt;B</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section project-settings-section">
+        <h2>Project Settings</h2>
+        <label>Kernel
+          <select id="kernelMode">
+            <option value="PXE">PXE</option>
+            <option value="DPC+">DPC+</option>
+            <option value="MULTISPRITE">Multisprite</option>
+            <option value="STANDARD">Standard</option>
+          </select>
+        </label>
+        <!-- Vertical stretch is kernel-defined: Standard is 2x; DPC+/PXE are 1x. -->
+        <label>BG <input id="bgColor" class="code-input" value="$00" maxlength="3"></label>
+      </section>
+
+      <section class="edit-section">
+        <h2>Transform</h2>
+        <div class="edit-subsection nudge-tools" aria-label="Nudge">
+          <div class="subcontrol-label">Nudge</div>
+          <div class="nudge-pad">
+            <span></span><button data-nudge="up" title="Nudge up"><svg><use href="#icon-up"></use></svg></button><span></span>
+            <button data-nudge="left" title="Nudge left"><svg class="rotate-left"><use href="#icon-up"></use></svg></button>
+            <button data-nudge="down" title="Nudge down"><svg><use href="#icon-down"></use></svg></button>
+            <button data-nudge="right" title="Nudge right"><svg class="rotate-right"><use href="#icon-up"></use></svg></button>
+          </div>
+          <div class="nudge-options">
+            <label class="check-row"><input id="nudgePixels" type="checkbox" checked> Nudge Pixels</label>
+            <label class="check-row"><input id="nudgeColors" type="checkbox" checked> Nudge Colors</label>
+          </div>
+        </div>
+        <div class="edit-subsection scale-tools" aria-label="Scale">
+          <div class="subcontrol-label">Scale</div>
+          <label class="scale-step-control">Scale Step <span><input id="scaleStep" type="number" min="1" step="1" value="25">%</span></label>
+          <div class="transform-pair"><span>Horizontal</span><button id="stretchHDown" title="Compress horizontally">−</button><button id="stretchHUp" title="Stretch horizontally">+</button></div>
+          <div class="transform-pair"><span>Vertical</span><button id="stretchVDown" title="Compress vertically">−</button><button id="stretchVUp" title="Stretch vertically">+</button></div>
+          <div class="transform-pair"><span>Uniform</span><button id="scaleUniformDown" title="Scale down uniformly">−</button><button id="scaleUniformUp" title="Scale up uniformly">+</button></div>
+          <div class="two-col"><button id="grow">Grow</button><button id="shrink">Shrink</button></div>
+        </div>
+        <div class="edit-subsection rotation-tools" aria-label="Sprite rotation">
+          <div class="rotation-label">Rotation</div>
+          <label>Rotation Step <span><input id="rotateAngle" type="number" min="1" max="180" step="1" value="45">&deg;</span></label>
+          <div class="two-col rotation-buttons"><button id="rotateL" title="Rotate left">Rot L</button><button id="rotateR" title="Rotate right">Rot R</button></div>
+        </div>
+        <div class="edit-subsection flip-tools" aria-label="Flip">
+          <div class="subcontrol-label">Flip</div>
+          <div class="two-col">
+          <button id="flipH">Flip H</button>
+          <button id="flipV">Flip V</button>
+          <button id="flipColor" class="span-two">Flip Color</button>
+          </div>
+        </div>
+        <button id="clearFrame" class="danger clear-frame">Clear</button>
+      </section>
+    </aside>
+
+    <section class="editor-zone" id="editorZone">
+      <div class="editor-toolbar" aria-label="Canvas view controls">
+        <div class="canvas-control-group view-control-group">
+          <label class="check-row"><input id="showGrid" type="checkbox" checked> Grid</label>
+          <label class="check-row"><input id="showColorColumns" type="checkbox" checked> Colors</label>
+          <div class="canvas-toolbar-divider compact-divider" aria-hidden="true"></div>
+          <label>Zoom <input id="zoom" type="range" min="0" max="100" value="50"></label>
+        </div>
+        <div class="canvas-toolbar-divider" aria-hidden="true"></div>
+        <div class="canvas-control-group onion-control-group">
+          <label class="check-row"><input id="onion" type="checkbox"> Onion</label>
+          <label class="onion-count">Frames <input id="onionFrames" type="number" min="1" max="10" value="1"></label>
+          <label class="onion-opacity">Opacity <input id="onionOpacity" type="range" min="5" max="90" value="35"></label>
+        </div>
+      </div>
+
+      <div class="canvas-band">
+        <div class="canvas-stage-scroll">
+        <div class="sprite-stage" id="spriteStage">
+          <div id="compositionBackdrop" class="composition-backdrop hidden" aria-hidden="true"></div>
+          <div id="playerCanvasGroup0" class="player-canvas-group"><div class="canvas-wrap"><canvas id="spriteCanvas" data-player="0" tabindex="0"></canvas></div></div>
+          <div id="playerCanvasGroup1" class="player-canvas-group hidden"><div class="canvas-wrap"><canvas id="spriteCanvas1" data-player="1" tabindex="0"></canvas></div></div>
+          <div id="compositionColorColumns" class="composition-color-columns" aria-label="Sprite scanline colors">
+            <div id="p0ColorsColumn" class="player-colors-panel canvas-colors"><div id="p0ColorsTitle" class="row-colors-title">P0</div><div id="rowColors0" class="row-colors"></div></div>
+            <div id="p1ColorsColumn" class="player-colors-panel canvas-colors"><div id="p1ColorsTitle" class="row-colors-title">P1</div><div id="rowColors1" class="row-colors"></div></div>
+          </div>
+        </div>
+        </div>
+        <!-- TIA preview retained for possible restoration.
+        <div class="preview-shell">
+          <div class="preview-title">TIA Preview</div>
+          <canvas id="previewCanvas"></canvas>
+          <div class="preview-caption" id="previewCaption">PXE/DPC+ pixel aspect 1.7:1</div>
+        </div> -->
+        <div id="canvasReadout" class="canvas-readout canvas-readout-dock"><span id="frameLabel">Frame 0</span><span id="pixelReadout">8 x 16</span></div>
+      </div>
+
+      <div id="selectionBar" class="selection-bar hidden">
+        <span id="selectionInfo">Selection</span>
+        <button id="copySelection">Copy</button>
+        <button id="cutSelection">Cut</button>
+        <button id="pasteSelection">Paste</button>
+        <button id="stampFromSelection">Make Stamp</button>
+        <button id="clearSelection">Clear</button>
+      </div>
+
+      <div class="frames-strip">
+        <div class="timeline-heading" id="timelineHeading" title="Click to clear frame selection">
+          <strong>Animation Timeline</strong>
+          <div class="animation-library-control" aria-label="Animation library">
+            <div class="animation-combobox">
+              <input id="animationName" role="combobox" aria-label="Animation name" aria-controls="animationMenu" aria-expanded="false" value="Untitled Animation" maxlength="48" spellcheck="false">
+              <button id="toggleAnimationMenu" class="animation-menu-toggle" type="button" title="Choose animation" aria-label="Choose animation" aria-haspopup="listbox" aria-expanded="false"><svg aria-hidden="true"><use href="#icon-down"></use></svg></button>
+              <div id="animationMenu" class="animation-menu hidden" role="listbox" aria-label="Animations"></div>
+            </div>
+            <button id="newAnimation" class="timeline-tool" type="button" title="New blank animation"><svg><use href="#icon-plus"></use></svg></button>
+            <button id="duplicateAnimation" class="timeline-tool" type="button" title="Duplicate animation"><svg><use href="#icon-duplicate"></use></svg></button>
+            <button id="deleteAnimation" class="timeline-tool danger" type="button" title="Delete animation"><svg><use href="#icon-delete"></use></svg></button>
+          </div>
+          <span id="timelineSummary">1 frame</span>
+        </div>
+        <div class="frames-actions" id="framesActions">
+          <button id="playAnim" class="timeline-play timeline-tool" title="Play animation"><span>PLAY</span><svg><use href="#icon-play"></use></svg></button>
+          <button id="loopPlayback" class="timeline-loop composer-loop-toggle active" type="button" title="Toggle animation loop" aria-label="Loop animation" aria-pressed="true">
+            <svg class="loop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 2l4 4-4 4"></path>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+              <path d="M7 22l-4-4 4-4"></path>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+            </svg>
+          </button>
+          <div class="timeline-divider" aria-hidden="true"></div>
+          <div class="frame-button-cluster" aria-label="Frame actions">
+            <button id="insertFrame" class="timeline-tool" title="Insert frame"><svg><use href="#icon-plus"></use></svg></button>
+            <button id="duplicateFrame" class="timeline-tool" title="Duplicate frame"><svg><use href="#icon-duplicate"></use></svg></button>
+            <button id="moveFrameLeft" class="timeline-tool" title="Move selected frames left"><svg class="rotate-left"><use href="#icon-up"></use></svg></button>
+            <button id="moveFrameRight" class="timeline-tool" title="Move selected frames right"><svg class="rotate-right"><use href="#icon-up"></use></svg></button>
+            <button id="reverseFrames" class="timeline-tool" title="Reverse selected frames or the whole animation"><svg><use href="#icon-reverse-order"></use></svg></button>
+            <button id="removeFrame" class="timeline-tool danger" title="Remove selected frames"><svg><use href="#icon-delete"></use></svg></button>
+          </div>
+          <div class="timeline-divider" aria-hidden="true"></div>
+          <label class="timeline-repeat">Frame Repeat <input id="timelineFrameRepeat" type="number" min="1" max="60" value="3"></label>
+          <button id="applyRepeatAll" class="compact-text-button">Apply to All</button>
+        </div>
+        <div id="framesList" class="frames-list"></div>
+      </div>
+    </section>
+
+    <aside class="panel right-panel">
+      <section id="palettePanel">
+        <div class="palette-title-row"><h2>Color Palette</h2></div>
+        <label class="display-region-row"><span>Display Region</span><button id="paletteEyedropper" class="tool-btn-small" title="Eyedropper (pick color)"><svg><use href="#icon-eyedropper"></use></svg></button>
+          <select id="displayRegion"><option value="NTSC">NTSC (128 Colors)</option><option value="PAL">PAL (104 Colors)</option></select>
+        </label>
+        <div class="current-color">
+          <button id="currentColorSwatch" title="Current Atari color"></button>
+          <input id="currentColor" class="code-input" value="$48" maxlength="3">
+        </div>
+        <div id="palette" class="palette persistent-palette-grid"></div>
+      </section>
+
+      <section>
+        <h2>Color Blocks</h2>
+        <div id="colorBlocks" class="asset-list"></div>
+        <button id="newColorBlock" class="btn-secondary asset-new">+ New Color Block</button>
+      </section>
+
+      <section>
+        <h2>Stamps</h2>
+        <div id="stamps" class="asset-list stamp-list"></div>
+        <button id="newStamp" class="btn-secondary asset-new">+ New Stamp</button>
+      </section>
+
+      <section>
+        <h2>Image Reference</h2>
+        <input id="refFile" type="file" accept="image/png,image/jpeg" hidden>
+        <div id="referenceImportSingle" class="reference-import-row"><button id="loadReference" class="btn-secondary"><svg><use href="#icon-image"></use></svg> Import Images</button></div>
+        <div id="referenceImportDual" class="reference-import-row reference-import-dual hidden">
+          <button id="loadReferenceA" class="btn-secondary"><svg><use href="#icon-image"></use></svg> Import Images A</button>
+          <button id="loadReferenceB" class="btn-secondary"><svg><use href="#icon-image"></use></svg> Import Images B</button>
+        </div>
+        <div id="refControls" class="ref-controls">
+          <div class="reference-auto-actions">
+            <button id="extractShape" class="btn-primary">Auto-Paint</button>
+            <button id="autoColor" class="btn-primary">Auto-Color</button>
+          </div>
+          <div class="reference-secondary-actions"><button id="toggleReference" class="btn-secondary">Hide</button><button id="removeReference" class="btn-danger">Delete</button></div>
+          <label class="reference-control">Threshold <input id="threshold" type="range" min="0" max="255" value="64"></label>
+          <label class="check-row reference-dither"><input id="refDither" type="checkbox"> Dithering</label>
+          <label class="reference-control">Fit Mode <select id="refFitMode"><option value="fit">Fit (Letterbox)</option><option value="crop">Crop (Fill)</option><option value="stretch">Stretch</option><option value="manual">Manual</option></select></label>
+          <button id="referenceTransform" class="btn-secondary reference-transform" title="Move and resize the reference image"><svg aria-hidden="true"><use href="#icon-transform"></use></svg> Move Image</button>
+          <label class="reference-control">Opacity <input id="refOpacity" type="range" min="0" max="100" value="100"></label>
+          <label class="reference-control">Scale <input id="refScale" type="range" min="10" max="500" value="100"></label>
+          <label class="reference-control">Offset X <input id="refX" type="range" min="-8" max="8" step="0.01" value="0"></label>
+          <label class="reference-control">Offset Y <input id="refY" type="range" min="-16" max="16" step="0.01" value="0"></label>
+          <div class="reference-filter-controls">
+            <label class="reference-control">Brightness <input id="refBrightness" type="range" min="0" max="400" value="100"></label>
+            <label class="reference-control">Contrast <input id="refContrast" type="range" min="0" max="400" value="100"></label>
+          </div>
+          <button id="resetReferenceDefaults" class="btn-secondary">Reset to Defaults</button>
+          <button id="applyReferenceTransformAll" class="btn-secondary">Apply to All</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="status-bar" aria-live="polite">
+    <span id="statusKernel">PXE</span>
+    <span id="statusFrame">Frame 1 of 1</span>
+    <span id="statusMessage">Ready</span>
+    <span class="status-hint">Arrows: selection or frames &middot; Ctrl+Z/Y: history</span>
+  </footer>
+
+  <dialog id="codeDialog">
+    <form method="dialog" class="dialog-body">
+      <h2 id="codeDialogTitle">bB Data</h2>
+      <div id="codeDiagnostics" class="code-diagnostics" aria-live="polite"></div>
+      <fieldset id="bbExportMode" class="import-mode-options">
+        <legend>Export Format</legend>
+        <label class="check-row"><input id="exportBbData" name="bbExportMode" type="radio" value="data" checked> Data Only</label>
+        <label class="check-row"><input id="exportBbDemo" name="bbExportMode" type="radio" value="demo"> Compilable Demo</label>
+      </fieldset>
+      <fieldset id="bbExportScope" class="import-mode-options">
+        <legend>Export Scope</legend>
+        <label class="check-row"><input id="exportBbCurrent" name="bbExportScope" type="radio" value="current" checked> Current Animation</label>
+        <label class="check-row"><input id="exportBbAll" name="bbExportScope" type="radio" value="all"> All Animations</label>
+      </fieldset>
+      <div id="bbImportHelp" class="bb-import-help" hidden>
+        <strong>Paste an exported YAJA scene or ordinary bB sprite data.</strong>
+        <ul>
+          <li>YAJA Data Only and Compilable Demo exports restore animation settings, frames, timing, assignments, offsets, NUSIZ, pixels, and colors.</li>
+          <li>Ordinary bB imports accept one or two <code>player#:</code> blocks, with optional <code>player#color:</code> blocks.</li>
+          <li>Keep the <code>;@YAJA</code> and frame marker comments intact for a complete scene round-trip.</li>
+        </ul>
+        <pre aria-label="Import format example">; Complete YAJA scene (recommended)
+;@YAJA PROJECT { ...exported project metadata... }
+;@YAJA FRAME_BEGIN 0 { ...frame settings... }
+player0:
+%00111100
+%01100110
+end
+;@YAJA FRAME_END 0
+
+; Ordinary bB sprite data
+player0:
+%00111100
+%01100110
+end</pre>
+      </div>
+      <textarea id="codeText" spellcheck="false" aria-label="bB scene data"></textarea>
+      <div class="dialog-actions">
+        <button id="copyCode" type="button">Copy</button>
+        <button id="downloadBas" type="button">Download .bas</button>
+        <button id="importFromText" type="button" class="btn-primary">Import Scene</button>
+        <button value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="colorBlockEditor" class="asset-editor-popover color-block-editor-popover">
+    <form method="dialog" class="dialog-body asset-editor-dialog color-block-editor-modal">
+      <h2 id="colorBlockEditorTitle">Color Block</h2>
+      <label class="asset-editor-field">Height <input id="colorBlockEditorHeight" type="number" min="1" max="255" value="8"></label>
+      <div id="colorBlockEditorLines" class="color-block-editor-lines" role="application" tabindex="0" aria-label="Color block scanline editor"></div>
+      <div class="color-block-offset-controls">
+        <label>Hue Offset <output id="colorBlockHueOffsetValue">0</output><input id="colorBlockHueOffset" type="range" min="0" max="15" value="0"></label>
+        <label>Lightness Offset <output id="colorBlockLightnessOffsetValue">0</output><input id="colorBlockLightnessOffset" type="range" min="0" max="7" value="0"></label>
+      </div>
+      <div class="dialog-actions color-block-editor-actions">
+        <button id="saveColorBlockEdit" type="button" class="btn-primary">Save</button>
+        <button id="saveColorBlockCopy" type="button" class="btn-secondary hidden">Save Copy</button>
+        <button value="cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="stampEditor" class="asset-editor-popover stamp-editor-popover">
+    <form method="dialog" class="dialog-body asset-editor-dialog stamp-editor-modal">
+      <h2 id="stampEditorTitle">Create New Stamp</h2>
+      <div id="stampEditorCanvasContainer" class="stamp-editor-canvas-container">
+        <div class="stamp-editor-canvas-stack">
+          <canvas id="stampEditorCanvas" width="400" height="400" tabindex="0" role="application" aria-label="Stamp pixel editor"></canvas>
+          <canvas id="stampEditorPreviewCanvas" width="400" height="400" aria-hidden="true"></canvas>
+        </div>
+      </div>
+      <div class="stamp-editor-footer">
+        <div class="stamp-editor-size-controls">
+          <label>Width <input id="stampEditorWidth" type="number" min="1" max="8"></label>
+          <label>Height <input id="stampEditorHeight" type="number" min="1" max="255"></label>
+          <output id="stampEditorReadout" class="stamp-editor-readout" aria-live="polite">8 × 16</output>
+        </div>
+        <div class="stamp-editor-zoom-actions">
+          <label class="stamp-editor-control-item"><span>Zoom</span><input id="stampEditorZoom" type="range" min="0" max="100" step="1" value="75"></label>
+          <div class="dialog-actions">
+            <button id="saveStampEdit" type="button" class="btn-primary">Save Stamp</button>
+            <button id="saveStampCopy" type="button" class="btn-secondary hidden">Save Copy</button>
+            <button value="cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="sequenceDialog">
+    <form method="dialog" class="dialog-body small-dialog">
+      <h2>Import Images</h2>
+      <p id="sequenceSummary">Choose one reference image for the current frame or import a frame sequence.</p>
+      <fieldset class="import-mode-options">
+        <legend>Import As</legend>
+        <label class="check-row"><input id="importCurrentFrame" name="referenceImportMode" type="radio" value="current" checked> Current frame reference</label>
+        <label class="check-row"><input id="importFrameSequence" name="referenceImportMode" type="radio" value="sequence"> Reference frame sequence</label>
+      </fieldset>
+      <div id="sequenceOptions" class="sequence-options hidden">
+        <label class="check-row"><input id="sequenceCreateFrames" type="checkbox" checked> Create blank frames if needed</label>
+        <label class="check-row"><input id="sequenceApplyTransform" type="checkbox" checked> Apply first image transform to sequence</label>
+      </div>
+      <div class="dialog-actions"><button id="chooseReferenceImages" type="button" class="btn-primary">Choose Image</button><button value="cancel">Cancel</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="exportPngDialog">
+    <form method="dialog" class="dialog-body small-dialog">
+      <h2>Export PNG</h2>
+      <p id="exportPngSummary">Choose which animation frames to export.</p>
+      <fieldset class="import-mode-options">
+        <legend>Frames</legend>
+        <label class="check-row"><input id="exportPngSelected" name="pngExportScope" type="radio" value="selected" checked> Selected frame(s)</label>
+        <label class="check-row"><input id="exportPngAll" name="pngExportScope" type="radio" value="all"> All frames</label>
+      </fieldset>
+      <div class="dialog-actions"><button id="confirmExportPng" type="button" class="btn-primary">Export PNG</button><button value="cancel">Cancel</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="textDialog">
+    <form method="dialog" class="dialog-body small-dialog">
+      <h2>Text Tool</h2>
+      <label>Text <input id="textToolText" value="YAJA"></label>
+      <label>X <input id="textToolX" type="number" min="0" max="7" value="0"></label>
+      <label>Y <input id="textToolY" type="number" min="0" value="0"></label>
+      <label>Direction
+        <select id="textDirection">
+          <option value="horizontal">Horizontal</option>
+          <option value="vertical">Vertical</option>
+        </select>
+      </label>
+      <div class="dialog-actions">
+        <button id="placeText" type="button">Place Text</button>
+        <button value="cancel">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script defer src="app.bundle.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YAJA 2600 Animator v1.1.17</title>
+  <title>YAJA 2600 Animator v1.1.20</title>
   <link rel="stylesheet" href="index.css">
 </head>
 <body class="theme-atari">
@@ -85,7 +85,7 @@
   <header class="app-header">
     <div class="brand">
       <div class="logo brand-title">YAJA 2600 Animator</div>
-      <div class="version">v1.1.17</div>
+      <div class="version">v1.1.20</div>
     </div>
     <div class="project-strip" aria-label="Project actions">
       <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
@@ -437,8 +437,10 @@ end</pre>
       <label class="asset-editor-field">Height <input id="colorBlockEditorHeight" type="number" min="1" max="255" value="8"></label>
       <div id="colorBlockEditorLines" class="color-block-editor-lines" role="application" tabindex="0" aria-label="Color block scanline editor"></div>
       <div class="color-block-offset-controls">
-        <label>Hue Offset <output id="colorBlockHueOffsetValue">0</output><input id="colorBlockHueOffset" type="range" min="0" max="15" value="0"></label>
-        <label>Lightness Offset <output id="colorBlockLightnessOffsetValue">0</output><input id="colorBlockLightnessOffset" type="range" min="0" max="7" value="0"></label>
+        <label for="colorBlockHueOffset">Hue Offset <output id="colorBlockHueOffsetValue">0</output></label>
+        <input id="colorBlockHueOffset" type="range" min="0" max="15" value="0">
+        <label for="colorBlockLightnessOffset">Lightness Offset <output id="colorBlockLightnessOffsetValue">0</output></label>
+        <input id="colorBlockLightnessOffset" type="range" min="0" max="7" value="0">
       </div>
       <div class="dialog-actions color-block-editor-actions">
         <button id="saveColorBlockEdit" type="button" class="btn-primary">Save</button>
