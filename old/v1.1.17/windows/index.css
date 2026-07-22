@@ -1,0 +1,4813 @@
+/* YAJA Animator v1.0.0 canonical stylesheet. Keep the cascade in this file. */
+
+@font-face {
+  font-family: "Orbitron";
+  src: url("assets/fonts/orbitron-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Press Start 2P";
+  src: url("assets/fonts/press-start-2p-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* Consolidated from themes.css. */
+/* YAJA shared theme token layer. Add future Painter themes as a new .theme-* block. */
+.theme-atari {
+  color-scheme: dark;
+
+  /* Painter-compatible core tokens */
+  --bg-darkest: #000000;
+  --bg-dark: #1a1a1a;
+  --bg-medium: #333333;
+  --bg-light: #4a4a4a;
+  --bg-lighter: #5a5a5a;
+  --accent: #ff903e;
+  --accent-dim: #e67e22;
+  --accent-red: #ef4444;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-dim: #999999;
+  --border-color: #4a4a4a;
+  --title-accent: #ff903e;
+
+  /* Animator component roles */
+  --theme-app-bg: #000000;
+  --theme-header-bg: #242424;
+  --theme-workspace-bg: #151515;
+  --theme-panel-bg: #292929;
+  --theme-editor-bg: #101010;
+  --theme-toolbar-bg: #252525;
+  --theme-canvas-workspace-bg: #141414;
+  --theme-timeline-bg: #242424;
+  --theme-status-bg: #202020;
+  --theme-input-bg: #1a1a1a;
+  --theme-control-bg: #4a4a4a;
+  --theme-control-hover-bg: #5a5a5a;
+  --theme-canvas-bg: #050505;
+  --theme-border: #4a4a4a;
+  --theme-divider: #555555;
+  --theme-selection-bg: #333333;
+  --theme-primary: #ff903e;
+  --theme-primary-hover: #e67e22;
+  --theme-primary-ink: #111111;
+  --theme-focus: var(--theme-primary);
+  --theme-cyan: #65e6e6;
+  --theme-pink: #ff4d91;
+  --theme-danger: #ef4444;
+  --theme-text: #ffffff;
+  --theme-text-secondary: #cccccc;
+  --theme-text-muted: #999999;
+
+  /* Compatibility aliases used by existing Animator modules */
+  --chrome: var(--theme-header-bg);
+  --chrome-raised: #303030;
+  --canvas-black: var(--theme-canvas-bg);
+  --accent-orange: #ff934d;
+  --accent-cyan: var(--theme-cyan);
+  --accent-pink: var(--theme-pink);
+  --focus-ring: var(--theme-primary);
+}
+
+/* Consolidated from index.css. */
+:root {
+  --bg: #121419;
+  --bg-2: #191e26;
+  --bg-3: #202733;
+  --panel: #171b23;
+  --line: #313948;
+  --line-2: #495466;
+  --text: #f4f7fb;
+  --muted: #aab5c3;
+  --dim: #778395;
+  --pink: #fcaadc;
+  --cyan: #86e7ff;
+  --green: #b8fcb8;
+  --red: #ff6b7a;
+  --focus: #fcaadc;
+  color-scheme: dark;
+  font-family: "Orbitron", system-ui, sans-serif;
+  letter-spacing: 0;
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 1180px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+input,
+select,
+textarea,
+.code-input,
+.readout,
+.frame-thumb-label,
+.preview-caption,
+.row-colors-title,
+.preview-title,
+.asset-meta span,
+.version {
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0;
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+.icon-defs {
+  display: none;
+}
+
+button {
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: #252c38;
+  color: var(--text);
+  min-height: 30px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--focus);
+  background: #303849;
+}
+
+button.active,
+.segmented button.active,
+.tool.active {
+  border-color: var(--pink);
+  background: #54364e;
+  color: #fff;
+}
+
+button.primary {
+  border-color: #cf84b6;
+  background: #8c2074;
+}
+
+button.danger,
+.danger {
+  border-color: #94434b;
+  color: #ffd8dd;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #0d1016;
+  color: var(--text);
+  padding: 5px 7px;
+}
+
+input[type="checkbox"] {
+  width: auto;
+}
+
+input[type="range"] {
+  padding: 0;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+h2 {
+  margin: 0 0 10px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+  color: #eef4ff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.app-header {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #151922;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 280px;
+}
+
+.brand-title {
+  font-family: "Press Start 2P", cursive;
+  color: var(--pink);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.version {
+  color: var(--cyan);
+  font-family: Consolas, "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.project-strip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1;
+}
+
+.project-strip label {
+  width: 240px;
+}
+
+.workspace {
+  height: calc(100vh - 58px);
+  display: grid;
+  grid-template-columns: 260px minmax(630px, 1fr) 290px;
+  overflow: hidden;
+}
+
+.panel {
+  overflow: auto;
+  padding: 12px;
+  background: var(--panel);
+}
+
+.tools-panel {
+  border-right: 1px solid var(--line);
+}
+
+.right-panel {
+  border-left: 1px solid var(--line);
+}
+
+.panel section {
+  margin-bottom: 18px;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tool {
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  font-weight: 800;
+}
+
+.tool svg,
+.icon-button svg,
+.nudge-pad svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  margin: auto;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.tool-glyph {
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0;
+  font-weight: 900;
+}
+
+.rotate-left {
+  transform: rotate(-90deg);
+}
+
+.rotate-right {
+  transform: rotate(90deg);
+}
+
+.compact-row,
+.two-col,
+.range-row {
+  display: grid;
+  gap: 6px;
+}
+
+.compact-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 8px;
+}
+
+.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 8px;
+}
+
+.range-row {
+  grid-template-columns: 1fr 1fr;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.nudge-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 36px);
+  grid-template-rows: repeat(2, 36px);
+  gap: 5px;
+  justify-content: center;
+}
+
+.nudge-pad button {
+  padding: 0;
+  font-weight: 900;
+}
+
+.editor-zone {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+  background: #0d1016;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+
+.editor-toolbar label {
+  min-width: 90px;
+}
+
+.readout {
+  display: flex;
+  gap: 8px;
+  margin-right: auto;
+}
+
+.readout span {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #0d1016;
+  padding: 5px 8px;
+  color: var(--green);
+}
+
+.canvas-band {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(330px, 1fr) 56px 250px;
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.canvas-wrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: #050608;
+}
+
+#spriteCanvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.row-colors-shell,
+.preview-shell {
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  min-height: 0;
+}
+
+.row-colors-title,
+.preview-title {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--line);
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.row-colors {
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+}
+
+.color-row {
+  height: 18px;
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  cursor: pointer;
+}
+
+.color-row span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.5);
+  color: #fff;
+  font-size: 9px;
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0;
+}
+
+.preview-shell {
+  padding-bottom: 8px;
+}
+
+#previewCanvas {
+  display: block;
+  width: 100%;
+  height: 260px;
+  image-rendering: pixelated;
+}
+
+.preview-caption {
+  padding: 0 10px;
+  color: var(--dim);
+  font-size: 11px;
+  text-align: center;
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: #1d2530;
+}
+
+.selection-bar.hidden {
+  display: none;
+}
+
+#selectionInfo {
+  margin-right: auto;
+  color: #fff;
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0;
+}
+
+.frames-strip {
+  min-height: 132px;
+  border-top: 1px solid var(--line);
+  background: #151922;
+}
+
+.frames-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.frames-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 12px 12px;
+}
+
+.frame-thumb {
+  flex: 0 0 82px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0d1016;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.frame-thumb.active {
+  border-color: var(--pink);
+  background: #2a2030;
+}
+
+.frame-thumb canvas {
+  display: block;
+  width: 70px;
+  height: 54px;
+  image-rendering: pixelated;
+  background: #000;
+}
+
+.frame-thumb-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.current-color {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#currentColorSwatch {
+  height: 34px;
+  padding: 0;
+  border-radius: 0;
+}
+
+.code-input {
+  text-transform: uppercase;
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  background: #050608;
+}
+
+.palette button {
+  min-height: 24px;
+  padding: 0;
+  border-radius: 0;
+  border-color: rgba(255,255,255,.18);
+}
+
+.palette button.selected {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.asset-list {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.asset-item {
+  display: grid;
+  grid-template-columns: 50px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-2);
+  padding: 5px;
+}
+
+.asset-item.active {
+  border-color: var(--pink);
+}
+
+.asset-preview {
+  width: 48px;
+  height: 32px;
+  border: 1px solid var(--line);
+  background: #000;
+  image-rendering: pixelated;
+  border-radius: 0;
+}
+
+.asset-meta {
+  min-width: 0;
+}
+
+.asset-meta strong,
+.asset-meta span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.asset-meta strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.asset-meta span {
+  color: var(--dim);
+  font-size: 10px;
+  font-family: Consolas, monospace;
+}
+
+.ref-controls {
+  display: none;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ref-controls.visible {
+  display: grid;
+}
+
+dialog {
+  width: min(900px, 92vw);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: rgba(0,0,0,.68);
+}
+
+.dialog-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.small-dialog {
+  width: min(420px, 92vw);
+}
+
+.dialog-body h2 {
+  margin: 0;
+}
+
+#codeText {
+  min-height: 430px;
+  resize: vertical;
+  font-family: Consolas, "JetBrains Mono", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.code-diagnostics {
+  display: grid;
+  gap: 6px;
+  max-height: 132px;
+  overflow: auto;
+}
+
+.diagnostic {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--cyan);
+  background: var(--bg-2);
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+
+.diagnostic strong { text-transform: uppercase; color: var(--cyan); }
+.diagnostic.error { border-color: var(--red); }
+.diagnostic.error strong { color: var(--red); }
+
+/* v0.005 YAJA creative-tool hierarchy */
+:root {
+  --chrome: #242424;
+  --chrome-raised: #303030;
+  --canvas-black: #050505;
+  --accent-orange: #ff934d;
+  --accent-cyan: #65e6e6;
+  --accent-pink: #ff4d91;
+  --focus-ring: var(--theme-primary);
+  --status-height: 28px;
+}
+
+body.theme-atari {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-header {
+  min-height: 66px;
+  padding: 8px 18px;
+  border-bottom-color: #4a4a4a;
+  background: var(--chrome);
+}
+
+.brand { min-width: 330px; }
+.brand-title { letter-spacing: .045em; }
+.project-strip { justify-content: flex-end; gap: 8px; }
+.project-strip label { color: #b9b9b9; }
+.project-divider { width: 1px; height: 30px; margin: 0 4px; background: #555; }
+
+.workspace {
+  height: calc(100vh - 66px - var(--status-height));
+  grid-template-columns: 210px minmax(520px, 1fr) 232px;
+  gap: 0;
+  background: #151515;
+}
+
+.panel {
+  border-radius: 0;
+  border-top: 0;
+  border-bottom: 0;
+  background: #292929;
+}
+
+.tools-panel { border-left: 0; }
+.right-panel { border-right: 0; }
+.panel section { padding: 13px 10px 15px; }
+.panel h2 { letter-spacing: .075em; }
+
+.editor-zone {
+  min-width: 0;
+  border-inline: 1px solid #454545;
+  background: #101010;
+}
+
+.editor-toolbar {
+  min-height: 62px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #414141;
+  background: #252525;
+}
+
+.canvas-band {
+  min-height: 0;
+  padding: 28px 18px;
+  background:
+    radial-gradient(circle at 1px 1px, #383838 1px, transparent 1.2px) 0 0 / 16px 16px,
+    #141414;
+}
+
+.canvas-wrap {
+  border: 1px solid #777;
+  box-shadow: 0 0 0 3px #080808, 0 18px 42px rgba(0,0,0,.42);
+  background: var(--canvas-black);
+}
+
+.preview-shell { width: 218px; border-color: #555; background: #181818; }
+.preview-title, .row-colors-title { color: var(--accent-cyan); }
+
+.frames-strip {
+  display: grid;
+  grid-template-rows: auto auto minmax(82px, 1fr);
+  gap: 8px;
+  min-height: 154px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid #505050;
+  background: #242424;
+}
+
+.timeline-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.timeline-heading > div { display: flex; align-items: baseline; gap: 12px; }
+.timeline-heading strong { color: var(--accent-orange); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.timeline-heading span { color: #9d9d9d; font-family: "JetBrains Mono", monospace; font-size: 10px; }
+.timeline-play { min-width: 74px; border-color: var(--accent-orange) !important; color: #111 !important; background: var(--accent-orange) !important; }
+.frames-actions { padding: 0; background: transparent; }
+.frames-list { padding-block: 2px 6px; }
+.frame-thumb.active { border-color: var(--accent-orange); box-shadow: 0 0 0 2px rgba(255,147,77,.22); }
+
+.status-bar {
+  height: var(--status-height);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 16px;
+  border-top: 1px solid #4b4b4b;
+  color: #a8a8a8;
+  background: #202020;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+}
+
+.status-bar span:not(.status-hint) { color: var(--accent-cyan); }
+.status-hint { margin-left: auto; }
+
+button, input, select, textarea, canvas[tabindex] { outline: none; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, canvas[tabindex]:focus-visible {
+  box-shadow: 0 0 0 2px #171717, 0 0 0 4px var(--focus-ring) !important;
+}
+
+button[disabled], input[disabled], select[disabled] { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 1120px) {
+  .brand { min-width: 270px; }
+  .project-strip button { padding-inline: 10px; }
+  .workspace { grid-template-columns: 188px minmax(480px, 1fr) 216px; }
+  .preview-shell { width: 190px; }
+  .canvas-band { padding-inline: 10px; }
+}
+
+@media (max-width: 920px) {
+  body.theme-atari { overflow: auto; }
+  .app-header { align-items: flex-start; flex-direction: column; }
+  .project-strip { width: 100%; justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; }
+  .workspace { height: auto; min-height: calc(100vh - 130px); grid-template-columns: 180px minmax(520px, 1fr); overflow: visible; }
+  .right-panel { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); max-height: 300px; overflow: auto; border-top: 1px solid #555; }
+  .status-bar { position: sticky; bottom: 0; }
+}
+
+@media (max-width: 720px) {
+  .tools-panel, .right-panel, .project-strip button:not(.primary), .project-divider { display: none; }
+  .workspace { display: block; min-width: 0; }
+  .editor-zone { min-height: calc(100vh - 150px); }
+  .canvas-band { min-height: 430px; overflow: auto; }
+  .status-hint { display: none; }
+}
+
+/* Final v0.008 cascade: supersede retained v0.006/v0.007 checkpoint rules. */
+.canvas-band, .editor-zone.two-sprite-layout .canvas-band { display: grid; place-items: center; grid-template-columns: 1fr; min-height: 0; padding: 54px 30px 34px; }
+.sprite-stage { position: relative; display: flex; align-items: flex-start; justify-content: center; gap: 10px; width: max-content; max-width: 100%; margin: 0 auto; padding-bottom: 36px; }
+.canvas-wrap { flex: 0 0 auto; border: 0; padding: 0; background: transparent; box-shadow: none; overflow: visible; }
+#spriteCanvas { display: block; outline: 0; border: 0; box-shadow: none; }
+.canvas-colors { position: relative; width: 48px; margin: 0; padding: 0; border: 0; }
+.canvas-colors .row-colors-title { position: absolute; top: -18px; left: 0; width: 100%; height: 16px; margin: 0; padding: 0; }
+.canvas-colors .row-colors { max-height: none; overflow: visible; }
+.rotation-tools { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.rotation-tools .rotation-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rotation-tools .rotation-buttons button { width: auto; min-width: 0; height: 38px; padding: 0 8px; white-space: nowrap; }
+.rotation-tools label { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font-size: 10px; }
+.rotation-tools label span { display: flex; align-items: center; gap: 3px; }
+.timeline-play { width: 38px; min-width: 38px; height: 38px; padding: 0; border-color: var(--border-color) !important; background: var(--bg-light) !important; color: #fff !important; }
+.timeline-play:hover { border-color: var(--accent-orange) !important; background: var(--bg-lighter) !important; }
+.clear-frame { height: 38px; padding: 0 16px; border: 1px solid var(--border-color); background: #ef4444; color: #fff; }
+
+@media (max-width: 1300px) {
+  .canvas-band, .editor-zone.two-sprite-layout .canvas-band { grid-template-columns: 1fr; padding: 46px 12px 28px; }
+}
+
+/* v0.008: canvas-adjacent color streams and Painter-parity controls */
+.export-actions { display: inline-flex; gap: 8px; flex: 0 0 auto; white-space: nowrap; }
+.export-actions button { flex: 0 0 auto; }
+.range-with-value { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 7px; align-items: center; }
+.range-with-value output { min-width: 34px; padding: 4px 2px; border: 1px solid #4b4b4b; background: #171717; color: #fff; text-align: center; font: 11px "JetBrains Mono", monospace; }
+.two-col .span-two { grid-column: 1 / -1; min-height: 38px; }
+.rotation-tools { display: flex; flex-direction: column; gap: 6px; align-items: stretch; margin-top: 12px; }
+.rotation-label { color: var(--accent-cyan); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.rotation-tools .rotation-buttons { display: grid; }
+.rotation-tools label { display: flex; align-items: center; justify-content: space-between; text-align: left; }
+.rotation-tools input { width: 58px; text-align: center; }
+.clear-frame { width: 100%; height: 38px; margin-top: 10px; padding: 0 16px; border: 1px solid var(--border-color); background: #ef4444; color: #fff; font-size: .7rem; }
+.clear-frame:hover { background: #dc2626; border-color: var(--accent-orange); box-shadow: 0 4px 8px rgba(0,0,0,.4); transform: translateY(-1px); }
+.canvas-band, .editor-zone.two-sprite-layout .canvas-band { display: grid; place-items: center; grid-template-columns: 1fr; min-height: 0; padding: 54px 30px 34px; }
+.sprite-stage { position: relative; display: flex; align-items: flex-start; justify-content: center; gap: 10px; width: max-content; max-width: 100%; margin: 0 auto; padding-bottom: 36px; }
+.canvas-wrap { flex: 0 0 auto; border: 0; padding: 0; background: transparent; box-shadow: none; overflow: visible; }
+#spriteCanvas { display: block; outline: 0; border: 0; box-shadow: none; }
+.canvas-color-columns { display: flex; gap: 7px; align-items: flex-start; }
+.canvas-colors { width: 48px; margin: 0; padding: 0; border: 0; }
+.canvas-colors.hidden { display: none; }
+.canvas-colors .row-colors-title { height: 18px; margin: -22px 0 4px; overflow: visible; white-space: nowrap; font-size: 9px; text-align: center; }
+.canvas-colors .row-colors { max-height: none; overflow: visible; border: 1px solid #555; background: #090909; }
+.canvas-colors .color-row { min-height: 0; box-sizing: border-box; }
+.canvas-colors .color-row > span { width: 18px; font-size: 8px; }
+.canvas-colors .color-row > div { min-width: 26px; }
+.canvas-readout { position: absolute; left: 0; bottom: 0; display: flex; min-width: 178px; height: 27px; align-items: center; padding: 0 10px; border: 1px solid #4b4b4b; background: rgba(20,20,20,.92); font: 11px "JetBrains Mono", monospace; }
+.canvas-readout span { display: inline-block; min-width: 72px; color: var(--text-muted); }
+.canvas-readout span:first-child { color: var(--accent-orange); }
+.canvas-readout span + span::before { content: "\00B7"; margin-right: 10px; color: #777; }
+.frames-strip { padding-top: 10px; }
+.frames-actions { align-items: center; gap: 5px; padding: 5px 0 8px; }
+.timeline-tool, .timeline-play { width: 38px; min-width: 38px; height: 38px; padding: 0; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-light); color: var(--text-dim); box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+.timeline-tool:hover, .timeline-play:hover { background: var(--bg-lighter); color: #fff; border-color: var(--accent-orange); }
+.timeline-play { width: 38px; min-width: 38px; color: var(--text-dim) !important; background: var(--bg-light) !important; }
+.timeline-play span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.timeline-repeat { display: flex; flex-direction: row; align-items: center; gap: 7px; margin-left: 8px; white-space: nowrap; color: var(--text-muted); font-size: 10px; }
+.timeline-repeat input { width: 54px; height: 34px; }
+.frame-thumb.selected { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+.frame-thumb.active { border-color: var(--accent-orange); box-shadow: 0 0 0 2px rgba(255,147,77,.45); }
+#playerTabs button.active { background: var(--accent-orange); border-color: var(--accent-orange); color: #151515; }
+#paletteEyedropper, #paletteEyedropper svg { color: #fff; fill: currentColor; }
+#paletteEyedropper.active { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+
+@media (max-width: 1300px) {
+  .canvas-band, .editor-zone.two-sprite-layout .canvas-band { grid-template-columns: 1fr; padding: 46px 12px 28px; }
+}
+
+@media (max-width: 1300px) {
+  body {
+    min-width: 1000px;
+  }
+
+  .workspace {
+    grid-template-columns: 230px minmax(560px, 1fr) 250px;
+  }
+
+  .canvas-band {
+    grid-template-columns: minmax(300px, 1fr) 48px 210px;
+  }
+}
+
+/* Theme tokens moved to themes.css in v0.021. */
+
+body.theme-atari {
+  color: var(--text-primary);
+  background: var(--bg-darkest);
+  overflow: hidden;
+  user-select: none;
+}
+
+.theme-atari input,
+.theme-atari textarea,
+.theme-atari select,
+.theme-atari .code-input {
+  user-select: auto;
+  font-family: "JetBrains Mono", monospace !important;
+  letter-spacing: 0 !important;
+}
+
+.app-header {
+  min-height: 60px;
+  height: auto;
+  background: var(--bg-medium);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 20px;
+  gap: 15px;
+}
+
+.brand {
+  min-width: 320px;
+}
+
+.brand-title.logo {
+  color: var(--title-accent);
+  font-size: 1rem;
+}
+
+.project-strip {
+  gap: 8px;
+}
+
+.workspace {
+  height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.panel {
+  width: 250px;
+  background: var(--bg-medium);
+  border-color: var(--border-color);
+  padding: 0.6rem;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.tools-panel {
+  border-right: 1px solid var(--border-color);
+}
+
+.right-panel {
+  border-left: 1px solid var(--border-color);
+}
+
+.panel section {
+  margin-bottom: 0.65rem;
+}
+
+h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: var(--title-accent);
+  font-weight: 700;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+input,
+select,
+textarea {
+  background: #1a1a1a;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 0.25rem;
+  accent-color: var(--accent);
+}
+
+button {
+  background: var(--bg-light);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+button:hover {
+  background: var(--bg-lighter);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.primary,
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg-darkest);
+  border-color: var(--accent);
+  font-weight: bold;
+}
+
+.tool-grid {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.tool-btn,
+.tool {
+  background: var(--bg-light);
+  color: var(--text-secondary);
+  width: 100%;
+  height: 38px;
+  aspect-ratio: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.tool-btn:hover,
+.tool:hover {
+  background: var(--bg-lighter);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.tool-btn.active,
+.tool.active {
+  background: var(--accent);
+  color: var(--bg-darkest);
+  border-color: var(--accent);
+  box-shadow: 0 0 15px var(--accent);
+  transform: translateY(1px);
+}
+
+.tool svg,
+.tool-btn svg,
+.btn-icon svg,
+.icon-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.editor-zone {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-dark);
+}
+
+.editor-toolbar,
+.frames-strip,
+.frames-actions {
+  background: var(--bg-medium);
+  border-color: var(--border-color);
+}
+
+.canvas-band {
+  display: grid;
+  grid-template-columns: 56px minmax(330px, 1fr) 250px;
+  gap: 5px;
+  padding: 60px;
+  background-color: var(--bg-dark);
+  background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
+  background-size: 20px 20px;
+  overflow: auto;
+  align-items: flex-start;
+}
+
+.canvas-wrap {
+  align-items: flex-start;
+  justify-content: flex-start;
+  border: 1px solid var(--border-color);
+  background: #000;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
+  padding-top: 25px;
+  min-height: unset;
+}
+
+#spriteCanvas {
+  background: #000;
+}
+
+.row-colors-shell {
+  border: 1px solid var(--border-color);
+  background: #000;
+  width: 56px;
+}
+
+.row-colors-title,
+.preview-title {
+  height: 25px;
+  line-height: 16px;
+  padding: 4px 0;
+  background: var(--bg-darkest);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.row-colors {
+  overflow: visible;
+  max-height: none;
+  background: #000;
+}
+
+.color-row {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  min-height: 1px;
+}
+
+.color-row span {
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text-secondary);
+  font-size: 0.58rem;
+}
+
+.preview-shell {
+  border: 1px solid var(--border-color);
+  background: var(--bg-medium);
+  margin-top: 25px;
+}
+
+.selection-bar {
+  background: var(--bg-medium);
+  border-color: var(--border-color);
+}
+
+.frame-thumb {
+  border-color: var(--border-color);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+}
+
+.frame-thumb.active {
+  border-color: var(--accent);
+  background: var(--bg-lighter);
+}
+
+.persistent-palette-grid {
+  display: grid;
+  grid-template-columns: 24px repeat(8, 1fr);
+  gap: 1px;
+  width: 100%;
+  background: #000;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+}
+
+.palette-axis-label {
+  font-size: 0.65rem;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  min-height: 22px;
+}
+
+.persistent-swatch {
+  aspect-ratio: 1 / 1;
+  min-height: 22px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0;
+  transition: transform 0.1s;
+  padding: 0;
+  box-shadow: none;
+}
+
+.persistent-swatch:hover {
+  transform: scale(1.1);
+  z-index: 10;
+  border-color: #fff;
+}
+
+.persistent-swatch.active,
+.persistent-swatch.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.asset-list,
+.stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.stamp-item,
+.asset-item {
+  background: #000;
+  border: 1px solid var(--border-color);
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+  border-radius: 0;
+}
+
+.stamp-item:hover,
+.asset-item:hover {
+  border-color: var(--accent);
+}
+
+.stamp-item.active,
+.asset-item.active {
+  border-color: var(--accent);
+  background: var(--bg-medium);
+}
+
+.asset-preview,
+.stamp-preview,
+.color-block-preview {
+  width: 90%;
+  height: 90%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  image-rendering: pixelated;
+}
+
+.color-block-preview {
+  display: flex;
+  flex-direction: column;
+}
+
+.color-block-preview-row {
+  flex: 1;
+  min-height: 0;
+}
+
+.asset-meta {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  background: rgba(0, 0, 0, 0.72);
+  padding: 2px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.asset-meta strong {
+  font-size: 0.55rem;
+}
+
+.asset-meta span {
+  display: none;
+}
+
+.asset-item button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-height: 18px;
+  height: 18px;
+  width: 28px;
+  padding: 0;
+  font-size: 0.55rem;
+  opacity: 0;
+}
+
+.asset-item:hover button {
+  opacity: 1;
+}
+
+/* v0.006 Painter interaction and Composer typography parity */
+:root, button, input, select, textarea {
+  font-kerning: normal;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+.brand-title { letter-spacing: 3px; }
+.panel h2, .timeline-heading strong { letter-spacing: 1px; }
+button, label, select, input { letter-spacing: .7px; }
+
+.tools-panel { display: flex; flex-direction: column; }
+.tools-panel > section:nth-child(1) { order: 1; }
+.tools-panel > section:nth-child(4) { order: 2; }
+.tools-panel > section:nth-child(2) { order: 3; }
+.tools-panel > section:nth-child(3) { order: 4; }
+
+.readout { display: flex; align-items: center; gap: 0; min-width: max-content; border: 0; background: transparent; }
+.readout span { padding: 0; border: 0; background: transparent; color: var(--text-muted); font-size: 11px; }
+.readout span + span::before { content: "\00B7"; margin: 0 9px; color: #777; }
+.readout #frameLabel { color: var(--accent-orange); }
+.readout #toolReadout { color: var(--accent-cyan); }
+
+#previewCanvas { width: 100%; height: auto; max-height: 300px; object-fit: contain; background: #000; }
+.editor-zone.two-sprite-layout .canvas-band { grid-template-columns: 48px minmax(420px, 1fr) minmax(250px, 320px); padding-inline: 18px; }
+.editor-zone.two-sprite-layout .preview-shell { width: auto; min-width: 250px; }
+
+.rotation-angle { margin-top: 8px; display: flex; align-items: center; justify-content: space-between; }
+.rotation-angle span { display: inline-flex; align-items: center; gap: 3px; }
+.rotation-angle input { width: 66px; }
+.color-row.placement-preview { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
+.asset-item.active { border-color: var(--accent-orange); box-shadow: 0 0 0 2px rgba(255,147,77,.24); }
+.asset-remove { opacity: 0; }
+.asset-item:hover .asset-remove, .asset-item:focus-within .asset-remove { opacity: 1; }
+
+@media (max-width: 1300px) {
+  .editor-zone.two-sprite-layout .canvas-band { grid-template-columns: 44px minmax(390px, 1fr) 250px; padding: 28px 10px; }
+}
+
+/* Final v0.005 cascade lock: legacy theme declarations above remain reusable. */
+body.theme-atari { min-width: 0; overflow: hidden; }
+.app-header { min-height: 66px; padding: 8px 18px; border-bottom-color: #4a4a4a; background: var(--chrome); }
+.brand { min-width: 330px; }
+.project-strip { justify-content: flex-end; gap: 8px; }
+.workspace { height: calc(100vh - 66px - var(--status-height)); grid-template-columns: 210px minmax(520px, 1fr) 232px; gap: 0; background: #151515; }
+.panel { border-radius: 0; border-top: 0; border-bottom: 0; background: #292929; }
+.editor-zone { min-width: 0; border-inline: 1px solid #454545; background: #101010; }
+.editor-toolbar { min-height: 62px; padding: 9px 12px; border-bottom: 1px solid #414141; background: #252525; }
+.canvas-band { min-height: 0; padding: 28px 18px; background: radial-gradient(circle at 1px 1px, #383838 1px, transparent 1.2px) 0 0 / 16px 16px, #141414; }
+.canvas-wrap { border: 1px solid #777; box-shadow: 0 0 0 3px #080808, 0 18px 42px rgba(0,0,0,.42); background: var(--canvas-black); }
+.preview-shell { width: 218px; border-color: #555; background: #181818; }
+.frames-strip { display: grid; grid-template-rows: auto auto minmax(82px, 1fr); gap: 8px; min-height: 154px; padding: 10px 12px 12px; border-top: 1px solid #505050; background: #242424; }
+.frames-actions { padding: 0; background: transparent; }
+
+@media (max-width: 1120px) {
+  .brand { min-width: 270px; }
+  .workspace { grid-template-columns: 188px minmax(480px, 1fr) 216px; }
+  .preview-shell { width: 190px; }
+}
+
+/* v0.007 Painter parity correction */
+.app-header { display: flex; overflow: hidden; }
+.brand { flex: 0 0 270px; min-width: 270px; }
+.project-strip { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.brand-title, .panel h2, .timeline-heading strong, .preview-title, .row-colors-title,
+.status-bar, button, label { letter-spacing: .08em; }
+.brand-title { letter-spacing: .16em; }
+
+.canvas-band,
+.editor-zone.two-sprite-layout .canvas-band {
+  grid-template-columns: minmax(300px, 1fr) minmax(218px, 280px);
+  align-items: flex-start;
+}
+.canvas-wrap {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-height: 0;
+}
+#spriteCanvas {
+  display: block;
+  outline: 1px solid #666;
+  outline-offset: 0;
+}
+
+.palette-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.palette-title-row h2 { margin: 0; }
+.tool-btn-small, .timeline-tool {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tool-btn-small svg, .timeline-tool svg { width: 17px; height: 17px; }
+.timeline-play { min-width: 72px; width: auto; padding-inline: 9px; gap: 6px; }
+.timeline-tool.wide { width: auto; padding-inline: 8px; gap: 5px; }
+.frames-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.rotation-tools { display: grid; grid-template-columns: 36px 1fr 36px; gap: 6px; align-items: end; margin-top: 10px; }
+.rotation-tools label { margin: 0; text-align: center; }
+.rotation-tools label span { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.rotation-tools input { width: 58px; text-align: center; }
+.clear-frame { width: 100%; margin-top: 10px; border-color: #b95454; color: #ffb0b0; background: #321919; }
+
+.player-colors-panel { margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+.row-colors-title { height: auto; margin-bottom: 5px; padding: 0; }
+.row-colors { border: 1px solid var(--border-color); max-height: 260px; overflow-y: auto; position: relative; }
+.color-row { min-height: 12px; height: 12px; position: relative; cursor: crosshair; }
+.color-row span { display: none; }
+.color-row { grid-template-columns: 1fr; }
+.color-row.color-selected { outline: 2px solid #fff; outline-offset: -2px; z-index: 4; }
+.color-row.placement-preview { outline: 2px solid #fff; outline-offset: -2px; z-index: 5; }
+.context-action { width: 100%; margin-top: 6px; }
+.hidden { display: none !important; }
+
+.persistent-swatch { position: relative; z-index: 1; }
+.persistent-swatch.active, .persistent-swatch.selected {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+  z-index: 12;
+}
+
+.asset-list { grid-template-columns: repeat(3, minmax(48px, 1fr)); gap: 6px; }
+.asset-item { min-height: 58px; aspect-ratio: 1 / 1; padding: 4px; overflow: visible; }
+.asset-item .asset-preview { width: 100%; height: 100%; }
+.asset-item button { width: 20px; height: 20px; padding: 0; opacity: 0; z-index: 5; }
+.asset-item .asset-remove { top: -5px; right: -5px; background: #4b1717; color: #fff; }
+.asset-item .asset-edit { top: auto; right: -5px; bottom: -5px; background: #1b3d45; color: #fff; }
+.asset-item .asset-edit svg { width: 12px; height: 12px; }
+.asset-item:hover button, .asset-item:focus-within button { opacity: 1; }
+.asset-item.active { border-color: var(--accent-orange); box-shadow: 0 0 0 2px rgba(255,147,77,.28); }
+
+.color-block-editor-rows { display: flex; flex-direction: column; gap: 3px; max-height: 55vh; overflow-y: auto; }
+.color-block-editor-row { display: grid; grid-template-columns: 32px 1fr 32px; gap: 6px; align-items: center; }
+.color-block-editor-row > span { width: 32px; height: 28px; border: 1px solid #777; }
+.color-block-editor-row button { width: 32px; height: 28px; padding: 0; }
+.stamp-editor-grid { display: grid; gap: 2px; justify-content: center; padding: 12px; background: #080808; }
+.stamp-editor-grid button { width: 26px; height: 26px; padding: 0; background: #171717; border: 1px solid #444; }
+.stamp-editor-grid button.active { background: #fff; border-color: #fff; }
+.asset-editor-dialog { min-width: 340px; }
+
+.readout { padding: 5px 8px; border: 1px solid #4b4b4b; background: #191919; }
+.readout span { font-family: "JetBrains Mono", monospace; }
+
+@media (max-width: 1300px) {
+  .workspace { grid-template-columns: 205px minmax(520px, 1fr) 250px; }
+  .canvas-band, .editor-zone.two-sprite-layout .canvas-band { grid-template-columns: minmax(300px, 1fr) 230px; padding: 20px 10px; }
+}
+
+@media (max-width: 920px) {
+  body.theme-atari { overflow: auto; }
+  .app-header { align-items: flex-start; flex-direction: column; }
+  .project-strip { width: 100%; justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; }
+  .workspace { height: auto; min-height: calc(100vh - 130px); grid-template-columns: 180px minmax(520px, 1fr); overflow: visible; }
+  .right-panel { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(210px, 1fr)); max-height: 300px; overflow: auto; border-top: 1px solid #555; }
+}
+
+@media (max-width: 720px) {
+  .tools-panel, .right-panel, .project-strip button:not(.primary), .project-divider { display: none; }
+  .workspace { display: block; min-width: 0; }
+  .editor-zone { min-height: calc(100vh - 150px); }
+  .canvas-band { min-height: 430px; overflow: auto; }
+  .status-hint { display: none; }
+}
+
+/* Consolidated from v008.css. */
+/* v0.008 final layout overrides, intentionally isolated from retained checkpoint CSS. */
+.export-actions { display:inline-flex; gap:8px; flex:0 0 auto; white-space:nowrap; }
+.range-with-value { display:grid; grid-template-columns:minmax(0,1fr) 34px; gap:7px; align-items:center; }
+.range-with-value output { padding:4px 2px; border:1px solid #4b4b4b; background:#171717; color:#fff; text-align:center; font:11px "JetBrains Mono",monospace; }
+.two-col .span-two { grid-column:1/-1; min-height:38px; }
+.canvas-band,.editor-zone.two-sprite-layout .canvas-band { display:grid; place-items:center; grid-template-columns:1fr; min-height:0; padding:54px 30px 34px; }
+.sprite-stage { position:relative; display:flex; align-items:flex-start; justify-content:center; gap:10px; width:max-content; max-width:100%; margin:0 auto; padding-bottom:36px; }
+.canvas-wrap { flex:0 0 auto; border:0!important; padding:0!important; background:transparent!important; box-shadow:none!important; overflow:visible; }
+#spriteCanvas { display:block; outline:0; border:0; box-shadow:none; }
+.canvas-color-columns { display:flex; gap:7px; align-items:flex-start; }
+.canvas-colors { position:relative; width:48px; margin:0; padding:0; border:0; }
+.canvas-colors.hidden { display:none; }
+.canvas-colors .row-colors-title { position:absolute; top:-18px; left:0; width:100%; height:16px; margin:0; padding:0; white-space:nowrap; font-size:9px; text-align:center; }
+.canvas-colors .row-colors { max-height:none; overflow:visible; border:1px solid #555; background:#090909; }
+.canvas-colors .color-row { min-height:0; box-sizing:border-box; }
+.canvas-readout { position:absolute; left:0; bottom:0; display:flex; min-width:178px; height:27px; align-items:center; padding:0 10px; border:1px solid #4b4b4b; background:rgba(20,20,20,.92); font:11px "JetBrains Mono",monospace; }
+.canvas-readout span { display:inline-block; min-width:72px; color:var(--text-muted); }
+.canvas-readout span:first-child { color:var(--accent-orange); }
+.canvas-readout span+span::before { content:"\00B7"; margin-right:10px; color:#777; }
+.rotation-tools { display:flex; flex-direction:column; align-items:stretch; gap:6px; margin-top:12px; }
+.rotation-label { color:var(--accent-cyan); font-size:10px; letter-spacing:1px; text-transform:uppercase; }
+.rotation-tools .rotation-buttons { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.rotation-tools .rotation-buttons button { width:auto; min-width:0; height:38px; padding:0 8px; white-space:nowrap; }
+.rotation-tools label { display:grid; grid-template-columns:1fr auto; align-items:center; gap:8px; margin:0; text-align:left; font-size:10px; }
+.rotation-tools label span { display:flex; align-items:center; gap:3px; }
+.rotation-tools input { width:58px; text-align:center; }
+.clear-frame { width:100%; height:38px; margin-top:10px; padding:0 16px; border:1px solid var(--border-color)!important; background:#ef4444!important; color:#fff!important; font-size:.7rem; }
+.clear-frame:hover { background:#dc2626; border-color:var(--accent-orange); box-shadow:0 4px 8px rgba(0,0,0,.4); transform:translateY(-1px); }
+.frames-strip { padding-top:10px; }
+.frames-actions { align-items:center; gap:5px; padding:5px 0 8px; }
+.timeline-tool,.timeline-play { width:38px; min-width:38px; height:38px; padding:0; border:1px solid var(--border-color)!important; border-radius:4px; background:var(--bg-light)!important; color:#fff!important; box-shadow:0 2px 4px rgba(0,0,0,.3); }
+.timeline-tool:hover,.timeline-play:hover { background:var(--bg-lighter)!important; border-color:var(--accent-orange)!important; }
+.timeline-play span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+.timeline-play svg { color:#fff!important; fill:#fff!important; }
+.timeline-repeat { display:flex; flex-direction:row; align-items:center; gap:7px; margin-left:8px; white-space:nowrap; color:var(--text-muted); font-size:10px; }
+.timeline-repeat input { width:54px; height:34px; }
+.frame-thumb.selected { border-color:#fff; box-shadow:0 0 0 1px #fff; }
+.frame-thumb.active { border-color:var(--accent-orange); box-shadow:0 0 0 2px rgba(255,147,77,.45); }
+#playerTabs button.active { background:var(--accent-orange); border-color:var(--accent-orange); color:#151515; }
+#paletteEyedropper,#paletteEyedropper svg { color:#fff; fill:currentColor; }
+#paletteEyedropper.active { color:var(--accent-cyan); border-color:var(--accent-cyan); }
+@media(max-width:1300px){.canvas-band,.editor-zone.two-sprite-layout .canvas-band{grid-template-columns:1fr;padding:46px 12px 28px;}}
+
+/* Consolidated from v009.css. */
+/* v0.009 — Painter-derived interaction and sizing corrections. */
+.workspace { grid-template-columns:230px minmax(520px,1fr) 232px; }
+.panel, .panel label, .panel button, .editor-toolbar label { font-size:.7rem; letter-spacing:.04em; }
+.panel h2 { font-size:.72rem; }
+.dimension-control { display:grid; grid-template-columns:1fr 54px; align-items:center; gap:7px; white-space:nowrap; }
+.dimension-control input { width:54px; }
+.subcontrol-label,.rotation-label { margin:2px 0 5px; color:#fff; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; }
+.player-transfer-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.player-transfer-grid .span-two { grid-column:1/-1; }
+.two-sprite-controls { display:flex; flex-direction:column; gap:7px; }
+.player-canvas-group { display:flex; align-items:flex-start; gap:9px; }
+.player-canvas-group.hidden { display:none!important; }
+.sprite-stage { gap:34px; }
+.canvas-colors { width:48px; }
+.canvas-colors .row-colors-title { top:-30px; height:28px; line-height:12px; color:#fff; overflow:visible; }
+.canvas-readout { color:#fff; }
+.selection-bar,.selection-bar span { color:#fff!important; }
+.onion-count { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.onion-count input { width:44px; height:28px; }
+.asset-new { width:100%; height:38px; margin-top:5px; justify-content:center; }
+.rotation-label { color:#fff; }
+.clear-frame { font-size:.82rem!important; }
+.timeline-play { width:auto!important; min-width:78px!important; padding:0 10px!important; gap:7px; }
+.timeline-play span { position:static!important; width:auto!important; height:auto!important; overflow:visible!important; clip:auto!important; color:#fff; }
+.timeline-tool svg { fill:#fff!important; color:#fff!important; }
+#moveFrameLeft svg,#moveFrameRight svg { width:28px!important; height:28px!important; transform-origin:center; }
+#moveFrameLeft svg { transform:rotate(-90deg) scale(1.25); }
+#moveFrameRight svg { transform:rotate(90deg) scale(1.25); }
+.asset-editor-dialog { width:640px; max-width:92vw; }
+#stampEditor .asset-editor-dialog { width:800px; }
+.stamp-editor-grid { max-height:500px; overflow:auto; padding:20px; background-color:#000; background-image:linear-gradient(45deg,#111 25%,transparent 25%),linear-gradient(-45deg,#111 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#111 75%),linear-gradient(-45deg,transparent 75%,#111 75%); background-size:20px 20px; }
+dialog::backdrop { background:rgba(0,0,0,.74); }
+@media(max-width:1300px){.workspace{grid-template-columns:218px minmax(520px,1fr) 226px}.sprite-stage{gap:20px}.panel,.panel label,.panel button{font-size:.66rem}}
+
+/* Consolidated from v010.css. */
+/* YAJA 2600 Animator v0.010 - Painter parity and frame motion */
+body.theme-atari { font-family: "Orbitron", system-ui, sans-serif; letter-spacing: .08rem; }
+input, select, textarea, output, .code-input { font-family: "JetBrains Mono", monospace !important; letter-spacing: normal !important; }
+
+button {
+  min-height: 36px;
+  padding: 0 16px;
+  font: 400 .85rem "Orbitron", system-ui, sans-serif;
+  letter-spacing: .08rem;
+  border-radius: 4px;
+}
+.tool-btn, .btn-icon, .timeline-tool { width: 38px; min-width: 38px; height: 38px; min-height: 38px; padding: 0; }
+.tool-btn { font: 400 .833333rem "Orbitron", system-ui, sans-serif !important; letter-spacing: .08rem !important; color: #fff; }
+.tool-btn.active { color: #000; }
+.tool-btn svg, .btn-icon svg, .timeline-tool svg { width: 20px; height: 20px; color: currentColor; fill: currentColor; }
+.btn-primary { background: var(--accent); color: var(--bg-darkest); font-weight: 600; }
+.btn-secondary { background: var(--bg-light); color: var(--text-primary); border: 1px solid var(--border-color); }
+.btn-danger, .danger { height: 38px; background: #ef4444; color: #fff; border: 1px solid var(--border-color); font-size: .7rem; }
+.clear-frame { width: auto; min-width: 118px; height: 38px; padding: 0 16px; font-size: .7rem !important; letter-spacing: .08rem !important; }
+.compact-text-button { height: 34px; min-height: 34px; padding: 0 10px; font-size: .7rem; white-space: nowrap; }
+
+.tools-panel section { margin-bottom: .55rem; }
+.active-sprite-label, .subcontrol-label { margin: 5px 0; color: #fff; font-size: .7rem; text-transform: uppercase; }
+.offset-controls label { min-width: 0; }
+.offset-controls input { width: 100%; }
+.bulk-actions { margin-top: 6px; grid-template-columns: 1fr; }
+.bulk-actions button { min-width: 0; height: 36px; padding: 0 9px; font-size: .65rem; line-height: 1.15; white-space: nowrap; }
+.player-transfer-grid { margin-top: 6px; }
+
+.editor-toolbar {
+  min-height: 44px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.editor-toolbar label, .editor-toolbar .check-row, .editor-toolbar .onion-count {
+  min-height: 32px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.editor-toolbar input[type="number"] { width: 52px; height: 32px; }
+.editor-toolbar input[type="range"] { height: 32px; }
+
+.canvas-band, .editor-zone.two-sprite-layout .canvas-band { padding-top: 38px; }
+.player-canvas-group { position: relative; }
+.player-canvas-group.active-slot canvas { outline: 1px solid #fff !important; outline-offset: 0; }
+.canvas-colors { width: 28px; }
+.canvas-colors .row-colors-title {
+  width: 28px;
+  margin-top: -28px;
+  height: 24px;
+  color: #fff;
+  font-size: .6rem;
+  line-height: 1.05;
+  letter-spacing: .02rem;
+  white-space: normal;
+}
+.canvas-colors .row-colors { width: 28px; position: relative; overflow: visible; }
+.canvas-colors .color-row { grid-template-columns: 1fr; }
+.canvas-colors .color-row > span { display: none; }
+.canvas-colors .color-row > div { min-width: 26px; }
+.color-row.color-selected { outline: none !important; }
+.scanline-selection-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 20;
+  border: 1px dashed #fff;
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000;
+}
+
+.frames-strip {
+  min-height: 142px;
+  grid-template-rows: auto auto minmax(76px, 1fr);
+  gap: 4px;
+  padding: 6px 12px 10px;
+}
+.timeline-heading { min-height: 18px; padding: 0; margin: 0; }
+.timeline-heading strong { font-size: .75rem; line-height: 18px; }
+.frames-actions { min-height: 38px; padding: 0; gap: 5px; align-items: center; }
+.timeline-play { width: auto !important; min-width: 82px !important; padding: 0 10px !important; gap: 6px; color: #fff !important; }
+.timeline-play span { position: static !important; width: auto !important; height: auto !important; overflow: visible !important; clip: auto !important; color: #fff; font: 400 .7rem "Orbitron", sans-serif; letter-spacing: .08rem; }
+.timeline-repeat { margin-left: 5px; font-size: .7rem; }
+.timeline-repeat input { height: 34px; }
+.frames-list { padding: 2px 0 4px; }
+
+.selection-bar button { height: 36px; padding: 0 12px; font-size: .8rem; }
+#selectionInfo { color: #fff; }
+.project-strip button, .export-actions button { height: 36px; font-size: .85rem; color: #fff; }
+.project-strip .btn-primary, .export-actions .btn-primary { color: #000; font-size: .833333rem; }
+.dialog-actions button, .asset-new, .reference-import-row button, .ref-controls button { font-size: .8rem; }
+
+.reference-import-row { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.reference-import-row button { min-width: 0; padding: 0 7px; }
+.reference-import-row svg, .reference-transform svg { width: 20px; height: 20px; fill: currentColor; flex: 0 0 auto; }
+.ref-controls { gap: 6px; }
+.ref-controls.visible { display: flex; }
+.ref-controls label { margin: 0; }
+.reference-transform {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.reference-transform.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.reference-transform-outline { position: absolute; pointer-events: none; border: 2px dashed #fff; z-index: 18; }
+
+@media (max-width: 1120px) {
+  .editor-toolbar { gap: 8px; overflow-x: auto; }
+  .timeline-repeat { margin-left: 0; }
+  .frames-actions { overflow-x: auto; flex-wrap: nowrap; }
+}
+
+/* Consolidated from v011.css. */
+/* YAJA 2600 Animator v0.011 - Painter-matched right-rail palette fit */
+.right-panel {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.right-panel > section {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+
+.right-panel .persistent-palette-grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  grid-template-columns: 24px repeat(8, minmax(0, 1fr));
+}
+
+.right-panel .persistent-swatch,
+.right-panel .palette-axis-label {
+  min-width: 0;
+}
+
+.right-panel .persistent-swatch {
+  min-height: 0;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Consolidated from v012.css. */
+/* YAJA 2600 Animator v0.012 - Painter typography and Composer timeline groups */
+.panel label {
+  font-size: .8rem;
+  letter-spacing: .08rem;
+}
+
+.panel button:not(.tool-btn):not(.btn-icon):not(.icon-button):not(.tool-btn-small) {
+  font-size: .85rem;
+  letter-spacing: .08rem;
+  gap: 6px;
+}
+
+.tool-grid .tool-btn {
+  width: 100%;
+  min-width: 0;
+}
+
+.frames-strip {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.frames-actions {
+  min-height: 44px;
+  padding: 4px 0;
+  gap: 0;
+  flex-wrap: nowrap;
+}
+
+.frame-button-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.timeline-divider {
+  width: 1px;
+  height: 30px;
+  margin: 0 8px;
+  flex: 0 0 1px;
+  background: var(--border-color);
+}
+
+.frames-actions .timeline-tool,
+.frames-actions .timeline-play {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+
+.frames-actions .timeline-play {
+  width: auto !important;
+  min-width: 82px !important;
+}
+
+.timeline-play span {
+  font-size: .85rem;
+  letter-spacing: .08rem;
+}
+
+.timeline-repeat {
+  min-height: 36px;
+  margin-left: 0;
+  gap: 7px;
+  font-size: .8rem;
+  letter-spacing: .08rem;
+}
+
+.timeline-repeat input,
+#applyRepeatAll {
+  height: 36px;
+  min-height: 36px;
+}
+
+#timelineFrameRepeat {
+  font-size: .85rem;
+}
+
+#applyRepeatAll {
+  margin-left: 8px;
+  padding: 0 12px;
+  font-size: .85rem;
+  letter-spacing: .08rem;
+}
+
+@media (max-width: 1120px) {
+  .frames-actions { overflow-x: auto; }
+  .timeline-divider { margin-inline: 6px; }
+}
+
+/* Consolidated from v013.css. */
+/* YAJA 2600 Animator v0.013 - canvas, toolbar, export, and reference import polish */
+
+.history-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+/* Painter v1.2 history controls: exact 38px square, icon, elevation, and interaction treatment. */
+.history-actions .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  flex: 0 0 38px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-light);
+  color: var(--text-dim);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .3);
+}
+.history-actions .btn-icon:hover {
+  background: var(--bg-lighter);
+  color: #fff;
+  border-color: var(--accent);
+}
+.history-actions .btn-icon:active { box-shadow: none; }
+.history-actions .btn-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.tools-panel > section:first-child {
+  margin-bottom: 0;
+  padding-inline: 0;
+  padding-bottom: 4px;
+}
+.tools-panel .edit-section { padding-top: 4px; }
+
+.editor-toolbar {
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  scrollbar-gutter: stable;
+}
+.editor-toolbar > * { flex: 0 0 auto; }
+
+.player-canvas-group.active-slot canvas {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.canvas-colors {
+  position: relative;
+  align-self: stretch;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  border-top: 0 !important;
+}
+.canvas-colors .row-colors-title {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  width: 28px;
+  height: 24px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  z-index: 3;
+  border: 1px solid #555;
+  border-bottom: 0;
+  background: #141414;
+}
+
+.reference-import-row { grid-template-columns: 1fr; }
+.reference-import-row button { width: 100%; }
+
+.import-mode-options {
+  margin: 0;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+}
+.import-mode-options .check-row {
+  display: flex;
+  grid-template-columns: none;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.import-mode-options input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  min-height: 0;
+  padding: 0;
+  flex: 0 0 14px;
+}
+.import-mode-options legend {
+  padding: 0 5px;
+  color: #fff;
+  font-size: .7rem;
+  letter-spacing: .08rem;
+  text-transform: uppercase;
+}
+
+.bb-import-dialog { width: min(980px, 94vw); }
+.bb-import-dialog .dialog-body {
+  grid-template-columns: minmax(260px, .8fr) minmax(400px, 1.35fr);
+  align-items: stretch;
+}
+.bb-import-dialog .dialog-body > h2,
+.bb-import-dialog .code-diagnostics,
+.bb-import-dialog .dialog-actions { grid-column: 1 / -1; }
+.bb-import-help {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-dark);
+  color: var(--text-secondary);
+  font: 400 .72rem/1.55 "JetBrains Mono", monospace;
+  letter-spacing: normal;
+}
+.bb-import-help strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-family: "Orbitron", system-ui, sans-serif;
+  letter-spacing: .08rem;
+}
+.bb-import-help ul { margin: 0 0 12px; padding-left: 18px; }
+.bb-import-help li + li { margin-top: 6px; }
+.bb-import-help code { color: var(--accent); }
+.bb-import-help pre {
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  background: var(--bg-darkest);
+  color: var(--text-primary);
+  font: inherit;
+  white-space: pre;
+}
+.bb-import-dialog #codeText { min-height: 510px; }
+
+@media (max-width: 760px) {
+  .bb-import-dialog .dialog-body { grid-template-columns: minmax(0, 1fr); }
+  .bb-import-dialog .dialog-body > h2,
+  .bb-import-dialog .code-diagnostics,
+  .bb-import-dialog .dialog-actions { grid-column: 1; }
+  .bb-import-dialog #codeText { min-height: 320px; }
+}
+.sequence-options { display: grid; gap: 8px; }
+.sequence-options.hidden { display: none; }
+
+#sequenceDialog,
+#exportPngDialog { width: min(420px, 92vw); }
+#sequenceDialog .small-dialog,
+#exportPngDialog .small-dialog {
+  width: auto;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Consolidated from v014.css. */
+/* YAJA 2600 Animator v0.014 - simplified sprite assignments and color transfer */
+
+.tools-panel > section:nth-child(2) {
+  margin-bottom: 0;
+  padding-bottom: 4px;
+}
+.tools-panel > section:nth-child(3) { padding-top: 8px; }
+
+.canvas-colors .row-colors-title {
+  top: -18px;
+  height: 18px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* Consolidated from v015.css. */
+/* YAJA 2600 Animator v0.015 - per-frame width and canvas edge correction */
+.sprite-assignment-row { margin-top: 10px; }
+.frame-dimensions { margin-top: 8px; }
+.frame-dimensions label { min-width: 0; }
+.frame-dimensions input { width: 100%; }
+
+/* Consolidated from v016.css. */
+/* YAJA 2600 Animator v0.016 - stable playback and grouped canvas controls */
+.editor-toolbar {
+  gap: 8px;
+}
+
+.canvas-control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.canvas-control-group > label {
+  margin: 0;
+}
+
+.canvas-toolbar-divider {
+  width: 1px;
+  height: 28px;
+  margin: 0 4px;
+  flex: 0 0 1px;
+  background: var(--border-color);
+}
+
+.frames-actions .timeline-play {
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+  flex: 0 0 88px;
+}
+
+.timeline-loop {
+  min-height: 36px;
+  margin-left: 8px;
+  flex: 0 0 auto;
+  color: #fff;
+  font-size: .8rem;
+  letter-spacing: .08rem;
+}
+
+@media (max-width: 1120px) {
+  .editor-toolbar { overflow-x: auto; }
+}
+
+/* Consolidated from v017.css. */
+/* YAJA 2600 Animator v0.017 - animation naming and settings rhythm */
+.tools-panel > section.settings-section {
+  padding-top: 14px;
+  padding-bottom: 16px;
+  margin-bottom: 12px;
+}
+
+.tools-panel .settings-section h2 { margin-bottom: 12px; }
+
+.tools-panel .settings-section > label,
+.tools-panel .settings-section > .two-col,
+.tools-panel .settings-section > .two-sprite-controls { margin-top: 10px; }
+
+.tools-panel .settings-section + .settings-section { padding-top: 16px; }
+
+.timeline-heading {
+  position: relative;
+  min-height: 36px;
+}
+
+.timeline-heading #timelineSummary {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+.animation-name-control {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(160px, 32vw);
+  margin: 0;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-size: .72rem;
+  letter-spacing: .08rem;
+  white-space: nowrap;
+}
+
+.animation-name-control input {
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  text-align: center;
+}
+
+.reference-import-row button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+@media (max-width: 900px) {
+  .timeline-heading { min-height: 70px; }
+  .timeline-heading #timelineSummary { top: 18px; }
+  .animation-name-control { top: auto; bottom: 3px; width: min(160px, 80%); transform: translateX(-50%); }
+}
+
+/* Consolidated from v018.css. */
+/* YAJA 2600 Animator v0.018 - Painter canvas edge, grid-linked columns, and toolbar rhythm */
+.view-control-group { gap: 8px; }
+.view-control-group > label { gap: 4px; }
+.view-control-group .check-row { min-width: 0; }
+
+.onion-control-group { gap: 12px; }
+.onion-control-group > label { gap: 5px; }
+
+.player-canvas-group canvas,
+.player-canvas-group.active-slot canvas {
+  outline: 1px solid var(--border-color) !important;
+  outline-offset: 0;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, .6) !important;
+}
+
+.editor-zone:not(.show-grid) .canvas-colors .color-row {
+  border-bottom-color: transparent;
+}
+
+/* Consolidated from v020.css. */
+/* YAJA 2600 Animator v0.020 - non-shifting selection context and Painter exit behavior */
+.editor-zone {
+  position: relative;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.selection-bar {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  z-index: 30;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  transform: translateX(-50%);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+
+.timeline-loop {
+  margin-left: 8px;
+  margin-right: 0;
+}
+
+/* Consolidated from v021.css. */
+/* YAJA 2600 Animator v0.021 - modular Atari Console theme consumption */
+body { color: var(--theme-text); background: var(--theme-app-bg); }
+.app-header { background: var(--theme-header-bg); border-color: var(--theme-border); }
+.workspace { background: var(--theme-workspace-bg); }
+.panel { background: var(--theme-panel-bg); border-color: var(--theme-border); }
+.editor-zone { background: var(--theme-editor-bg); border-color: var(--theme-border); }
+.editor-toolbar { background: var(--theme-toolbar-bg); border-color: var(--theme-border); }
+.canvas-band {
+  background-color: var(--theme-canvas-workspace-bg);
+  background-image: radial-gradient(circle at 1px 1px, #383838 1px, transparent 1.2px);
+}
+.frames-strip { background: var(--theme-timeline-bg); border-color: var(--theme-border); }
+.status-bar { background: var(--theme-status-bg); border-color: var(--theme-border); color: var(--theme-text-muted); }
+.selection-bar { background: var(--theme-selection-bg); border-color: var(--theme-border); }
+input, select, textarea { background: var(--theme-input-bg); color: var(--theme-text); border-color: var(--theme-border); }
+button { background: var(--theme-control-bg); color: var(--theme-text-secondary); border-color: var(--theme-border); }
+button:hover { background: var(--theme-control-hover-bg); border-color: var(--theme-primary); color: var(--theme-text); }
+
+.frames-actions .timeline-play {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary-ink) !important;
+}
+.frames-actions .timeline-play:hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+}
+.frames-actions .timeline-play svg {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  flex: 0 0 24px;
+  color: currentColor !important;
+  fill: currentColor !important;
+}
+
+/* Consolidated from v022.css. */
+/* YAJA 2600 Animator v0.022 - Painter color-column grid parity */
+.canvas-colors {
+  width: 24px;
+  flex: 0 0 24px;
+}
+
+.canvas-colors .row-colors-title {
+  width: 24px;
+}
+
+.canvas-colors .row-colors {
+  width: 24px;
+  overflow: visible;
+  position: relative;
+  box-sizing: content-box;
+  background: #000;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--theme-border);
+}
+
+.canvas-colors .color-row {
+  width: 24px;
+  min-height: 1px;
+  box-sizing: border-box;
+  border: 0;
+  cursor: default;
+}
+
+.canvas-colors .color-row > div {
+  min-width: 24px;
+}
+
+/* Consolidated from v023.css. */
+/* YAJA 2600 Animator v0.023 - subdued theme-aware version text */
+.app-header .version {
+  color: var(--theme-text-muted);
+}
+
+/* Consolidated from v024.css. */
+/* YAJA 2600 Animator v0.024 - multikernel composition and export refinement */
+:root {
+  --focus-ring: var(--theme-primary);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+canvas[tabindex]:focus-visible {
+  outline: 2px solid var(--theme-primary) !important;
+  outline-offset: 1px !important;
+  box-shadow: none !important;
+}
+
+.editor-toolbar { gap: 6px; }
+.view-control-group { gap: 7px; }
+.onion-control-group { gap: 4px; }
+.canvas-toolbar-divider { margin-inline: 3px; }
+.canvas-toolbar-divider.compact-divider { height: 24px; margin-inline: 2px; }
+.onion-control-group .onion-count { margin-left: 0; }
+
+.frames-actions .timeline-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px !important;
+  color: #111 !important;
+  text-align: center;
+}
+.frames-actions .timeline-play span { flex: 0 0 auto; line-height: 1; }
+.frames-actions .timeline-play svg { flex: 0 0 24px; }
+
+.animation-name-control {
+  top: 2px;
+  transform: translateX(-50%);
+  flex-direction: column;
+  gap: 2px;
+}
+.animation-name-control small {
+  color: var(--theme-text-muted);
+  font: 9px/1.2 "JetBrains Mono", monospace;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.timeline-heading { min-height: 48px; }
+
+.sprite-stage {
+  align-items: flex-start;
+  gap: 0;
+  isolation: isolate;
+}
+.player-canvas-group {
+  position: relative;
+  flex: 0 0 auto;
+  transition: none;
+}
+.player-canvas-group.active-slot canvas { box-shadow: inset 0 0 0 2px rgba(255,255,255,.75); }
+.composition-color-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-left: 10px;
+  position: relative;
+  z-index: 5;
+}
+.composition-color-columns:empty { display: none; }
+.solid-color-kernel .composition-color-columns { display: none; }
+
+.display-region-row {
+  display: grid;
+  grid-template-columns: 1fr 32px;
+  gap: 5px 8px;
+  align-items: center;
+}
+.display-region-row > span { grid-column: 1; }
+.display-region-row #paletteEyedropper {
+  grid-column: 2;
+  grid-row: 1;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 6px;
+}
+.display-region-row select {
+  grid-column: 1 / -1;
+  height: 36px;
+  min-height: 36px;
+}
+.current-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+#currentColorSwatch {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+}
+#currentColor {
+  width: 64px;
+  min-width: 64px;
+  height: 36px;
+  flex: 0 0 64px;
+}
+
+#bbExportMode { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#bbExportMode legend { grid-column: 1 / -1; }
+
+@media (max-width: 1120px) {
+  .editor-toolbar { overflow-x: auto; overflow-y: hidden; }
+}
+
+/* v0.025 cross-Chromium rendering normalization. */
+html {
+  width: 100%;
+  height: 100%;
+  background: var(--theme-app-bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body.theme-atari {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  margin: 0;
+  font-family: inherit;
+  font-kerning: inherit;
+  font-feature-settings: inherit;
+  letter-spacing: inherit;
+}
+
+button,
+select {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+
+svg,
+canvas {
+  display: block;
+}
+
+@supports (height: 100dvh) {
+  body.theme-atari { min-height: 100dvh; }
+  .workspace { height: calc(100dvh - 66px - var(--status-height)); }
+}
+
+/* v0.026 fixed playback control: center the complete black label/icon group. */
+#playAnim {
+  display: inline-grid !important;
+  grid-template-columns: auto 24px;
+  place-content: center;
+  align-items: center;
+  column-gap: 6px;
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+  height: 38px !important;
+  padding: 0 8px !important;
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary-ink) !important;
+  text-align: center;
+}
+
+#playAnim:hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+}
+
+#playAnim span,
+#playAnim svg,
+#playAnim use {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  clip: auto !important;
+  color: var(--theme-primary-ink) !important;
+  fill: var(--theme-primary-ink) !important;
+}
+
+#playAnim span {
+  justify-self: end;
+  font: 400 .7rem/1 "Orbitron", sans-serif;
+  letter-spacing: .08rem;
+}
+
+#playAnim svg {
+  justify-self: start;
+  width: 24px !important;
+  height: 24px !important;
+}
+
+/* v0.027 connected transforms, explicit sprite targeting, and Painter reference parity. */
+.active-sprite-tabs {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.active-sprite-tabs > span {
+  color: var(--theme-text-secondary);
+  font-size: .7rem;
+  letter-spacing: .08rem;
+  text-transform: uppercase;
+}
+
+.active-sprite-tabs .segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.active-sprite-tabs button {
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  font-size: .75rem;
+}
+
+.active-sprite-tabs button.active {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary-ink) !important;
+}
+
+.offset-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.offset-controls.x-visible {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reference-import-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.reference-import-dual {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.reference-import-row button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 7px;
+  font: 400 .72rem/1 "Orbitron", system-ui, sans-serif;
+  letter-spacing: .06rem;
+}
+
+.ref-controls.visible {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 6px;
+}
+
+.reference-auto-actions,
+.reference-filter-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.reference-secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.reference-auto-actions button,
+.reference-secondary-actions button,
+.ref-controls > button {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+}
+
+.reference-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.reference-control input[type="range"],
+.reference-control select {
+  width: 100%;
+  min-width: 0;
+}
+
+.reference-dither {
+  min-height: 30px;
+  align-items: center;
+}
+
+.reference-filter-controls {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--theme-divider);
+}
+
+dialog {
+  background: var(--theme-panel-bg);
+  color: var(--theme-text);
+  border: 1px solid var(--theme-border);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .72);
+}
+
+.dialog-body {
+  background: var(--theme-panel-bg);
+  color: var(--theme-text);
+}
+
+dialog h2,
+dialog label,
+dialog p {
+  color: var(--theme-text);
+}
+
+dialog input,
+dialog select,
+dialog textarea {
+  background: var(--theme-input-bg);
+  color: var(--theme-text);
+  border-color: var(--theme-border);
+}
+
+dialog button {
+  background: var(--theme-control-bg);
+  color: var(--theme-text-secondary);
+  border-color: var(--theme-border);
+}
+
+dialog .btn-primary {
+  background: var(--theme-primary);
+  border-color: var(--theme-primary);
+  color: var(--theme-primary-ink);
+}
+
+dialog .btn-danger {
+  background: var(--theme-danger);
+  color: #fff;
+}
+
+#playAnim {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+#playAnim span {
+  flex: 0 0 auto;
+  justify-self: auto;
+  font: 700 .8rem/1 "Orbitron", system-ui, sans-serif;
+  letter-spacing: .08rem;
+}
+
+#playAnim svg {
+  flex: 0 0 24px;
+  justify-self: auto;
+}
+
+.composition-color-columns {
+  flex: 0 0 auto;
+}
+
+.composition-color-columns.hidden {
+  display: none !important;
+}
+
+/* v0.029 exact zero-offset seam, centered composition readout, and Grid-style Colors control. */
+.player-canvas-group canvas,
+.player-canvas-group.active-slot canvas {
+  box-shadow: none !important;
+}
+
+.canvas-readout {
+  transform: translateX(-50%);
+}
+
+/* v0.030 per-frame offsets use Atari's downward-positive Y with a bottom-left sprite anchor. */
+.frame-offset-label {
+  margin-top: 10px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.frame-offset-label + .offset-controls {
+  margin-top: 0;
+}
+
+/* v0.031 inherited frame repeats and optically centered playback controls. */
+#playAnim span,
+#playAnim svg {
+  transform: translateX(3px);
+}
+
+.timeline-loop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  min-height: 38px;
+  line-height: 1;
+}
+
+.timeline-loop input {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.timeline-loop span {
+  display: inline-flex;
+  align-items: center;
+  height: 14px;
+  line-height: 14px;
+}
+
+/* YAJA 2600 Animator v0.032 - Painter v1.2 themes and responsive composition. */
+.theme-atari-controller {
+  color-scheme: dark;
+  --bg-darkest: #000000; --bg-dark: #1a1a1a; --bg-medium: #333333; --bg-light: #4a4a4a; --bg-lighter: #5a5a5a;
+  --accent: #ff4444; --accent-dim: #cc3333; --accent-red: #ef4444; --accent-purple: #ff4444;
+  --text-primary: #ffffff; --text-secondary: #cccccc; --text-dim: #999999; --border-color: #4a4a4a; --title-accent: #cccccc;
+}
+
+.theme-synthwave {
+  color-scheme: dark;
+  --bg-darkest: #050212; --bg-dark: #0d081f; --bg-medium: #160e2e; --bg-light: #241845; --bg-lighter: #31235c;
+  --accent: #bd00ff; --accent-dim: #7a00a3; --accent-red: #ef4444; --accent-purple: #ff00ff;
+  --text-primary: #ffffff; --text-secondary: #a5a5e0; --text-dim: #6a6a99; --border-color: #241845; --title-accent: #bd00ff;
+}
+
+.theme-synthwave-bright {
+  color-scheme: dark;
+  --bg-darkest: #1a0a3e; --bg-dark: #251654; --bg-medium: #2d1b69; --bg-light: #3d2a6d; --bg-lighter: #4d3a7d;
+  --accent: #00fff5; --accent-dim: #e67e22; --accent-red: #ef4444; --accent-purple: #9d4edd;
+  --text-primary: #ffffff; --text-secondary: #cccccc; --text-dim: #999999; --border-color: #4d3a7d; --title-accent: #00fff5;
+}
+
+.theme-blue {
+  color-scheme: dark;
+  --bg-darkest: #0f172a; --bg-dark: #202b3c; --bg-medium: #1e293b; --bg-light: #334155; --bg-lighter: #475569;
+  --accent: #3b82f6; --accent-dim: #2563eb; --accent-red: #ef4444; --accent-purple: #3b82f6;
+  --text-primary: #ffffff; --text-secondary: #cbd5e1; --text-dim: #94a3b8; --border-color: #334155; --title-accent: #cbd5e1;
+}
+
+.theme-classic-dark {
+  color-scheme: dark;
+  --bg-darkest: #1a1a1a; --bg-dark: #252525; --bg-medium: #353535; --bg-light: #404040; --bg-lighter: #4a4a4a;
+  --accent: #4a9eff; --accent-dim: #e67e22; --accent-red: #ef4444; --accent-purple: #4a9eff;
+  --text-primary: #ffffff; --text-secondary: #d0d0d0; --text-dim: #a0a0a0; --border-color: #404040; --title-accent: #d0d0d0;
+}
+
+.theme-classic-light {
+  color-scheme: light;
+  --bg-darkest: #c0c0c0; --bg-dark: #b5b5b5; --bg-medium: #c8c8c8; --bg-light: #cdcdcd; --bg-lighter: #c5c5c5;
+  --accent: #0066cc; --accent-dim: #e67e22; --accent-red: #ef4444; --accent-purple: #ff903e;
+  --text-primary: #000000; --text-secondary: #2a2a2a; --text-dim: #4a4a4a; --border-color: #a0a0a0; --title-accent: #4a4a4a;
+}
+
+body:not(.theme-atari) {
+  --theme-app-bg: var(--bg-darkest);
+  --theme-header-bg: var(--bg-medium);
+  --theme-workspace-bg: var(--bg-dark);
+  --theme-panel-bg: var(--bg-medium);
+  --theme-editor-bg: var(--bg-dark);
+  --theme-toolbar-bg: var(--bg-medium);
+  --theme-canvas-workspace-bg: var(--bg-dark);
+  --theme-timeline-bg: var(--bg-medium);
+  --theme-status-bg: var(--bg-dark);
+  --theme-input-bg: var(--bg-dark);
+  --theme-control-bg: var(--bg-light);
+  --theme-control-hover-bg: var(--bg-lighter);
+  --theme-canvas-bg: var(--bg-darkest);
+  --theme-border: var(--border-color);
+  --theme-divider: var(--bg-light);
+  --theme-selection-bg: var(--bg-medium);
+  --theme-primary: var(--accent);
+  --theme-primary-hover: var(--accent-dim);
+  --theme-primary-ink: var(--bg-darkest);
+  --theme-focus: var(--accent);
+  --theme-cyan: var(--accent-purple);
+  --theme-pink: var(--accent-purple);
+  --theme-danger: var(--accent-red);
+  --theme-text: var(--text-primary);
+  --theme-text-secondary: var(--text-secondary);
+  --theme-text-muted: var(--text-dim);
+  --chrome: var(--theme-header-bg);
+  --chrome-raised: var(--bg-light);
+  --canvas-black: var(--theme-canvas-bg);
+  --accent-orange: var(--accent);
+  --accent-cyan: var(--accent-purple);
+  --accent-pink: var(--accent-purple);
+  --focus-ring: var(--accent);
+}
+
+body.theme-atari-controller h2,
+body.theme-atari-controller .panel-title { color: #ff4444 !important; }
+
+body,
+html { background: var(--theme-app-bg); }
+
+body {
+  min-width: 0;
+  min-height: 100dvh;
+  overflow: hidden;
+  color: var(--theme-text);
+}
+
+.brand-title,
+.panel h2,
+.timeline-heading strong { color: var(--title-accent); }
+
+.canvas-band {
+  background-color: var(--theme-canvas-workspace-bg);
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--theme-text) 18%, transparent) 1px, transparent 1.2px);
+}
+
+button.active,
+.segmented button.active,
+.tool.active {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary-ink) !important;
+}
+
+input[type="checkbox"],
+input[type="range"] { accent-color: var(--theme-primary); }
+
+::-webkit-scrollbar-track { background: var(--theme-app-bg); }
+::-webkit-scrollbar-thumb { background: var(--theme-control-bg); border-color: var(--theme-app-bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--theme-primary); }
+* { scrollbar-color: var(--theme-control-bg) var(--theme-app-bg); }
+
+.theme-classic-light input,
+.theme-classic-light select,
+.theme-classic-light textarea {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #777777 !important;
+}
+
+.theme-control {
+  display: grid;
+  grid-template-columns: auto 154px;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.theme-control select {
+  width: 154px;
+  height: 36px;
+  min-height: 36px;
+}
+
+.composition-backdrop {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  outline: 1px solid var(--theme-border);
+  outline-offset: -1px;
+}
+
+.player-canvas-group { z-index: 1; }
+.player-canvas-group canvas { background: transparent; }
+.canvas-readout { z-index: 7; }
+
+@media (max-width: 1380px) {
+  .app-header { gap: 12px; padding-inline: 12px; }
+  .project-strip { gap: 6px; }
+  .project-strip > label:not(.theme-control) input { width: 170px; }
+  .theme-control { grid-template-columns: auto 136px; }
+  .theme-control select { width: 136px; }
+  .workspace { grid-template-columns: 205px minmax(430px, 1fr) 220px; }
+}
+
+@media (max-width: 1120px) {
+  .app-header {
+    height: auto;
+    min-height: 66px;
+    flex-wrap: wrap;
+    align-content: center;
+    overflow: visible;
+  }
+  .brand { flex: 1 0 250px; }
+  .project-strip {
+    flex: 1 1 680px;
+    max-width: 100%;
+    padding-bottom: 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .workspace {
+    height: calc(100dvh - 108px - var(--status-height));
+    grid-template-columns: 184px minmax(360px, 1fr) 196px;
+  }
+  .panel { min-width: 0; }
+  .panel section { padding-inline: 7px; }
+  .canvas-band { padding-inline: 12px; overflow: auto; }
+  .right-panel .persistent-palette-grid { max-width: 100%; }
+}
+
+@media (max-width: 820px) {
+  body { min-height: 100dvh; overflow: auto; }
+  .app-header { position: relative; }
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "editor" "tools" "palette";
+    height: auto;
+    overflow: visible;
+  }
+  .editor-zone { grid-area: editor; min-height: 680px; border-inline: 0; }
+  .tools-panel { grid-area: tools; }
+  .right-panel { grid-area: palette; }
+  .panel {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-top: 1px solid var(--theme-border);
+  }
+  .tools-panel,
+  .right-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .right-panel .palette { max-width: 232px; }
+  .status-bar { position: sticky; bottom: 0; z-index: 50; }
+}
+
+@media (max-width: 560px) {
+  .app-header { padding: 8px; }
+  .brand { min-width: 100%; }
+  .brand-title { font-size: 11px; }
+  .project-strip { flex-basis: 100%; }
+  .editor-toolbar { justify-content: flex-start; }
+  .canvas-band { justify-content: flex-start; padding-inline: 8px; }
+  .tools-panel,
+  .right-panel { grid-template-columns: minmax(0, 1fr); }
+  .timeline-heading { min-height: 60px; }
+  .frames-actions { overflow-x: auto; overflow-y: hidden; }
+}
+
+/* YAJA 2600 Animator v0.033 - shared controls and Classic Light contrast. */
+.project-name-control,
+.theme-control {
+  width: auto !important;
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: var(--theme-text-secondary) !important;
+}
+
+.project-name-control input {
+  width: 240px;
+  height: 36px;
+  min-height: 36px;
+}
+
+.theme-control,
+.theme-control select {
+  width: auto;
+}
+
+.theme-control select {
+  width: 184px;
+  min-width: 184px;
+  max-width: 184px;
+  height: 36px;
+  min-height: 36px;
+}
+
+:is(.project-strip, .tools-panel, .right-panel, .frames-actions, .selection-bar, .dialog-actions, .reference-auto-actions, .reference-secondary-actions)
+button:where(:not(.persistent-swatch):not(#currentColorSwatch)) {
+  background: var(--theme-control-bg) !important;
+  border-color: var(--theme-border) !important;
+  color: var(--theme-text-secondary) !important;
+}
+
+:is(.project-strip, .tools-panel, .right-panel, .frames-actions, .selection-bar, .dialog-actions, .reference-auto-actions, .reference-secondary-actions)
+button:where(:not(.persistent-swatch):not(#currentColorSwatch)):hover {
+  background: var(--theme-control-hover-bg) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-text) !important;
+}
+
+:is(.project-strip, .tools-panel, .right-panel, .frames-actions, .selection-bar, .dialog-actions, .reference-auto-actions, .reference-secondary-actions)
+button:where(:not(.persistent-swatch):not(#currentColorSwatch)) svg {
+  color: currentColor !important;
+  fill: currentColor !important;
+}
+
+:is(.project-strip, .tools-panel, .right-panel, .frames-actions, .selection-bar, .dialog-actions, .reference-auto-actions, .reference-secondary-actions)
+:is(button.active, .tool.active, button.primary, .btn-primary, #playAnim) {
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary-ink) !important;
+}
+
+:is(.project-strip, .tools-panel, .right-panel, .frames-actions, .selection-bar, .dialog-actions, .reference-auto-actions, .reference-secondary-actions)
+:is(button.active, .tool.active, button.primary, .btn-primary, #playAnim):hover {
+  background: var(--theme-primary-hover) !important;
+  border-color: var(--theme-primary-hover) !important;
+  color: var(--theme-primary-ink) !important;
+}
+
+:is(.project-strip, .tools-panel, .right-panel, .frames-actions, .selection-bar, .dialog-actions, .reference-auto-actions, .reference-secondary-actions)
+:is(button.danger, .danger, .btn-danger) {
+  background: var(--theme-danger) !important;
+  border-color: var(--theme-danger) !important;
+  color: #ffffff !important;
+}
+
+.theme-atari .status-bar span:not(.status-hint) {
+  color: var(--theme-primary);
+}
+
+.theme-classic-light .status-bar span:not(.status-hint),
+.theme-classic-light .panel label,
+.theme-classic-light .active-sprite-label,
+.theme-classic-light .subcontrol-label,
+.theme-classic-light .rotation-label,
+.theme-classic-light .frames-actions,
+.theme-classic-light .timeline-loop,
+.theme-classic-light .selection-bar,
+.theme-classic-light .selection-bar span {
+  color: var(--theme-text-secondary) !important;
+}
+
+@media (max-width: 1380px) {
+  .project-strip { justify-content: flex-start; }
+  .project-name-control input { width: 170px; }
+  .theme-control select { width: 184px; min-width: 184px; max-width: 184px; }
+}
+
+/* YAJA 2600 Animator v0.034 - Painter asset editors and timeline multiselect. */
+:root {
+  --canvas-grid-line: rgba(255, 255, 255, .15);
+  --canvas-grid-line-width: 1px;
+}
+
+#palette .persistent-swatch.active,
+#palette .persistent-swatch.selected,
+#palette .persistent-swatch.active:hover,
+#palette .persistent-swatch.selected:hover {
+  position: relative;
+  z-index: 12;
+  background: var(--swatch-color) !important;
+  border-color: transparent !important;
+  box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
+  outline: 0 !important;
+  transform: none;
+}
+
+.canvas-readout,
+.canvas-readout span {
+  width: max-content;
+  min-width: max-content;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+.canvas-readout { padding-inline: 10px; }
+.canvas-readout span { flex: 0 0 auto; }
+
+.composition-color-columns { gap: 3px; }
+.canvas-colors,
+.row-colors-title {
+  width: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  flex: 0 0 24px !important;
+  box-sizing: border-box;
+}
+
+.row-colors-title {
+  display: grid;
+  place-items: center;
+  height: 18px;
+  padding: 0 !important;
+  overflow: hidden;
+  font: 700 8px/1 "Orbitron", sans-serif !important;
+  letter-spacing: .02rem !important;
+  white-space: nowrap;
+}
+
+.canvas-colors .row-colors { width: 24px !important; }
+.canvas-colors .color-row {
+  width: 24px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.editor-zone.show-grid .canvas-colors .color-row:not(:first-child)::before,
+.editor-zone.show-grid .canvas-colors .scanline-row:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  height: var(--canvas-grid-line-width);
+  background: var(--canvas-grid-line);
+  pointer-events: none;
+}
+
+.asset-list {
+  overflow: visible;
+  padding: 4px 5px 3px;
+}
+
+.asset-item {
+  position: relative;
+  overflow: visible;
+}
+
+.asset-item.active .asset-preview {
+  outline: 2px solid var(--theme-primary);
+  outline-offset: 1px;
+}
+
+.asset-remove,
+.asset-edit {
+  position: absolute !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 1px solid color-mix(in srgb, #000 45%, transparent) !important;
+  border-radius: 50% !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .55) !important;
+  opacity: 0;
+  transform: scale(.84);
+  transition: opacity .12s ease, transform .12s ease, filter .12s ease;
+  z-index: 20;
+}
+
+.asset-remove {
+  top: -6px !important;
+  right: -6px !important;
+  width: 16px !important;
+  min-width: 16px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  background: #d93434 !important;
+  border-color: #ff7676 !important;
+  color: #fff !important;
+  font: 700 12px/14px Arial, sans-serif !important;
+}
+
+.asset-edit {
+  right: -7px !important;
+  bottom: -7px !important;
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary) !important;
+  color: var(--theme-primary-ink) !important;
+}
+
+.asset-edit svg { width: 13px !important; height: 13px !important; fill: currentColor !important; }
+.asset-item:hover :is(.asset-remove, .asset-edit),
+.asset-item:focus-within :is(.asset-remove, .asset-edit),
+.asset-remove:focus-visible,
+.asset-edit:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+.asset-remove:hover,
+.asset-edit:hover { filter: brightness(1.14); transform: scale(1.08) !important; }
+@media (hover: none) { .asset-remove, .asset-edit { opacity: 1; transform: scale(1); } }
+
+dialog.asset-editor-popover {
+  width: min(800px, calc(100vw - 28px));
+  max-width: none;
+  max-height: calc(100dvh - 28px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--theme-border);
+  border-radius: .8rem;
+  background: var(--theme-panel-bg);
+  color: var(--theme-text);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .5);
+  z-index: 110;
+}
+
+dialog.asset-editor-popover[open] {
+  display: block;
+  position: fixed;
+  inset: 50% auto auto 50%;
+  margin: 0;
+  overflow-x: hidden;
+  transform: translate(-50%, -50%);
+}
+.asset-editor-dialog {
+  box-sizing: border-box;
+  display: grid;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  gap: 12px;
+  padding: 14px;
+  background: var(--theme-panel-bg);
+}
+.asset-editor-dialog h2 { margin: 0; color: var(--theme-primary); font: 700 12px/1.2 "Orbitron", sans-serif; letter-spacing: .08rem; }
+.asset-editor-field { display: flex; align-items: center; gap: 9px; }
+.asset-editor-field input { width: 64px; }
+
+.stamp-editor-canvas-container {
+  min-height: 340px;
+  max-height: min(500px, 55dvh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  border: 1px solid var(--theme-border);
+  background-color: #090909;
+  background-image: linear-gradient(45deg, #171717 25%, transparent 25%), linear-gradient(-45deg, #171717 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #171717 75%), linear-gradient(-45deg, transparent 75%, #171717 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+.stamp-editor-canvas-stack { position: relative; flex: 0 0 auto; }
+#stampEditorCanvas { display: block; background: transparent; cursor: crosshair; touch-action: none; }
+#stampEditorPreviewCanvas { position: absolute; inset: 0; pointer-events: none; }
+.stamp-editor-footer { display: grid; grid-template-columns: minmax(190px, .75fr) minmax(280px, 1.25fr); gap: 20px; align-items: end; padding: 12px; background: var(--theme-control-bg); }
+.stamp-editor-size-controls { display: flex; gap: 20px; }
+.stamp-editor-size-controls label { display: grid; gap: 5px; }
+.stamp-editor-size-controls input { width: 64px; }
+.stamp-editor-zoom-actions { display: grid; gap: 10px; }
+.stamp-editor-zoom-actions > label { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+.asset-editor-dialog .dialog-actions { margin: 0; display: flex; gap: 8px; }
+.asset-editor-dialog .dialog-actions button { min-width: 0 !important; min-height: 36px; flex: 1 1 0; }
+
+.color-block-editor-popover { width: min(350px, calc(100vw - 28px)) !important; }
+.color-block-editor-lines {
+  position: relative;
+  width: 100%;
+  max-height: 360px;
+  min-height: 128px;
+  overflow-y: auto;
+  border: 1px solid var(--theme-border);
+  background: #080808;
+  touch-action: none;
+}
+.color-block-editor-line { position: relative; height: 16px; min-height: 16px; border-bottom: var(--canvas-grid-line-width) solid var(--canvas-grid-line); cursor: crosshair; }
+.color-block-editor-line.selected::after { content: ""; position: absolute; inset: 0; border-inline: 2px dashed #fff; background: rgba(255,255,255,.12); pointer-events: none; }
+.color-block-editor-line.selected:first-of-type::after { border-top: 2px dashed #fff; }
+.color-block-editor-line.selected:last-of-type::after { border-bottom: 2px dashed #fff; }
+.color-block-offset-controls { display: grid; gap: 8px; }
+.color-block-offset-controls label { display: grid; grid-template-columns: auto 28px 1fr; gap: 8px; align-items: center; }
+.color-block-offset-controls output { color: var(--theme-primary); text-align: right; }
+
+.frames-list { position: relative; user-select: none; touch-action: pan-x; }
+.frames-list.reordering { cursor: grabbing; }
+.timeline-drop-indicator {
+  position: absolute;
+  top: 1px;
+  bottom: 3px;
+  width: 3px;
+  background: var(--theme-primary);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--theme-primary) 72%, transparent);
+  z-index: 40;
+  pointer-events: none;
+}
+.timeline-drop-indicator::before,
+.timeline-drop-indicator::after { content: ""; position: absolute; left: 50%; translate: -50% 0; border-inline: 5px solid transparent; }
+.timeline-drop-indicator::before { top: 0; border-top: 6px solid var(--theme-primary); }
+.timeline-drop-indicator::after { bottom: 0; border-bottom: 6px solid var(--theme-primary); }
+.timeline-marquee { position: absolute; border: 1px dashed var(--theme-primary); background: color-mix(in srgb, var(--theme-primary) 16%, transparent); z-index: 35; pointer-events: none; }
+
+@media (max-width: 700px) {
+  dialog.asset-editor-popover[open] { width: calc(100vw - 14px); }
+  .stamp-editor-footer { grid-template-columns: 1fr; gap: 12px; }
+  .stamp-editor-canvas-container { min-height: 260px; max-height: 48dvh; }
+}
+
+/* YAJA 2600 Animator v0.035 - Classic Light readout and frame-selection contrast. */
+.theme-classic-light .canvas-readout,
+.theme-classic-light .canvas-readout span,
+.theme-classic-light .canvas-readout span:first-child,
+.theme-classic-light .canvas-readout span + span::before {
+  color: #ffffff !important;
+}
+
+.theme-classic-light .frame-thumb.active,
+.theme-classic-light .frame-thumb.selected,
+.theme-classic-light .frame-thumb.active.selected {
+  box-sizing: border-box;
+  border: 2px solid #1687ff !important;
+  box-shadow: 0 0 0 2px rgba(22, 135, 255, .48), 0 0 10px rgba(22, 135, 255, .28) !important;
+}
+
+/* YAJA 2600 Animator v0.036 - height-safe responsive header and timeline stacking. */
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
+.app-header,
+.status-bar { flex: 0 0 auto; }
+
+.workspace {
+  flex: 1 1 auto;
+  height: auto !important;
+  min-height: 0;
+}
+
+@media (max-width: 1280px) {
+  .timeline-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: 4px;
+    min-height: 64px;
+  }
+
+  .timeline-heading > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .timeline-heading #timelineSummary {
+    position: static;
+    flex: 0 0 auto;
+    margin: 0;
+    transform: none;
+  }
+
+  .animation-name-control {
+    position: static;
+    justify-self: center;
+    width: min(160px, 100%);
+    margin: 0;
+    transform: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .app-header {
+    flex: 0 0 auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-content: normal;
+    align-items: stretch;
+    gap: 8px;
+    height: auto;
+    min-height: 0;
+    padding: 8px 12px;
+    overflow: hidden;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-strip {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+    min-height: 36px;
+    padding: 0 0 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 1020px) {
+  body {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "editor" "tools" "palette";
+    height: auto !important;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .editor-zone {
+    grid-area: editor;
+    min-height: clamp(640px, 82dvh, 760px);
+    border-inline: 0;
+  }
+
+  .tools-panel {
+    grid-area: tools;
+    display: grid !important;
+  }
+
+  .right-panel {
+    grid-area: palette;
+    display: grid !important;
+  }
+
+  .panel {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-top: 1px solid var(--theme-border);
+  }
+
+  .tools-panel,
+  .right-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .project-strip button { display: inline-flex !important; }
+  .project-divider { display: block !important; }
+  .status-bar { position: sticky; bottom: 0; z-index: 50; }
+}
+
+@media (max-width: 620px) {
+  .app-header { padding: 8px; }
+
+  .brand {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .tools-panel,
+  .right-panel { grid-template-columns: minmax(0, 1fr); }
+
+  .timeline-heading > div {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .timeline-heading #timelineSummary { margin-left: auto; }
+}
+
+/* YAJA 2600 Animator v0.037 - Painter rails and Composer-style row wrapping. */
+.tool-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 38px;
+  justify-content: stretch;
+  gap: 4px;
+}
+
+.tool-grid .tool,
+.tool-grid .tool-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  aspect-ratio: auto !important;
+}
+
+@media (max-width: 1120px) {
+  .app-header {
+    overflow: visible;
+  }
+
+  .project-strip {
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 6px;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .project-strip > *,
+  .export-actions,
+  .export-actions > button {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 1020px) {
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .workspace {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: row;
+    height: auto !important;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .tools-panel,
+  .right-panel {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+    width: auto;
+    height: 100%;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-top: 0;
+  }
+
+  .tools-panel {
+    flex: 0 0 190px;
+    border-right: 1px solid var(--theme-border);
+  }
+
+  .right-panel {
+    flex: 0 0 220px;
+    border-left: 1px solid var(--theme-border);
+  }
+
+  .editor-zone {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    border-inline: 0;
+  }
+
+  .frames-actions {
+    flex-wrap: wrap;
+    align-content: center;
+    overflow: visible;
+    row-gap: 5px;
+  }
+
+  .project-strip button { display: inline-flex !important; }
+  .project-divider { display: block !important; }
+  .status-bar { position: static; }
+}
+
+@media (max-width: 760px) {
+  .tools-panel { flex-basis: 180px; }
+  .right-panel { flex-basis: 210px; }
+
+  .frame-button-cluster {
+    display: grid;
+    grid-template-columns: repeat(3, 36px);
+    grid-auto-rows: 36px;
+    gap: 5px;
+  }
+
+  .frames-actions {
+    align-items: start;
+  }
+}
+
+@media (max-width: 560px) {
+  .tools-panel { flex-basis: 174px; }
+  .right-panel { flex-basis: 198px; }
+
+  .brand { min-width: 0; }
+  .brand-title { white-space: normal; }
+}
+
+/* YAJA 2600 Animator v0.038 - invariant rail and button dimensions. */
+.panel button:not(.tool-btn):not(.btn-icon):not(.icon-button):not(.tool-btn-small) {
+  flex-shrink: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+#newColorBlock,
+#newStamp,
+.reference-import-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  min-height: 38px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (max-width: 1120px) {
+  .panel section {
+    padding-inline: 0;
+  }
+}
+
+@media (max-width: 1020px) {
+  .tools-panel,
+  .right-panel {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+  }
+
+  .tools-panel { flex: 0 0 250px; }
+  .right-panel { flex: 0 0 250px; }
+}
+
+@media (max-width: 760px) {
+  .tools-panel,
+  .right-panel {
+    flex-basis: 250px;
+  }
+}
+
+@media (max-width: 560px) {
+  .tools-panel,
+  .right-panel {
+    flex-basis: 250px;
+  }
+}
+
+/* YAJA 2600 Animator v0.039 - invariant top-shelf label centering. */
+.project-strip button,
+.export-actions button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  min-height: 36px;
+  padding-block: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* YAJA 2600 Animator v0.040 - reclaim obsolete timeline helper-note space. */
+@media (max-width: 1280px) {
+  .frames-strip {
+    row-gap: 2px;
+  }
+
+  .timeline-heading {
+    min-height: 50px;
+    height: 50px;
+    align-content: start;
+    gap: 2px;
+  }
+
+  .frames-actions {
+    align-content: flex-start;
+    padding-block: 0;
+  }
+}
+
+/* YAJA 2600 Animator v0.042 - compact title rhythm and larger frame previews. */
+.frames-strip {
+  grid-template-rows: auto auto minmax(100px, 1fr);
+  row-gap: 2px;
+}
+
+.timeline-heading {
+  min-height: 32px;
+  height: 32px;
+}
+
+.frames-actions {
+  min-height: 38px;
+  padding-block: 0;
+}
+
+.frames-list {
+  align-items: flex-start;
+  padding-block: 2px 4px;
+}
+
+.frame-thumb {
+  flex-basis: 96px;
+  width: 96px;
+}
+
+.frame-thumb canvas {
+  width: 84px;
+  height: 64px;
+}
+
+@media (max-width: 1280px) {
+  .timeline-heading {
+    min-height: 46px;
+    height: 46px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .frames-strip {
+    grid-template-rows: auto 38px minmax(100px, 1fr);
+  }
+}
+
+/* YAJA 2600 Animator v0.043 - centered playback label/icon group. */
+#playAnim {
+  gap: 2px;
+}
+
+#playAnim span,
+#playAnim svg {
+  transform: none;
+}
+
+/* YAJA 2600 Animator v0.044 - restore the pre-export-note three-row rhythm. */
+.frames-strip {
+  row-gap: 4px;
+}
+
+.timeline-heading {
+  min-height: 36px;
+  height: 36px;
+}
+
+.frames-actions {
+  min-height: 54px;
+  padding-block: 8px;
+}
+
+.frames-list {
+  padding-block: 3px 6px;
+}
+
+/* YAJA 2600 Animator v0.045 - Painter stamp-canvas, history, playback, and rail rhythm parity. */
+dialog.stamp-editor-popover {
+  width: min(560px, calc(100vw - 28px)) !important;
+}
+
+.stamp-editor-modal {
+  width: 100% !important;
+}
+
+.stamp-editor-canvas-container {
+  min-height: 360px;
+  height: min(430px, 55dvh);
+  max-height: 430px;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+.stamp-editor-canvas-stack {
+  outline: 1px solid var(--canvas-edge, var(--theme-border));
+  outline-offset: 0;
+}
+
+.stamp-editor-footer {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 10px;
+}
+
+.stamp-editor-size-controls {
+  align-items: end;
+  gap: 8px;
+}
+
+.stamp-editor-size-controls input { width: 56px; }
+.stamp-editor-readout {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-input-bg);
+  color: var(--theme-text);
+  font: 400 .72rem/1 "JetBrains Mono", monospace;
+  white-space: nowrap;
+}
+
+/* Painter v1.2 uses a 4px history gap, 38px squares and 20px icons. */
+.history-actions {
+  gap: 4px !important;
+  margin-top: 10px !important;
+}
+.history-actions .btn-icon {
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+}
+.history-actions .btn-icon svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+/* Center PLAY/STOP as one compact group instead of pinning its parts to the edges. */
+#playAnim {
+  display: inline-flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding-inline: 12px !important;
+}
+#playAnim span,
+#playAnim svg {
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+#playAnim svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+/* Keep every first right-rail action the same distance beneath its divider. */
+.right-panel > section > .reference-import-row { margin-top: 10px !important; }
+.right-panel > section > .asset-new { margin-top: 2px !important; }
+.right-panel > section > .asset-list:empty + .asset-new {
+  margin-top: 2px !important;
+}
+.right-panel > section > .asset-list:empty {
+  display: none;
+}
+
+/* Painter-width labels with Orbitron's intended tracking and no clipping. */
+.canvas-colors,
+.canvas-colors .row-colors,
+.canvas-colors .color-row,
+.canvas-colors .row-colors-title {
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  flex-basis: 28px !important;
+}
+.canvas-colors .row-colors-title {
+  overflow: visible;
+  font-family: "Orbitron", sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  line-height: 18px !important;
+  letter-spacing: .04rem !important;
+  font-kerning: normal;
+  text-align: center;
+}
+
+/* v0.054: color columns follow the sprite but never participate in its centering. */
+.composition-color-columns {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  flex: none;
+}
+
+@media (max-width: 700px) {
+  dialog.stamp-editor-popover[open] { width: calc(100vw - 14px) !important; }
+  .stamp-editor-canvas-container { min-height: 260px; height: 48dvh; }
+  .stamp-editor-footer { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1280px) {
+  .timeline-heading {
+    min-height: 49px;
+    height: 49px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .frames-strip {
+    grid-template-rows: auto 54px minmax(100px, 1fr);
+  }
+}
+
+/* YAJA 2600 Animator v0.046 - browser-annotated spacing and responsive corrections. */
+#playAnim,
+.frames-actions .timeline-play {
+  width: 96px !important;
+  min-width: 96px !important;
+  max-width: 96px !important;
+  flex-basis: 96px !important;
+  gap: 4px !important;
+  padding-inline: 12px !important;
+}
+
+.frames-actions {
+  min-height: 50px;
+  padding: 3px 0 9px;
+}
+
+.tools-panel > section.settings-section,
+.tools-panel .settings-section + .settings-section {
+  padding-top: 4px;
+}
+
+.tools-panel > section.settings-section {
+  margin-bottom: 4px;
+}
+
+.tools-panel .edit-section {
+  margin-bottom: 0;
+  padding-bottom: 4px;
+}
+
+.onion-control-group {
+  gap: 6px;
+}
+
+.onion-control-group > label {
+  min-width: 0;
+}
+
+.onion-control-group .onion-count {
+  margin-left: 6px !important;
+  margin-right: 10px !important;
+}
+
+.onion-control-group label:has(input:disabled) {
+  color: var(--theme-text-muted);
+  opacity: .46;
+}
+
+.onion-control-group input:disabled {
+  cursor: not-allowed;
+  filter: saturate(.25);
+}
+
+@media (max-width: 1360px) {
+  .app-header {
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    height: auto;
+    min-height: 0;
+    padding: 8px 12px;
+    overflow: visible;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-strip {
+    width: 100%;
+    min-height: 36px;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-content: center;
+    gap: 6px;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .project-strip > *,
+  .export-actions,
+  .export-actions > button {
+    flex: 0 0 auto;
+  }
+}
+
+/* YAJA 2600 Animator v0.047 - Painter selection, scaling and asset-editor parity. */
+body {
+  --theme-edit-action: #65e6e6;
+  --theme-edit-action-ink: #071717;
+  --theme-subpanel-bg: var(--theme-toolbar-bg);
+}
+
+.theme-classic-light {
+  --theme-edit-action: #087f8c;
+  --theme-edit-action-ink: #ffffff;
+  --theme-subpanel-bg: #b2b2b2;
+}
+
+.edit-section .nudge-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+
+.edit-subsection {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.edit-subsection .subcontrol-label {
+  color: var(--theme-text);
+}
+
+.scale-step-control {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.scale-step-control > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scale-step-control input {
+  width: 58px;
+}
+
+.transform-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px 38px;
+  align-items: center;
+  gap: 6px;
+}
+
+.transform-pair > span {
+  color: var(--theme-text-muted);
+  white-space: nowrap;
+}
+
+.transform-pair button {
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  font: 600 1rem/1 "JetBrains Mono", monospace !important;
+}
+
+.asset-remove {
+  top: 2px !important;
+  right: 2px !important;
+  background: var(--theme-danger) !important;
+  border-color: color-mix(in srgb, var(--theme-danger) 70%, #fff) !important;
+}
+
+.asset-edit {
+  right: 2px !important;
+  bottom: 2px !important;
+  background: var(--theme-edit-action) !important;
+  border-color: var(--theme-edit-action) !important;
+  color: var(--theme-edit-action-ink) !important;
+}
+
+.stamp-editor-footer {
+  background: var(--theme-subpanel-bg) !important;
+  border-top: 1px solid var(--theme-border);
+}
+
+dialog.color-block-editor-popover,
+dialog.color-block-editor-popover[open] {
+  position: fixed !important;
+  left: var(--editor-left, 8px) !important;
+  top: var(--editor-top, 8px) !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 180px !important;
+  min-width: 180px !important;
+  max-width: 180px !important;
+  margin: 0 !important;
+  transform: none !important;
+  overflow: visible !important;
+}
+
+.color-block-editor-popover .color-block-editor-modal {
+  width: 180px !important;
+  padding: 10px !important;
+  gap: 8px;
+}
+
+.color-block-editor-popover .asset-editor-field {
+  justify-content: space-between;
+}
+
+.color-block-editor-lines {
+  min-height: 32px !important;
+  max-height: 62vh !important;
+}
+
+.color-block-editor-line {
+  height: 8px !important;
+  min-height: 8px !important;
+}
+
+.color-block-editor-actions {
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px !important;
+}
+
+.color-block-editor-actions button {
+  width: 100% !important;
+  flex: 0 0 36px !important;
+}
+
+/* YAJA 2600 Animator v0.050 - keep the composition center stable as tall frames begin scrolling. */
+.canvas-band {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* YAJA 2600 Animator v0.051 - Painter stamp controls with a full-width, stable range row. */
+.stamp-editor-footer {
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: end;
+  padding: 15px;
+}
+
+.stamp-editor-size-controls {
+  gap: 20px;
+}
+
+.stamp-editor-zoom-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stamp-editor-control-item {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  margin: 0;
+}
+
+.stamp-editor-control-item > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.stamp-editor-control-item input[type="range"] {
+  flex: 1 1 auto;
+  width: auto !important;
+  min-width: 0;
+  margin: 0;
+}
+
+.stamp-editor-zoom-actions .dialog-actions {
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.stamp-editor-zoom-actions .dialog-actions button {
+  white-space: nowrap;
+  padding-inline: 12px !important;
+}
+
+@media (max-width: 620px) {
+  .stamp-editor-footer { grid-template-columns: 1fr; gap: 12px; }
+}
+
+/* YAJA 2600 Animator v0.069 - theme-readable palette labels and frame/readout parity. */
+#palette .palette-axis-label {
+  color: #c8c8c8 !important;
+  background: #111111 !important;
+}
+
+.frame-thumb.selected,
+.frame-thumb.active,
+.frame-thumb.active.selected,
+.theme-classic-light .frame-thumb.selected,
+.theme-classic-light .frame-thumb.active,
+.theme-classic-light .frame-thumb.active.selected {
+  box-sizing: border-box;
+  border: 2px solid var(--theme-primary) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-primary) 42%, transparent) !important;
+}
+
+.theme-classic-light .canvas-readout {
+  background: var(--theme-panel-bg) !important;
+  border-color: var(--theme-border) !important;
+}
+
+.theme-classic-light .canvas-readout,
+.theme-classic-light .canvas-readout span,
+.theme-classic-light .canvas-readout span:first-child,
+.theme-classic-light .canvas-readout span + span::before {
+  color: var(--theme-text-secondary) !important;
+}
+
+/* YAJA 2600 Animator v0.071 - docked readout and stable composition alignment. */
+.canvas-band,
+.editor-zone.two-sprite-layout .canvas-band {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0 !important;
+  overflow: hidden !important;
+  min-width: 0;
+}
+
+.canvas-stage-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px 18px;
+}
+
+.sprite-stage,
+.editor-zone.two-sprite-layout .sprite-stage {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.canvas-readout.canvas-readout-dock,
+.theme-classic-light .canvas-readout.canvas-readout-dock {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  align-self: center;
+  flex: 0 0 auto;
+  margin: 5px auto 4px;
+  z-index: 5;
+}
+
+@media (max-width: 760px) {
+  .canvas-stage-scroll { padding-inline: 10px; }
+}
+
+/* v0.074 rotation-control ordering and full-row Clear action. */
+.tools-panel .clear-frame {
+  width: 100% !important;
+  min-width: 0 !important;
+  align-self: stretch;
+}
+
+/* v0.075 Composer-style timeline loop toggle. */
+.frames-actions .composer-loop-toggle,
+.frames-actions .composer-loop-toggle.timeline-loop {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  flex: 0 0 36px;
+  margin: 0 0 0 8px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 4px;
+  background: var(--theme-control-bg) !important;
+  color: var(--theme-text-secondary) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+
+/* YAJA 2600 Animator v1.0.0 - Painter-style Edit subsection dividers. */
+.edit-section > .edit-subsection {
+  display: grid;
+  gap: 6px;
+  margin-top: 0;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--theme-border);
+}
+
+.edit-section > .edit-subsection:first-of-type {
+  padding-top: 4px;
+}
+
+.edit-section > .edit-subsection + .edit-subsection {
+  padding-top: 10px;
+}
+
+/* YAJA 2600 Animator v1.0.4 - intersection-aware circle pivots. */
+
+.fullscreen-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding-left: 5px;
+}
+
+#btn-fullscreen {
+  width: 38px;
+  min-width: 38px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+#btn-fullscreen svg {
+  width: 20px;
+  height: 20px;
+  transition: transform .2s;
+}
+
+#btn-fullscreen:hover svg { transform: scale(1.1); }
+#btn-fullscreen.active { border-color: var(--theme-primary); color: var(--theme-primary); }
+.brand-title {
+  white-space: nowrap !important;
+  line-height: 1.15;
+}
+
+.brand {
+  flex: 0 0 400px;
+  min-width: 400px;
+}
+
+.project-name-control,
+.theme-control,
+.export-actions {
+  flex: 0 0 auto;
+}
+
+.canvas-stage-scroll {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: auto;
+}
+
+.canvas-stage-scroll > .sprite-stage {
+  flex: 0 0 auto;
+  max-width: none;
+  margin: auto;
+}
+
+.onion-control-group .onion-count {
+  margin-left: 10px !important;
+  margin-right: 10px !important;
+}
+
+@media (max-width: 1680px) {
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-strip {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-content: center;
+    overflow: visible;
+  }
+}
+
+.edit-section > .edit-subsection.rotation-tools {
+  display: flex;
+  margin-top: 0;
+}
+
+.edit-section > .clear-frame {
+  margin-top: 10px;
+}
+
+.frames-actions .composer-loop-toggle .loop-icon {
+  width: 19px;
+  height: 19px;
+  display: block;
+  fill: none !important;
+  stroke: currentColor;
+}
+
+.frames-actions .composer-loop-toggle:hover {
+  background: var(--theme-control-hover-bg) !important;
+  color: var(--theme-text) !important;
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--theme-primary) 55%, transparent) !important;
+}
+
+.frames-actions .composer-loop-toggle.active,
+.frames-actions .composer-loop-toggle[aria-pressed="true"] {
+  background: var(--theme-primary) !important;
+  color: var(--theme-primary-ink) !important;
+  border-color: var(--theme-primary) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--theme-primary) 72%, transparent),
+              0 0 0 1px color-mix(in srgb, var(--theme-primary) 50%, transparent) !important;
+}
+
+/* YAJA 2600 Animator v1.1.0 - multi-animation library. */
+.animation-library-control {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transform: translate(-50%, -50%);
+}
+
+.animation-combobox {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 160px) 30px;
+  width: 190px;
+}
+
+.animation-combobox input {
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  padding-right: 6px;
+  text-align: center;
+  border-radius: 0;
+}
+
+.animation-menu-toggle {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border-left: 0;
+  border-radius: 0;
+  color: var(--text-main);
+}
+
+.animation-library-control > .timeline-tool {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.animation-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 80;
+  width: 100%;
+  max-height: 161px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 35%);
+}
+
+.animation-menu button {
+  width: 100%;
+  height: 36px;
+  min-height: 32px;
+  padding: 5px 8px;
+  overflow: hidden;
+  color: var(--text-main);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--button-bg);
+}
+
+.animation-menu button + button { margin-top: 3px; }
+.animation-menu button[aria-selected="true"] {
+  color: var(--button-primary-text);
+  background: var(--theme-highlight);
+}
+
+#bbExportScope { margin-top: 8px; }
+
+@media (max-width: 1280px) {
+  .animation-library-control {
+    position: static;
+    display: flex;
+    justify-content: flex-start;
+    justify-self: center;
+    width: auto;
+    min-width: 0;
+    transform: none;
+  }
+
+  .timeline-heading > .animation-library-control {
+    display: flex;
+    justify-content: flex-start;
+    width: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .animation-combobox {
+    grid-template-columns: minmax(0, 132px) 30px;
+    width: 162px;
+  }
+}
+
+/* YAJA 2600 Animator v1.1.1 - timeline animation-library visual parity. */
+.animation-library-control {
+  gap: 4px;
+}
+
+.animation-combobox {
+  grid-template-columns: minmax(0, 220px) 36px;
+  width: 256px;
+}
+
+.animation-combobox input {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 4px 0 0 4px;
+  color: var(--theme-text);
+  background: var(--theme-input-bg);
+  font-size: .78rem;
+  line-height: 1;
+}
+
+.animation-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-color: var(--theme-border) !important;
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+  color: var(--theme-text-secondary) !important;
+  background: var(--theme-control-bg) !important;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 30%);
+}
+
+.animation-menu-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  transition: transform 120ms ease;
+}
+
+.animation-menu-toggle:hover,
+.animation-menu-toggle[aria-expanded="true"] {
+  color: var(--theme-text) !important;
+  border-color: var(--theme-primary) !important;
+  background: var(--theme-control-hover-bg) !important;
+}
+
+.animation-menu-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.animation-library-control > .timeline-tool {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.animation-library-control > .timeline-tool.danger {
+  color: #fff !important;
+  background: var(--theme-danger) !important;
+  border-color: var(--theme-danger) !important;
+}
+
+.animation-library-control > .timeline-tool.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--theme-danger) 82%, #000) !important;
+  border-color: var(--theme-primary) !important;
+}
+
+.animation-menu {
+  width: 100%;
+  padding: 4px;
+  border-color: var(--theme-border);
+  background: var(--theme-input-bg) !important;
+  opacity: 1;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 45%);
+}
+
+.animation-menu button {
+  min-height: 36px;
+  color: var(--theme-text-secondary);
+  background: var(--theme-control-bg) !important;
+}
+
+.animation-menu button:hover,
+.animation-menu button:focus-visible {
+  color: var(--theme-text);
+  border-color: var(--theme-primary);
+  background: var(--theme-control-hover-bg) !important;
+}
+
+.animation-menu button[aria-selected="true"] {
+  color: var(--theme-primary-ink);
+  background: var(--theme-primary) !important;
+  border-color: var(--theme-primary);
+}
+
+@media (max-width: 760px) {
+  .animation-combobox {
+    grid-template-columns: minmax(0, 188px) 36px;
+    width: 224px;
+  }
+}
+
+/* YAJA 2600 Animator v1.1.2 - animation library title-line alignment. */
+.animation-library-control {
+  top: calc(50% + 3px);
+}
+
+.animation-menu-toggle {
+  position: relative;
+  z-index: 2;
+  margin-left: -1px;
+  border-left: 1px solid var(--theme-border);
+}
+
+.animation-menu-toggle svg {
+  width: 24px;
+  height: 24px;
+}
+
+.animation-menu-toggle:hover,
+.animation-menu-toggle:focus-visible,
+.animation-menu-toggle[aria-expanded="true"] {
+  box-shadow: 0 0 0 1px var(--theme-primary), 0 2px 4px rgb(0 0 0 / 30%);
+}
+
+.animation-menu button {
+  font-family: "JetBrains Mono", monospace;
+  font-size: .78rem;
+  letter-spacing: 0;
+}
+
+@media (max-width: 1280px) {
+  .animation-library-control {
+    top: auto;
+    transform: translateY(3px);
+  }
+}
+
+/* YAJA 2600 Animator v1.1.3 - prevent title-row baseline inheritance. */
+.timeline-heading > .animation-library-control {
+  align-items: center;
+  gap: 4px;
+}
+
+/* YAJA 2600 Animator v1.1.4 - focused control rings must paint above siblings. */
+.tools-panel .dimension-control:focus-within {
+  position: relative;
+  z-index: 2;
+}
+
+#animationName:focus-visible {
+  position: relative;
+  z-index: 3;
+}
+
+/* YAJA 2600 Animator v1.1.6 - header fields retain complete control outlines. */
+.project-strip .project-name-control input,
+.project-strip .theme-control select {
+  box-sizing: border-box;
+  border: 1px solid var(--theme-border) !important;
+  border-radius: 4px;
+}
+
+/* YAJA 2600 Animator v1.1.7 - keep all header field edges above neighboring layers. */
+.project-strip .project-name-control,
+.project-strip .theme-control {
+  position: relative;
+  z-index: 3;
+}
+
+.project-strip .project-name-control input,
+.project-strip .theme-control select {
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 0 0 0 1px var(--theme-border);
+}
+
+/* YAJA 2600 Animator v1.1.8 - Chrome clips exterior outlines in the header.
+   Keep this ring inside the field so every edge remains visible. */
+.project-strip .project-name-control input:focus-visible,
+.project-strip .theme-control select:focus-visible {
+  position: relative;
+  z-index: 4;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
+}
+
+/* YAJA 2600 Animator v1.1.10 - timeline picker is part of the heading flow.
+   It stays on the title line while space permits and gains its own row before
+   it can ever overlap the playback/frame controls. */
+.timeline-heading {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px !important;
+  height: auto !important;
+  padding: 3px 0;
+}
+
+.timeline-heading > strong {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  min-width: 0;
+}
+
+.timeline-heading > .animation-library-control {
+  position: static !important;
+  display: flex;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  justify-self: center;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  transform: none !important;
+}
+
+.timeline-heading #timelineSummary {
+  position: static !important;
+  display: block;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  margin: 0;
+  transform: none !important;
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .timeline-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    min-height: 82px !important;
+    row-gap: 5px;
+  }
+
+  .timeline-heading > strong { grid-column: 1; grid-row: 1; }
+  .timeline-heading #timelineSummary { grid-column: 2; grid-row: 1; }
+
+  .timeline-heading > .animation-library-control {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* YAJA 2600 Animator v1.1.13 - Palette swatches are fixed grid cells.
+   Hover and selection use inset treatments so they cannot expand into, clip,
+   or visually merge with their neighboring palette row. */
+#palette.persistent-palette-grid {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+#palette .persistent-swatch {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 22px;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  transform: none !important;
+  transition: box-shadow .1s ease, border-color .1s ease;
+}
+
+#palette .persistent-swatch:hover {
+  z-index: auto;
+  transform: none !important;
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--theme-text) !important;
+}
+
+#palette .persistent-swatch.active,
+#palette .persistent-swatch.selected,
+#palette .persistent-swatch.active:hover,
+#palette .persistent-swatch.selected:hover {
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
+}

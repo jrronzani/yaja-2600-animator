@@ -200,7 +200,7 @@ function defaultState() {
   const project = {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "1.1.0",
+    version: "1.1.20",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -243,6 +243,15 @@ function currentFrame() {
 
 function currentPlayer() {
   return currentFrame().players[state.activePlayer];
+}
+
+function forEachSelectedFrame(callback) {
+  selectedFrameIndices().forEach(index => callback(state.frames[index], index));
+}
+
+function selectedFrameLabel() {
+  const count = selectedFrameIndices().length;
+  return count === 1 ? "frame" : `${count} frames`;
 }
 
 function usesSolidColor() { return state.kernel === "STANDARD" || state.kernel === "MULTISPRITE"; }
@@ -873,10 +882,12 @@ function endPointer() {
 function applyToolAt(cell, isStart) {
   const tool = rightEraseStroke && state.tool === "pencil" ? "eraser" : state.tool;
   if (tool === "picker") {
-    state.currentColor = currentFrame().players[cell.player].colors[cell.row];
+    const player = currentFrame().players[cell.player];
+    state.currentColor = usesSolidColor() ? player.solidColor : player.colors[cell.row];
     paletteEyedropperArmed = false;
     state.tool = "pencil";
     syncControls();
+    renderAll();
     return;
   }
   if (tool === "color") {
@@ -1609,16 +1620,31 @@ function renderStamps() {
     item.className = `stamp-item asset-item${index === activeStampIndex ? " active" : ""}`;
     const canvas = document.createElement("canvas");
     canvas.className = "stamp-preview asset-preview";
-    canvas.width = 48;
-    canvas.height = 32;
+    canvas.width = 84;
+    canvas.height = 64;
     const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, 48, 32);
-    const px = Math.max(2, Math.floor(Math.min(44 / stamp.w, 28 / stamp.h)));
-    const ox = Math.floor((48 - stamp.w * px) / 2);
-    const oy = Math.floor((32 - stamp.h * px) / 2);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const player = currentPlayer();
+    const geometry = timelineThumbnailGeometry(
+      canvas.width,
+      canvas.height,
+      stamp.w,
+      stamp.h,
+      state.verticalStretch,
+      4,
+      NUSIZ[player.nusiz].scale
+    );
     ctx.fillStyle = colorHex(state.currentColor);
-    stamp.pixels.forEach((row, y) => row.forEach((v, x) => v && ctx.fillRect(ox + x * px, oy + y * px, px, px)));
+    stamp.pixels.forEach((row, y) => row.forEach((value, x) => {
+      if (!value) return;
+      const left = Math.round(geometry.x + x * geometry.cellW);
+      const right = Math.round(geometry.x + (x + 1) * geometry.cellW);
+      const top = Math.round(geometry.y + y * geometry.cellH);
+      const bottom = Math.round(geometry.y + (y + 1) * geometry.cellH);
+      ctx.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
+    }));
     const remove = document.createElement("button");
     remove.className = "asset-remove";
     remove.textContent = "\u00d7";
@@ -2401,51 +2427,57 @@ function nudge(dx, dy) {
   const movePixels = !!el.nudgePixels.checked;
   const moveColors = !!el.nudgeColors.checked && !!dy;
   if (!movePixels && !moveColors) return;
-  const player = currentPlayer();
-  const live = selection ? tightenSelectionToLivePixels(player.pixels, selection, state.width, state.height) : null;
+  const current = currentPlayer();
+  const live = selection ? tightenSelectionToLivePixels(current.pixels, selection, state.width, state.height) : null;
   if (selection && !live && !moveColors) {
     selection = null;
     el.statusMessage.textContent = "The selection contains no live pixels";
     renderAll();
     return;
   }
+  const frameIndices = selection || colorSelection ? [state.currentFrame] : selectedFrameIndices();
   pushHistory();
-  if (movePixels) {
-    if (live) {
-      selection = live;
-      const nx = Math.max(0, Math.min(state.width - live.w, live.x + dx));
-      const ny = Math.max(0, Math.min(state.height - live.h, live.y + dy));
-      const data = extractSelectionPixels(player.pixels, live);
-      player.pixels = moveMaskedSelectionPixels(player.pixels, live, data, nx, ny);
-      selection = tightenSelectionToLivePixels(player.pixels, { ...live, x: nx, y: ny }, state.width, state.height);
-    } else if (!selection) {
-      const next = Array.from({ length: state.height }, () => Array(8).fill(0));
-      for (let y = 0; y < state.height; y++) for (let x = 0; x < state.width; x++) {
-        const nx = x + dx, ny = y + dy;
-        if (nx >= 0 && nx < state.width && ny >= 0 && ny < state.height) next[ny][nx] = player.pixels[y][x];
+  frameIndices.forEach(frameIndex => {
+    const frame = state.frames[frameIndex];
+    const player = frame.players[state.activePlayer];
+    const width = frame.width || 8;
+    const height = frame.height || player.pixels.length;
+    if (movePixels) {
+      if (frameIndex === state.currentFrame && live) {
+        selection = live;
+        const nx = Math.max(0, Math.min(width - live.w, live.x + dx));
+        const ny = Math.max(0, Math.min(height - live.h, live.y + dy));
+        const data = extractSelectionPixels(player.pixels, live);
+        player.pixels = moveMaskedSelectionPixels(player.pixels, live, data, nx, ny);
+        selection = tightenSelectionToLivePixels(player.pixels, { ...live, x: nx, y: ny }, width, height);
+      } else if (!selection) {
+        const next = Array.from({ length: height }, () => Array(8).fill(0));
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) next[ny][nx] = player.pixels[y][x];
+        }
+        player.pixels = next;
       }
-      player.pixels = next;
-    } else {
-      selection = null;
     }
-  }
-  if (moveColors) {
-    const source = player.colors.slice();
-    if (colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean)) {
-      const next = source.slice();
-      const movedMask = Array(state.height).fill(false);
-      colorSelection.mask.forEach((selected, row) => { if (selected) next[row] = state.currentColor; });
-      colorSelection.mask.forEach((selected, row) => {
-        const target = row + dy;
-        if (selected && target >= 0 && target < state.height) { next[target] = source[row]; movedMask[target] = true; }
-      });
-      player.colors = next;
-      const rows = movedMask.map((value, row) => value ? row : -1).filter(row => row >= 0);
-      colorSelection = rows.length ? { player: state.activePlayer, mask: movedMask, start: rows[0], end: rows.at(-1) } : null;
-    } else {
-      player.colors = Array.from({ length: state.height }, (_, y) => source[y - dy] || state.currentColor);
+    if (moveColors) {
+      const source = player.colors.slice(0, height);
+      if (frameIndex === state.currentFrame && colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean)) {
+        const next = source.slice();
+        const movedMask = Array(height).fill(false);
+        colorSelection.mask.forEach((selected, row) => { if (selected && row < height) next[row] = state.currentColor; });
+        colorSelection.mask.forEach((selected, row) => {
+          const target = row + dy;
+          if (selected && row < height && target >= 0 && target < height) { next[target] = source[row]; movedMask[target] = true; }
+        });
+        player.colors = next;
+        const rows = movedMask.map((value, row) => value ? row : -1).filter(row => row >= 0);
+        colorSelection = rows.length ? { player: state.activePlayer, mask: movedMask, start: rows[0], end: rows.at(-1) } : null;
+      } else if (!colorSelection) {
+        player.colors = Array.from({ length: height }, (_, y) => source[y - dy] || state.currentColor);
+      }
     }
-  }
+  });
+  if (frameIndices.length > 1) el.statusMessage.textContent = `Nudged ${selectedFrameLabel()}`;
   renderAll();
 }
 
@@ -2499,45 +2531,53 @@ function scaleArtwork(axis, direction) {
     return;
   }
 
-  const frame = currentFrame();
-  const oldWidth = frame.width || state.width;
-  const oldHeight = frame.height || state.height;
-  const oldColors = frame.players.map(player => player.colors.slice(0, oldHeight));
-  const result = scaleRasterArtwork(
-    frame.players.map(player => player.pixels),
-    oldWidth,
-    oldHeight,
-    scaleX,
-    scaleY,
-    { maxWidth: 8, maxHeight: 255, indices: state.twoSpriteMode ? [0, 1] : [state.activePlayer] }
-  );
-  if (!result.changed) {
+  const updates = selectedFrameIndices().map(frameIndex => {
+    const frame = state.frames[frameIndex];
+    const oldWidth = frame.width || 8;
+    const oldHeight = frame.height || frame.players[0].pixels.length;
+    const oldColors = frame.players.map(player => player.colors.slice(0, oldHeight));
+    const result = scaleRasterArtwork(
+      frame.players.map(player => player.pixels),
+      oldWidth,
+      oldHeight,
+      scaleX,
+      scaleY,
+      { maxWidth: 8, maxHeight: 255, indices: state.twoSpriteMode ? [0, 1] : [state.activePlayer] }
+    );
+    return { frame, oldColors, result, scaleY };
+  });
+  if (!updates.some(update => update.result.changed)) {
     el.statusMessage.textContent = "Draw pixels before scaling, or use a larger Scale Step";
     return;
   }
   pushHistory();
-  frame.players.forEach((player, index) => {
-    player.pixels = result.grids[index].map(row => [...row, ...Array(Math.max(0, 8 - row.length)).fill(0)].slice(0, 8));
-    const nextColors = Array(result.height).fill(state.currentColor);
-    oldColors[index].forEach((color, y) => {
-      const targetY = y + result.shiftY;
-      if (targetY >= 0 && targetY < result.height) nextColors[targetY] = color;
-    });
-    const plan = result.plans[index];
-    if (plan?.affected && plan.source && plan.target && scaleY !== 1) {
-      const scaledColors = resampleValues(oldColors[index].slice(plan.source.y, plan.source.y + plan.source.h), plan.target.h, state.currentColor);
-      scaledColors.forEach((color, y) => {
-        const targetY = plan.target.y + y;
+  updates.forEach(({ frame, oldColors, result }) => {
+    if (!result.changed) return;
+    frame.players.forEach((player, index) => {
+      player.pixels = result.grids[index].map(row => [...row, ...Array(Math.max(0, 8 - row.length)).fill(0)].slice(0, 8));
+      const nextColors = Array(result.height).fill(state.currentColor);
+      oldColors[index].forEach((color, y) => {
+        const targetY = y + result.shiftY;
         if (targetY >= 0 && targetY < result.height) nextColors[targetY] = color;
       });
-    }
-    player.colors = nextColors;
+      const plan = result.plans[index];
+      if (plan?.affected && plan.source && plan.target && scaleY !== 1) {
+        const scaledColors = resampleValues(oldColors[index].slice(plan.source.y, plan.source.y + plan.source.h), plan.target.h, state.currentColor);
+        scaledColors.forEach((color, y) => {
+          const targetY = plan.target.y + y;
+          if (targetY >= 0 && targetY < result.height) nextColors[targetY] = color;
+        });
+      }
+      player.colors = nextColors;
+    });
+    frame.width = result.width;
+    frame.height = result.height;
   });
-  frame.width = state.width = result.width;
-  frame.height = state.height = result.height;
+  syncFrameSize();
   selection = null;
   rotationSession = null;
   syncControls();
+  if (updates.length > 1) el.statusMessage.textContent = `Scaled ${selectedFrameLabel()}`;
   renderAll();
 }
 
@@ -2552,7 +2592,12 @@ function flipH() {
     return;
   }
   pushHistory();
-  currentPlayer().pixels = currentPlayer().pixels.map(row => [...row.slice(0, state.width).reverse(), ...Array(8 - state.width).fill(0)]);
+  forEachSelectedFrame(frame => {
+    const width = frame.width || 8;
+    const player = frame.players[state.activePlayer];
+    player.pixels = player.pixels.map(row => [...row.slice(0, width).reverse(), ...Array(8 - width).fill(0)]);
+  });
+  if (selectedFrameIndices().length > 1) el.statusMessage.textContent = `Flipped ${selectedFrameLabel()} horizontally`;
   renderAll();
 }
 
@@ -2567,12 +2612,25 @@ function flipV(withColors = false) {
     return;
   }
   pushHistory();
-  currentPlayer().pixels.reverse();
-  if (withColors) currentPlayer().colors.reverse();
+  forEachSelectedFrame(frame => {
+    const player = frame.players[state.activePlayer];
+    player.pixels.reverse();
+    if (withColors) player.colors.reverse();
+  });
+  if (selectedFrameIndices().length > 1) el.statusMessage.textContent = `Flipped ${selectedFrameLabel()} vertically`;
   renderAll();
 }
 
 function flipColor() {
+  const hasPixelSelection = !!selection;
+  const hasColorSelection = colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean);
+  if (!hasPixelSelection && !hasColorSelection) {
+    pushHistory();
+    forEachSelectedFrame(frame => frame.players[state.activePlayer].colors.reverse());
+    if (selectedFrameIndices().length > 1) el.statusMessage.textContent = `Flipped colors on ${selectedFrameLabel()}`;
+    renderAll();
+    return;
+  }
   let rows = [];
   if (colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean)) {
     rows = colorSelection.mask.map((value, row) => value ? row : -1).filter(row => row >= 0);
@@ -2596,7 +2654,58 @@ function invert() {
   renderAll();
 }
 
+function rotateSelectedFrameSet(angle, frameIndices) {
+  const signature = `frames:${state.activePlayer}:${frameIndices.join(",")}`;
+  if (!rotationSession || rotationSession.signature !== signature) {
+    const aspect = aspectForKernel();
+    const pixelAspect = aspect.w / (aspect.h * state.verticalStretch);
+    const entries = frameIndices.map(frameIndex => {
+      const frame = state.frames[frameIndex];
+      const player = frame.players[state.activePlayer];
+      const width = frame.width || 8;
+      const height = frame.height || player.pixels.length;
+      const live = tightenSelectionToLivePixels(player.pixels, selectionFromRectangle({ x: 0, y: 0, w: width, h: height }), width, height);
+      if (!live) return null;
+      const source = Array.from({ length: live.h }, (_, y) => Array.from({ length: live.w }, (_, x) => player.pixels[live.y + y]?.[live.x + x] ? 1 : 0));
+      return {
+        frameIndex,
+        width,
+        height,
+        source: live,
+        originalPixels: player.pixels.map(row => row.slice()),
+        session: createRotationSession(source, pixelAspect, { expandBounds: true })
+      };
+    }).filter(Boolean);
+    rotationSession = { signature, kind: "frames", entries };
+  }
+  if (!rotationSession.entries.length) {
+    el.statusMessage.textContent = "Draw pixels before rotating";
+    return;
+  }
+  pushHistory(true);
+  let clipped = false;
+  rotationSession.entries.forEach(entry => {
+    const rotated = entry.session.rotate(angle);
+    const rotatedWidth = rotated[0]?.length || 0;
+    const targetX = Math.round(entry.source.x + (entry.source.w - rotatedWidth) / 2);
+    const targetY = Math.round(entry.source.y + (entry.source.h - rotated.length) / 2);
+    const composed = compositeSelectionGrid(entry.originalPixels, entry.source, rotated, targetX, targetY, entry.width, entry.height);
+    state.frames[entry.frameIndex].players[state.activePlayer].pixels = composed.pixels;
+    clipped ||= targetX < 0 || targetY < 0 || targetX + rotatedWidth > entry.width || targetY + rotated.length > entry.height;
+  });
+  selection = null;
+  el.statusMessage.textContent = clipped
+    ? `Rotated ${selectedFrameLabel()}; overflow was clipped`
+    : `Rotated ${selectedFrameLabel()}`;
+  renderAll();
+}
+
 function rotate(angle) {
+  const frameIndices = selectedFrameIndices();
+  if (!selection && frameIndices.length > 1) {
+    rotateSelectedFrameSet(angle, frameIndices);
+    return;
+  }
   const requestedSelection = selection;
   const live = tightenSelectionToLivePixels(
     currentPlayer().pixels,
@@ -2647,29 +2756,40 @@ function grow() {
     renderAll();
     return;
   }
-  const frame = currentFrame();
-  const oldHeight = state.height;
-  const colors = frame.players.map(player => player.colors.slice(0, oldHeight));
-  const result = growRasterArtwork(frame.players.map(player => player.pixels), state.activePlayer, state.width, state.height, 8, 255);
-  if (!result.changed) {
+  const updates = selectedFrameIndices().map(frameIndex => {
+    const frame = state.frames[frameIndex];
+    const width = frame.width || 8;
+    const height = frame.height || frame.players[0].pixels.length;
+    return {
+      frame,
+      colors: frame.players.map(player => player.colors.slice(0, height)),
+      result: growRasterArtwork(frame.players.map(player => player.pixels), state.activePlayer, width, height, 8, 255)
+    };
+  });
+  if (!updates.some(update => update.result.changed)) {
     el.statusMessage.textContent = "Draw pixels before growing";
     return;
   }
   pushHistory();
-  frame.players.forEach((player, index) => {
-    player.pixels = result.grids[index].map(row => [...row, ...Array(Math.max(0, 8 - row.length)).fill(0)].slice(0, 8));
-    const nextColors = Array(result.height).fill(state.currentColor);
-    colors[index].forEach((color, y) => {
-      const targetY = y + result.shiftY;
-      if (targetY >= 0 && targetY < result.height) nextColors[targetY] = color;
+  updates.forEach(({ frame, colors, result }) => {
+    if (!result.changed) return;
+    frame.players.forEach((player, index) => {
+      player.pixels = result.grids[index].map(row => [...row, ...Array(Math.max(0, 8 - row.length)).fill(0)].slice(0, 8));
+      const nextColors = Array(result.height).fill(state.currentColor);
+      colors[index].forEach((color, y) => {
+        const targetY = y + result.shiftY;
+        if (targetY >= 0 && targetY < result.height) nextColors[targetY] = color;
+      });
+      player.colors = nextColors;
     });
-    player.colors = nextColors;
+    frame.width = result.width;
+    frame.height = result.height;
   });
-  frame.width = state.width = result.width;
-  frame.height = state.height = result.height;
+  syncFrameSize();
   selection = null;
   rotationSession = null;
   syncControls();
+  if (updates.length > 1) el.statusMessage.textContent = `Grew ${selectedFrameLabel()}`;
   renderAll();
 }
 
@@ -2686,14 +2806,19 @@ function shrink() {
     return;
   }
   pushHistory();
-  const src = currentPlayer().pixels;
-  const out = Array.from({ length: state.height }, () => Array(8).fill(0));
-  for (let y = 0; y < state.height; y++) for (let x = 0; x < 8; x++) {
-    if (!src[y][x]) continue;
-    const neighbors = [[1,0],[-1,0],[0,1],[0,-1]].every(([dx, dy]) => src[y + dy]?.[x + dx]);
-    out[y][x] = neighbors ? 1 : 0;
-  }
-  currentPlayer().pixels = out;
+  forEachSelectedFrame(frame => {
+    const player = frame.players[state.activePlayer];
+    const height = frame.height || player.pixels.length;
+    const src = player.pixels;
+    const out = Array.from({ length: height }, () => Array(8).fill(0));
+    for (let y = 0; y < height; y++) for (let x = 0; x < 8; x++) {
+      if (!src[y][x]) continue;
+      const neighbors = [[1,0],[-1,0],[0,1],[0,-1]].every(([dx, dy]) => src[y + dy]?.[x + dx]);
+      out[y][x] = neighbors ? 1 : 0;
+    }
+    player.pixels = out;
+  });
+  if (selectedFrameIndices().length > 1) el.statusMessage.textContent = `Shrank ${selectedFrameLabel()}`;
   renderAll();
 }
 
@@ -2713,25 +2838,33 @@ function clearActiveFrame() {
     return;
   }
   pushHistory();
-  currentPlayer().pixels = Array.from({ length: state.height }, () => Array(8).fill(0));
-  currentPlayer().colors = Array.from({ length: state.height }, () => state.currentColor);
+  forEachSelectedFrame(frame => {
+    const player = frame.players[state.activePlayer];
+    const height = frame.height || player.pixels.length;
+    player.pixels = Array.from({ length: height }, () => Array(8).fill(0));
+    player.colors = Array.from({ length: height }, () => state.currentColor);
+  });
+  if (selectedFrameIndices().length > 1) el.statusMessage.textContent = `Cleared ${selectedFrameLabel()}`;
   renderAll();
 }
 
 function setHeight() {
   const height = Math.max(1, Math.min(255, Number(el.spriteHeight.value) || state.height));
   pushHistory();
-  state.height = height;
-  currentFrame().height = height;
-  currentFrame().players.forEach(player => resizePlayer(player, height));
+  forEachSelectedFrame(frame => {
+    frame.height = height;
+    frame.players.forEach(player => resizePlayer(player, height));
+  });
+  state.height = currentFrame().height;
+  selection = null;
   renderAll();
 }
 
 function setWidth() {
   const width = Math.max(1, Math.min(8, Number(el.spriteWidth.value) || state.width));
   pushHistory();
-  state.width = width;
-  currentFrame().width = width;
+  forEachSelectedFrame(frame => { frame.width = width; });
+  state.width = currentFrame().width;
   selection = null;
   syncControls();
   renderAll();
@@ -2841,26 +2974,28 @@ function copyToNext() {
 
 function swapPlayers() {
   pushHistory();
-  state.frames.forEach(frame => frame.players.reverse());
+  forEachSelectedFrame(frame => frame.players.reverse());
   renderAll();
 }
 
 function copyP0ToP1() {
   pushHistory();
-  currentFrame().players[1] = cloneData(currentFrame().players[0]);
+  forEachSelectedFrame(frame => { frame.players[1] = cloneData(frame.players[0]); });
   renderAll();
 }
 
 function copyColorsP0ToP1() {
   pushHistory();
-  currentFrame().players[1].colors = [...currentFrame().players[0].colors];
+  forEachSelectedFrame(frame => { frame.players[1].colors = [...frame.players[0].colors]; });
   renderAll();
 }
 
 function mirrorP0ToP1() {
   pushHistory();
-  const source = currentFrame().players[0];
-  currentFrame().players[1] = { ...cloneData(source), pixels: source.pixels.map(row => row.slice().reverse()) };
+  forEachSelectedFrame(frame => {
+    const source = frame.players[0];
+    frame.players[1] = { ...cloneData(source), pixels: source.pixels.map(row => row.slice().reverse()) };
+  });
   renderAll();
 }
 
@@ -3002,7 +3137,7 @@ function projectNameFromFilename(filename, fallback = "Untitled Project") {
 }
 
 function normalizeJsonSaveName(rawName, fallbackProjectName) {
-  const fallback = `${safeName(fallbackProjectName || "Untitled Project")}_yaja2600animator.json`;
+  const fallback = `${String(fallbackProjectName || "Untitled Project").trim() || "Untitled Project"}.json`;
   const entered = String(rawName || "").trim() || fallback;
   const filename = /\.json$/i.test(entered) ? entered : `${entered}.json`;
   return {
@@ -3012,7 +3147,7 @@ function normalizeJsonSaveName(rawName, fallbackProjectName) {
 }
 
 async function saveProject(forceSaveAs = false) {
-  const filename = `${safeName(state.projectName)}_yaja2600animator.json`;
+  const filename = normalizeJsonSaveName(`${state.projectName || "Untitled Project"}.json`, state.projectName).filename;
   if (window.YaJaDesktop?.isDesktop) {
     const content = serializedProject();
     const bridge = window.YaJaDesktop;
@@ -3029,7 +3164,7 @@ async function saveProject(forceSaveAs = false) {
     return;
   }
 
-  if ("showSaveFilePicker" in window && !document.fullscreenElement) {
+  if ("showSaveFilePicker" in window) {
     try {
       const handle = await window.showSaveFilePicker(addProjectPickerStart({
         id: PROJECT_PICKER_ID,
@@ -3050,16 +3185,11 @@ async function saveProject(forceSaveAs = false) {
       return;
     } catch (error) {
       if (error?.name === "AbortError") return;
-      console.warn("Save picker failed, falling back to filename prompt.", error);
+      console.warn("Save picker failed, falling back to a direct project download.", error);
     }
   }
 
-  const enteredName = window.prompt("Save Animator project as (.json):", filename);
-  if (enteredName === null) return;
-  const normalized = normalizeJsonSaveName(enteredName, state.projectName);
-  state.projectName = normalized.projectName;
-  el.projectName.value = normalized.projectName;
-  await downloadBlob(new Blob([serializedProject()], { type: "application/json" }), normalized.filename);
+  await downloadBlob(new Blob([serializedProject()], { type: "application/json" }), filename);
 }
 
 function loadProjectContent(content) {
@@ -3539,10 +3669,24 @@ function bindEvents() {
   el.applyRepeatAll.addEventListener("click", applyRepeatToAll);
   bindValue(el.playerAssignment0, v => setPlayerAssignment(0, Number(v)), true);
   bindValue(el.playerAssignment1, v => setPlayerAssignment(1, Number(v)), true);
-  bindValue(el.spriteNusiz, v => currentPlayer().nusiz = v, true);
-  bindValue(el.spriteSolidColor, v => { currentPlayer().solidColor = normalizeCode(v, currentPlayer().solidColor); state.currentColor = currentPlayer().solidColor; }, true);
-  bindValue(el.spriteOffsetX, v => currentPlayer().xOffset = Number(v) || 0, true);
-  bindValue(el.spriteOffsetY, v => currentPlayer().yOffset = Number(v) || 0, true);
+  bindValue(el.spriteNusiz, v => {
+    if (!NUSIZ[v]) return;
+    forEachSelectedFrame(frame => { frame.players[state.activePlayer].nusiz = v; });
+    rotationSession = null;
+  }, true);
+  bindValue(el.spriteSolidColor, v => {
+    const color = normalizeCode(v, currentPlayer().solidColor);
+    forEachSelectedFrame(frame => { frame.players[state.activePlayer].solidColor = color; });
+    state.currentColor = color;
+  }, true);
+  bindValue(el.spriteOffsetX, v => {
+    const value = Number(v) || 0;
+    forEachSelectedFrame(frame => { frame.players[state.activePlayer].xOffset = value; });
+  }, true);
+  bindValue(el.spriteOffsetY, v => {
+    const value = Number(v) || 0;
+    forEachSelectedFrame(frame => { frame.players[state.activePlayer].yOffset = value; });
+  }, true);
   el.applySizeAll.addEventListener("click", applySizeToAll);
   el.applyOffsetsAll.addEventListener("click", applyOffsetsToAll);
   bindValue(el.zoom, v => state.zoom = sliderToZoom(v), true);
@@ -3790,10 +3934,22 @@ function redo() {
   restore(snap);
 }
 
+function isTextEntryTarget(target) {
+  if (!(target instanceof Element)) return false;
+  if (target.matches("textarea, [contenteditable='true']")) return true;
+  if (!target.matches("input")) return false;
+  return !["button", "checkbox", "color", "file", "radio", "range", "reset", "submit"].includes((target.type || "text").toLowerCase());
+}
+
 function handleKeys(e) {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && el.stampEditor?.open) { e.preventDefault(); e.shiftKey ? redoStampEditor() : undoStampEditor(); return; }
+  const commandKey = e.ctrlKey || e.metaKey;
+  const key = e.key.toLowerCase();
+  const redoKey = commandKey && ((e.shiftKey && (key === "z" || key === "r")) || key === "y");
+  if (commandKey && key === "z" && el.stampEditor?.open) { e.preventDefault(); e.shiftKey ? redoStampEditor() : undoStampEditor(); return; }
+  if (redoKey && el.stampEditor?.open) { e.preventDefault(); redoStampEditor(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y" && el.stampEditor?.open) { e.preventDefault(); redoStampEditor(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && el.colorBlockEditor?.open) { e.preventDefault(); e.shiftKey ? redoColorBlockEditor() : undoColorBlockEditor(); return; }
+  if (commandKey && key === "z" && el.colorBlockEditor?.open) { e.preventDefault(); e.shiftKey ? redoColorBlockEditor() : undoColorBlockEditor(); return; }
+  if (redoKey && el.colorBlockEditor?.open) { e.preventDefault(); redoColorBlockEditor(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y" && el.colorBlockEditor?.open) { e.preventDefault(); redoColorBlockEditor(); return; }
   if (el.stampEditor?.open && stampEditorSelection && e.key.startsWith("Arrow")) {
     e.preventDefault();
@@ -3814,9 +3970,17 @@ function handleKeys(e) {
     return;
   }
   if (e.key === "Escape" && el.colorBlockEditor?.open) { el.colorBlockEditor.close(); return; }
-  if (e.target.matches("input, textarea")) return;
-  if (e.ctrlKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
-  if (e.ctrlKey && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); }
+  if (isTextEntryTarget(e.target)) return;
+  if (commandKey && key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (redoKey) { e.preventDefault(); redo(); return; }
+  if (commandKey && key === "c" && selection) { e.preventDefault(); copySelection(false); return; }
+  if (commandKey && key === "x" && selection) { e.preventDefault(); copySelection(true); return; }
+  if (commandKey && key === "v" && clipboard) { e.preventDefault(); pasteSelection(); return; }
+  if (e.code === "Space" && !el.stampEditor?.open && !el.colorBlockEditor?.open) {
+    e.preventDefault();
+    togglePlayback();
+    return;
+  }
   if (state.tool === "select" && selection && e.key.startsWith("Arrow")) {
     e.preventDefault();
     moveSelectionBy(e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0, e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
@@ -3824,8 +3988,6 @@ function handleKeys(e) {
   }
   if (e.key === "ArrowLeft" && !e.ctrlKey) { state.currentFrame = Math.max(0, state.currentFrame - 1); rotationSession = null; syncControls(); renderAll(); }
   if (e.key === "ArrowRight" && !e.ctrlKey) { state.currentFrame = Math.min(state.frames.length - 1, state.currentFrame + 1); rotationSession = null; syncControls(); renderAll(); }
-  if (e.key.toLowerCase() === "c" && selection) copySelection(false);
-  if ((e.key.toLowerCase() === "v" || e.key.toLowerCase() === "p") && clipboard) pasteSelection();
   if (e.key === "Delete" && selection) copySelection(true);
   if (e.key === "Escape" && (activeStampIndex !== null || activeColorBlockIndex !== null)) {
     activeStampIndex = null; activeColorBlockIndex = null; colorBlockHoverRow = null; state.tool = "pencil"; syncControls(); renderAll();

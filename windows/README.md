@@ -1,6 +1,24 @@
-# YAJA 2600 Animator v1.1.17
+# YAJA 2600 Animator v1.1.20
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
+
+## v1.1.20 working notes
+
+- Centers every export-dialog action label vertically, including `Download .bas`, using Painter's 36px inline-flex button treatment.
+- Moves PXE and DPC+ compilable-demo `bkcolors:` scanline data to the bottom of the generated source so executable animation code is easier to reach.
+- Keeps Standard and Multisprite `COLUBK` setup near the top because those kernels use a compact register assignment rather than a full scanline table.
+
+## v1.1.19 working notes
+
+- Canvas eyedropper picks the visible sprite color and immediately updates the palette, swatch, and color field.
+- Web Save opens the native file picker with `<Project Name>.json`, matching YAJA Painter, without an extra filename prompt or Animator suffix.
+
+## v1.1.18 working notes
+
+- Matches Painter's full-width Hue Offset and Lightness Offset controls in the Color Block Editor.
+- Stamp previews use the same uniform Atari pixel-aspect, kernel-stretch, and current-frame NUSIZ fitting as timeline thumbnails.
+- Space toggles animation playback outside text-entry controls; Ctrl/Cmd+C, X, V, Z, Y, Shift+Z, and Shift+R follow standard edit behavior.
+- Timeline multi-selection now targets all selected frames for Transform and per-frame Sprite Settings commands as one history action.
 
 ## v1.1.17 working notes
 
