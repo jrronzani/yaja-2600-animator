@@ -1,6 +1,69 @@
-# YAJA 2600 Animator v1.1.20
+# YAJA 2600 Animator v1.2.7
+
+## v1.2.7 working notes
+
+- Renamed the import dialog to `Import bB Data`.
+- Renamed the dialog action to `Import bB` to match the toolbar control.
+
+## v1.2.6 working notes
+
+- Enlarged the Import bB dialog just enough for the complete ordinary/YAJA example to fit without a textarea scrollbar at desktop sizes.
+- Added root-level validation artifacts for lean/full import fidelity and moving NUSIZ-centering ROM compilation.
+
+## v1.2.5 working notes
+
+- Matched the ordinary and YAJA import examples by separating sprite pixels and scanline-color tables with a blank line.
+
+## v1.2.4 working notes
+
+- Simplified Import bB to a single Painter-style text area with ordinary bB and YAJA project-data examples.
+- Complete project-data exports round-trip frames, repeats, NUSIZ, offsets, assignments, pixels, and colors.
+- Lean and ordinary bB imports recover the first readable one- or two-sprite frame and its available color data without unnecessary warnings.
+- Added solid-kernel frame-color recovery and strict, atomic errors for malformed YAJA metadata.
+
+## v1.2.3 working notes
+
+- Classic Light primary buttons now darken subtly on hover while remaining blue.
+
+## v1.2.2 working notes
+
+- Download `.bas` now uses the active theme's primary action color in the export dialog.
 
 YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
+
+## v1.2.1 working notes
+
+- Harmonizes Classic Light hover colors with Painter so blue theme actions remain blue instead of changing to orange.
+- Wraps YAJA bB project metadata into compiler-safe comment lines, with a semicolon on every exported line.
+- Rewords positioning choices and variable-use summaries in clearer, user-facing language.
+
+## v1.2.0 working notes
+
+- Replaces the displayed NTSC and PAL colors with Stella Standard RGB mappings shared by every editor, preview, reference, and export surface.
+- Adds reversible NTSC/PAL color banks so each region remembers its exact project colors without repeated conversion drift.
+- Displays all 128 NTSC choices and the 104 canonical PAL choices while continuing to load every PAL `$XX` value.
+- Advances Animator projects to schema 11 and migrates older PAL projects once from the former YAJA palette appearance.
+
+## v1.1.23 working notes
+
+- The desktop toolbar Save button now always opens Save As while native Save and Save As shortcuts retain their conventional behavior.
+- bB export now offers Tables Only, Animation Module, and Compilable Demo profiles with optional project metadata, explanatory comments, and two positioning approaches.
+- Generated variables use ordinary names, labels retain double underscores, and the default module uses only the Frame and Timer variables.
+- PXE demos omit Standard-only TV and score directives, and thumbnail timing is again shown as `x#`.
+
+## v1.1.22 working notes
+
+- Targets brush and stamp hover feedback to the sprite canvas currently under the pointer in Two Sprite Mode.
+- Keeps click-to-activate behavior while preventing hover previews from appearing on the previously active sprite.
+
+## v1.1.21 working notes
+
+- Preserves relative NUSIZ scale in two-sprite timeline thumbnails.
+- Automatically activates whichever visible sprite receives a canvas tool action.
+- Refreshes thumbnails immediately after scanline recoloring.
+- Clarifies Sprite Offsets, repeat labels, and compact two-sprite transfer actions.
+- Adds an optional `Export with project data` interchange layer; lean bB is now the default.
+- Harmonizes export format/scope layout and suppresses non-actionable info banners.
 
 ## v1.1.20 working notes
 

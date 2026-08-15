@@ -8,42 +8,7 @@ import { buildStoredZip } from "./core/zip.js";
 import { canvasCellSize, NUSIZ_MODES as NUSIZ, rasterCellBoundary, rasterCellRect, rasterSurfaceGeometry, timelineThumbnailGeometry } from "./core/display-geometry.js";
 import { averageReferenceGridRow, estimateUniformBorderColor, fittedReferenceRect, nearestPaletteColor, referenceCellGrid, referenceCellIsForeground } from "./core/reference-image.js";
 import { animationRecordFromWorkspace, duplicateAnimationRecord, ensureAnimationCollection, loadAnimationWorkspace, nextAnimationId, syncActiveAnimation, uniqueAnimationName } from "./core/animation-collection.js";
-
-const ATARI_NTSC = {
-  "$00": "#000000", "$02": "#444444", "$04": "#707070", "$06": "#949494", "$08": "#B4B4B4", "$0A": "#D0D0D0", "$0C": "#E8E8E8", "$0E": "#F0F0F0",
-  "$10": "#444400", "$12": "#646410", "$14": "#848424", "$16": "#A0A034", "$18": "#B8B840", "$1A": "#D0D050", "$1C": "#E8E85C", "$1E": "#FCFC68",
-  "$20": "#702800", "$22": "#844414", "$24": "#985C28", "$26": "#AC783C", "$28": "#BC8C4C", "$2A": "#CCA05C", "$2C": "#DCB468", "$2E": "#E8CC7C",
-  "$30": "#841800", "$32": "#983418", "$34": "#AC5030", "$36": "#C06848", "$38": "#D0805C", "$3A": "#E09470", "$3C": "#ECA880", "$3E": "#FCBCB0",
-  "$40": "#880000", "$42": "#9C2020", "$44": "#B03C3C", "$46": "#C05858", "$48": "#D07070", "$4A": "#E08888", "$4C": "#ECA0A0", "$4E": "#FCB8B8",
-  "$50": "#78005C", "$52": "#8C2074", "$54": "#A03C88", "$56": "#B0589C", "$58": "#C070B0", "$5A": "#D084C0", "$5C": "#DC9CD0", "$5E": "#FCAADC",
-  "$60": "#480078", "$62": "#602090", "$64": "#783CA4", "$66": "#8C58B8", "$68": "#A070CC", "$6A": "#B484DC", "$6C": "#C49CEC", "$6E": "#D0B0FC",
-  "$70": "#140084", "$72": "#302098", "$74": "#4C3CAC", "$76": "#6858C0", "$78": "#7C70D0", "$7A": "#9488E0", "$7C": "#A8A0EC", "$7E": "#B8B8FC",
-  "$80": "#000088", "$82": "#1C209C", "$84": "#3840B0", "$86": "#505CC0", "$88": "#6874D0", "$8A": "#7C8CE0", "$8C": "#90A4EC", "$8E": "#A0A0FC",
-  "$90": "#00187C", "$92": "#1C3890", "$94": "#3854A8", "$96": "#5070BC", "$98": "#6888CC", "$9A": "#7C9CDC", "$9C": "#90B4EC", "$9E": "#A0C0FC",
-  "$A0": "#002C5C", "$A2": "#1C4C78", "$A4": "#386890", "$A6": "#5084AC", "$A8": "#689CC0", "$AA": "#7CB4D4", "$AC": "#90CCE8", "$AE": "#A0E0FC",
-  "$B0": "#00402C", "$B2": "#1C5C48", "$B4": "#387C64", "$B6": "#509C80", "$B8": "#68B494", "$BA": "#7CD0AC", "$BC": "#90E4C0", "$BE": "#A0FCF0",
-  "$C0": "#003C00", "$C2": "#205C20", "$C4": "#407C40", "$C6": "#5C9C5C", "$C8": "#74B474", "$CA": "#8CD08C", "$CC": "#A4E4A4", "$CE": "#B8FCB8",
-  "$D0": "#143800", "$D2": "#345C1C", "$D4": "#507C38", "$D6": "#6C9850", "$D8": "#84B468", "$DA": "#9CCC7C", "$DC": "#B4E490", "$DE": "#C8FCAC",
-  "$E0": "#2C3000", "$E2": "#4C501C", "$E4": "#687034", "$E6": "#848C4C", "$E8": "#9CA864", "$EA": "#B4C078", "$EC": "#CCD488", "$EE": "#E0FCB0",
-  "$F0": "#442800", "$F2": "#644818", "$F4": "#846830", "$F6": "#A08444", "$F8": "#B89C58", "$FA": "#D0B46C", "$FC": "#E8CC7C", "$FE": "#FCFC88"
-};
-
-const PAL_ROWS = {
-  "0": "000000 404040 6C6C6C 909090 B0B0B0 C8C8C8 DCDCDC ECECEC",
-  "1": "003C70 1C5888 3874A0 508CB4 68A4C8 7CB8DC 90CCE8 A4E0FC",
-  "2": "805800 947020 A8843C BC9C58 CCAC70 DCC084 ECD09C FCE0B0",
-  "3": "580070 6C2088 803CA0 9458B4 A470C8 B484DC C49CEC D4B0FC",
-  "4": "445C00 5C7820 74903C 8CAC58 A0C070 B0D484 C0E89C D4FCB0",
-  "5": "002070 1C3C88 3858A0 5074B4 6888C8 7CA0DC 90B4EC A4C8FC",
-  "6": "703400 885020 A0683C B48458 C89870 DCAC84 ECC09C FCD4B0",
-  "7": "3C0080 542094 6C3CA4 8058BC 9470CC A884DC B89CEC C8B0FC",
-  "8": "006414 208034 3C9850 58B06C 70C484 84D89C 9CE8B4 B0FCC8",
-  "9": "000088 20209C 3C3CB0 5858C0 7070D0 8484E0 9C9CEC B0B0FC",
-  "A": "700014 882034 A03C50 B4586C C87084 DC849C EC9CB4 FCB0C8",
-  "C": "005C5C 207474 3C8C8C 58A4A4 70B8B8 84C8C8 9CDCDC B0ECEC",
-  "E": "70005C 842074 943C88 A8589C B470B0 C484C0 D09CD0 E0B0E0"
-};
-const ATARI_PAL = Object.fromEntries(Object.entries(PAL_ROWS).flatMap(([hue, row]) => row.split(" ").map((hex, i) => [`$${hue}${(i * 2).toString(16).toUpperCase()}`, `#${hex}`])));
+import { ATARI_NTSC, ATARI_PAL, convertColorCode, displayCodesForRegion, migrateLegacyPalCode, paletteForRegion } from "./core/atari-palettes.js";
 
 const CODES = Object.keys(ATARI_NTSC);
 const FONT_3X5 = {
@@ -76,9 +41,12 @@ const PROJECT_PICKER_ID = "yaja-animator-project-files";
 const SHARED_PICKER_HANDLE_KEY = "__yajaAnimatorLastProjectPickerHandle";
 let currentProjectFileHandle = null;
 let lastProjectPickerHandle = null;
-let currentBbExportMode = "data";
+let currentBbExportMode = "tables";
 let currentBbExportScope = "current";
-let currentBbExportFilename = "UntitledAnimation_Data.bas";
+let currentBbExportWithProjectData = false;
+let currentBbExportWithComments = true;
+let currentBbPositioning = "sprite";
+let currentBbExportFilename = "UntitledAnimation_Tables.bas";
 let history = [];
 let redoStack = [];
 let isPointerDown = false;
@@ -200,7 +168,7 @@ function defaultState() {
   const project = {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "1.1.20",
+    version: "1.2.7",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -260,6 +228,101 @@ function cloneData(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function resizeRegionColorStream(colors, height, fallback) {
+  const source = Array.isArray(colors) && colors.length ? colors : [fallback];
+  if (source.length === height) return source.map(code => normalizeCode(code, fallback));
+  return Array.from({ length: height }, (_, row) => {
+    const index = height <= 1 ? 0 : Math.round(row * (source.length - 1) / (height - 1));
+    return normalizeCode(source[index], fallback);
+  });
+}
+
+function allProjectPlayers(project, callback) {
+  ensureAnimationCollection(project);
+  project.animations.forEach(animation => animation.frames.forEach(frame => frame.players.forEach(player => callback(player, frame))));
+}
+
+function captureRegionColors(project, region) {
+  syncActiveAnimation(project);
+  allProjectPlayers(project, (player, frame) => {
+    player.regionalColors ||= {};
+    player.regionalColors[region] = {
+      solidColor: normalizeCode(player.solidColor, "$48"),
+      colors: resizeRegionColorStream(player.colors, frame.height, player.solidColor || "$48")
+    };
+  });
+  project.colorBlocks.forEach(block => {
+    block.regionalColors ||= {};
+    block.regionalColors[region] = block.colors.map(code => normalizeCode(code, "$48"));
+  });
+  project.regionalProjectColors ||= {};
+  project.regionalProjectColors[region] = {
+    background: normalizeCode(project.background, "$00"),
+    currentColor: normalizeCode(project.currentColor, "$48")
+  };
+  loadAnimationWorkspace(project, project.activeAnimationId);
+}
+
+function restoreRegionColors(project, fromRegion, toRegion) {
+  allProjectPlayers(project, (player, frame) => {
+    player.regionalColors ||= {};
+    const source = player.regionalColors[fromRegion] || { solidColor: player.solidColor, colors: player.colors };
+    const target = player.regionalColors[toRegion] || {
+      solidColor: convertColorCode(source.solidColor, fromRegion, toRegion),
+      colors: source.colors.map(code => convertColorCode(code, fromRegion, toRegion))
+    };
+    player.regionalColors[toRegion] = cloneData(target);
+    player.solidColor = normalizeCode(target.solidColor, "$48");
+    player.colors = resizeRegionColorStream(target.colors, frame.height, player.solidColor);
+  });
+  project.colorBlocks.forEach(block => {
+    block.regionalColors ||= {};
+    const source = block.regionalColors[fromRegion] || block.colors;
+    const target = block.regionalColors[toRegion] || source.map(code => convertColorCode(code, fromRegion, toRegion));
+    block.regionalColors[toRegion] = target.slice();
+    block.colors = target.slice();
+  });
+  project.regionalProjectColors ||= {};
+  const source = project.regionalProjectColors[fromRegion] || { background: project.background, currentColor: project.currentColor };
+  const target = project.regionalProjectColors[toRegion] || {
+    background: convertColorCode(source.background, fromRegion, toRegion),
+    currentColor: convertColorCode(source.currentColor, fromRegion, toRegion)
+  };
+  project.regionalProjectColors[toRegion] = { ...target };
+  project.background = normalizeCode(target.background, "$00");
+  project.currentColor = normalizeCode(target.currentColor, "$48");
+}
+
+function initializeRegionalColors(project) {
+  if (project.paletteDataVersion >= 1) return;
+  const region = project.region === "PAL" ? "PAL" : "NTSC";
+  if (region === "PAL") {
+    allProjectPlayers(project, player => {
+      player.solidColor = migrateLegacyPalCode(player.solidColor);
+      player.colors = player.colors.map(migrateLegacyPalCode);
+    });
+    project.colorBlocks.forEach(block => block.colors = block.colors.map(migrateLegacyPalCode));
+    project.background = migrateLegacyPalCode(project.background);
+    project.currentColor = migrateLegacyPalCode(project.currentColor);
+  }
+  captureRegionColors(project, region);
+  project.paletteDataVersion = 1;
+}
+
+function switchProjectRegion(nextRegion) {
+  const target = nextRegion === "PAL" ? "PAL" : "NTSC";
+  if (target === state.region) return;
+  pushHistory();
+  const previous = state.region;
+  captureRegionColors(state, previous);
+  restoreRegionColors(state, previous, target);
+  state.region = target;
+  loadAnimationWorkspace(state, state.activeAnimationId);
+  normalizeProject();
+  syncControls();
+  renderAll();
+}
+
 function snapshot() {
   syncActiveAnimation(state);
   const snap = cloneData(state);
@@ -286,7 +349,7 @@ function restore(snap) {
 
 function normalizeProject() {
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
-  state.version = "1.1.0";
+  state.version = "1.2.7";
   ensureAnimationCollection(state);
   state.theme = applyTheme(normalizeThemeId(state.theme));
   state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
@@ -330,6 +393,7 @@ function normalizeProject() {
       if (frame.players[p].reference) frame.players[p].reference = normalizeReference(frame.players[p].reference);
     }
   });
+  initializeRegionalColors(state);
   syncFrameSize();
 }
 
@@ -453,7 +517,9 @@ function renderEditor() {
     const visible = state.twoSpriteMode || playerIndex === state.activePlayer;
     group.classList.toggle("hidden", !visible);
     group.classList.toggle("active-slot", playerIndex === state.activePlayer);
-    group.style.pointerEvents = playerIndex === state.activePlayer ? "auto" : "none";
+    // Both visible sprites are direct editing surfaces. Pointer-down selects
+    // the target slot before applying the active tool.
+    group.style.pointerEvents = "auto";
     if (!visible) return;
     const player = currentFrame().players[playerIndex];
     const scale = NUSIZ[player.nusiz].scale;
@@ -470,8 +536,8 @@ function renderEditor() {
     if (state.showGrid) drawGrid(ctx, l);
     // Grid lines must sit beneath selection and brush feedback. Drawing the
     // feedback last keeps its complete border visible on shared cell edges.
-    if (playerIndex === state.activePlayer) {
-      drawSelection(ctx, l);
+    if (playerIndex === state.activePlayer) drawSelection(ctx, l);
+    if (pointerInsideCanvas && lastCell.player === playerIndex) {
       drawStampPlacementPreview(ctx, l);
       drawBrushGhost(ctx, l);
     }
@@ -722,7 +788,7 @@ function updateCanvasSelectionCursor(event) {
   canvas.style.cursor = cell && cell.player === state.activePlayer && !modifiers && selectionContains(selection, cell.col, cell.row) ? "grab" : "crosshair";
 }
 
-function setActivePlayer(playerIndex) {
+function setActivePlayer(playerIndex, render = true) {
   const nextPlayer = playerIndex ? 1 : 0;
   if (state.activePlayer === nextPlayer) return;
   colorSelection = null;
@@ -732,13 +798,14 @@ function setActivePlayer(playerIndex) {
   state.activePlayer = nextPlayer;
   if (usesSolidColor()) state.currentColor = currentPlayer().solidColor;
   syncControls();
-  renderAll();
+  if (render) renderAll();
 }
 
 function beginPointer(event) {
   event.preventDefault();
   const cell = cellFromPointer(event);
   if (!cell) return;
+  if (cell.player !== state.activePlayer) setActivePlayer(cell.player, false);
   pointerInsideCanvas = true;
   rightEraseStroke = event.button === 2;
   if (cell.canvas.setPointerCapture && event.pointerId !== undefined) cell.canvas.setPointerCapture(event.pointerId);
@@ -761,7 +828,6 @@ function beginPointer(event) {
   const hasModifiers = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
   const shouldMoveSelection = state.tool === "select" && cell.player === state.activePlayer && selection && !hasModifiers && pointInSelection(cell, selection, true);
   if (cell.player !== state.activePlayer) selection = null;
-  setActivePlayer(cell.player);
   if (state.tool === "text") {
     el.textToolX.value = cell.col;
     el.textToolY.value = cell.row;
@@ -1174,6 +1240,7 @@ function paintRowColor(y, playerIndex = state.activePlayer, rowElement = null) {
   }
   renderEditor();
   if (el.previewCanvas) renderPreview();
+  renderFrames();
 }
 
 function reconcileRenderedRowColors() {
@@ -1194,7 +1261,7 @@ function reconcileRenderedRowColors() {
 
 function renderPalette() {
   el.palette.innerHTML = "";
-  const palette = state.region === "PAL" ? ATARI_PAL : ATARI_NTSC;
+  const palette = paletteForRegion(state.region);
   const corner = document.createElement("div");
   corner.className = "palette-axis-label";
   corner.textContent = "$";
@@ -1205,7 +1272,7 @@ function renderPalette() {
     label.textContent = lum;
     el.palette.appendChild(label);
   });
-  const hues = [...new Set(Object.keys(palette).map(code => code[1]))];
+  const hues = [...new Set(displayCodesForRegion(state.region).map(code => code[1]))];
   for (const hueCode of hues) {
     const hue = parseInt(hueCode, 16);
     const rowLabel = document.createElement("div");
@@ -1391,7 +1458,7 @@ function renderFrames() {
     drawFrameThumb(canvas, frame);
     const label = document.createElement("div");
     label.className = "frame-thumb-label";
-    label.innerHTML = `<span>${index}</span><span>x${frame.duration}</span>`;
+    label.innerHTML = `<span>${index}</span><span title="Frame repeat: ${frame.duration}" aria-label="Frame repeat: ${frame.duration}">x${frame.duration}</span>`;
     item.append(canvas, label);
     item.addEventListener("click", event => {
       if (suppressFrameClick) return;
@@ -1543,12 +1610,19 @@ function drawFrameThumb(canvas, frame) {
   const rows = frame.height || frame.players[0].pixels.length;
   const columns = Math.max(1, Math.min(8, frame.width || state.width || 8));
   if (state.twoSpriteMode) {
-    const gap = 4;
-    const slotWidth = (canvas.width - gap) / 2;
-    const first = timelineThumbnailGeometry(slotWidth, canvas.height, columns, rows, state.verticalStretch, 3, NUSIZ[frame.players[0].nusiz].scale);
-    const second = timelineThumbnailGeometry(slotWidth, canvas.height, columns, rows, state.verticalStretch, 3, NUSIZ[frame.players[1].nusiz].scale);
-    drawThumbPlayer(ctx, frame.players[0], first.x, first.y, first.cellW, first.cellH, rows, columns);
-    drawThumbPlayer(ctx, frame.players[1], slotWidth + gap + second.x, second.y, second.cellW, second.cellH, rows, columns);
+    const scales = frame.players.map(player => NUSIZ[player.nusiz].scale);
+    const starts = [frame.players[0].xOffset, columns * scales[0] + frame.players[1].xOffset];
+    const minX = Math.min(...starts);
+    const maxX = Math.max(starts[0] + columns * scales[0], starts[1] + columns * scales[1]);
+    const minY = Math.min(frame.players[0].yOffset, frame.players[1].yOffset);
+    const maxY = Math.max(frame.players[0].yOffset + rows, frame.players[1].yOffset + rows);
+    const geometry = timelineThumbnailGeometry(canvas.width, canvas.height, Math.max(1, maxX - minX), Math.max(1, maxY - minY), state.verticalStretch, 4, 1);
+    frame.players.forEach((player, index) => {
+      drawThumbPlayer(ctx, player,
+        geometry.x + (starts[index] - minX) * geometry.cellW,
+        geometry.y + (player.yOffset - minY) * geometry.cellH,
+        geometry.cellW * scales[index], geometry.cellH, rows, columns);
+    });
   } else {
     const player = frame.players[state.activePlayer];
     const geometry = timelineThumbnailGeometry(canvas.width, canvas.height, columns, rows, state.verticalStretch, 4, NUSIZ[player.nusiz].scale);
@@ -3043,12 +3117,28 @@ function schedulePlaybackStep() {
 function exportBB() {
   state.projectName = el.projectName.value || state.projectName;
   syncActiveAnimation(state);
-  const result = generateAnimationCode(state, { mode: currentBbExportMode, scope: currentBbExportScope });
+  const result = generateAnimationCode(state, {
+    content: currentBbExportMode,
+    scope: currentBbExportScope,
+    includeProjectData: currentBbExportWithProjectData,
+    includeComments: currentBbExportWithComments,
+    positioning: currentBbPositioning
+  });
   currentBbExportFilename = result.filename;
-  const notes = result.diagnostics.map(item => `; ${item.severity.toUpperCase()}: ${item.message}`);
-  el.codeDiagnostics.innerHTML = result.diagnostics.map(item => `<div class="diagnostic ${item.severity}"><strong>${item.severity}</strong><span>${item.message}</span></div>`).join("");
+  const visibleDiagnostics = result.diagnostics.filter(item => item.severity !== "info");
+  el.codeDiagnostics.innerHTML = visibleDiagnostics.map(item => `<div class="diagnostic ${item.severity}"><strong>${item.severity}</strong><span>${item.message}</span></div>`).join("");
+  el.codeDiagnostics.hidden = visibleDiagnostics.length === 0;
+  const ownership = result.diagnostics.find(item => item.code === "VARIABLE_OWNERSHIP");
+  el.bbRamSummary.textContent = ownership?.message || `${result.ramBytes || 0} variable${result.ramBytes === 1 ? "" : "s"} used.`;
   const scopeLabel = currentBbExportScope === "all" ? "All Animations" : "Current Animation";
-  openCodeDialog(`${currentBbExportMode === "demo" ? "Export Compilable bB Demo" : "Export bB Data Only"} — ${scopeLabel}`, [...notes, "", result.output].join("\n"), false);
+  const contentLabel = currentBbExportMode === "demo" ? "Compilable Demo" : currentBbExportMode === "module" ? "Animation Module" : "Tables Only";
+  openCodeDialog(`Export bB ${contentLabel} — ${scopeLabel}`, result.output, false);
+}
+
+function syncBbExportOptions() {
+  const tablesOnly = currentBbExportMode === "tables";
+  el.bbExportPositioning.disabled = tablesOnly;
+  el.bbExportPositioning.classList.toggle("is-disabled", tablesOnly);
 }
 
 function openCodeDialog(title, text, importMode) {
@@ -3056,11 +3146,14 @@ function openCodeDialog(title, text, importMode) {
   el.codeText.value = text;
   el.codeDialog.classList.toggle("bb-import-dialog", importMode);
   el.importFromText.style.display = importMode ? "inline-block" : "none";
-  el.bbImportHelp.hidden = !importMode;
   el.bbExportMode.style.display = importMode ? "none" : "grid";
   el.bbExportScope.style.display = importMode ? "none" : "grid";
+  el.bbExportOptions.style.display = importMode ? "none" : "grid";
+  el.bbExportPositioning.style.display = importMode ? "none" : "grid";
+  el.bbRamSummary.style.display = importMode ? "none" : "block";
   el.downloadBas.style.display = importMode ? "none" : "inline-flex";
-  if (importMode) el.codeDiagnostics.innerHTML = "";
+  if (importMode) { el.codeDiagnostics.innerHTML = ""; el.codeDiagnostics.hidden = true; }
+  else syncBbExportOptions();
   if (!el.codeDialog.open) el.codeDialog.showModal();
 }
 
@@ -3096,7 +3189,9 @@ function importBBText(text) {
   state.kernel = parsed.inferredKernel || state.kernel;
   state.playerAssignments = normalizePlayerAssignments(state.playerAssignments, state.kernel);
   const height = Math.max(...parsed.players.map(p => p.rows.length));
+  state.width = 8;
   state.height = height;
+  currentFrame().width = 8;
   currentFrame().height = height;
   currentFrame().players.forEach(player => resizePlayer(player, height));
   const distinct = [...new Set(parsed.players.map(player => player.index).filter(Number.isInteger))];
@@ -3107,10 +3202,16 @@ function importBBText(text) {
     state.activePlayer = idx;
     const player = currentFrame().players[idx];
     resizePlayer(player, height);
+    player.pixels = Array.from({ length: height }, () => Array(8).fill(0));
+    player.colors = Array(height).fill(state.currentColor);
     p.rows.forEach((row, y) => player.pixels[y] = row);
     (p.colors || []).forEach((code, y) => {
       if (y < height) player.colors[y] = normalizeCode(code, state.currentColor);
     });
+    if (p.solidColor) {
+      player.solidColor = normalizeCode(p.solidColor, state.currentColor);
+      if (!(p.colors || []).length) player.colors = Array(height).fill(player.solidColor);
+    }
   });
   syncControls();
   renderAll();
@@ -3123,6 +3224,7 @@ function parseBB(text) {
 
 function serializedProject() {
   state.projectName = el.projectName.value || state.projectName;
+  captureRegionColors(state, state.region);
   const project = snapshot();
   delete project.__selection;
   return JSON.stringify(project, null, 2);
@@ -3721,7 +3823,7 @@ function bindEvents() {
   bindCheck(el.fillShapes, v => state.fillShapes = v);
   bindValue(el.brushWidth, v => state.brushWidth = Math.max(1, Math.min(8, Number(v) || 1)), true);
   bindValue(el.brushHeight, v => state.brushHeight = Math.max(1, Math.min(32, Number(v) || 1)), true);
-  bindValue(el.displayRegion, v => state.region = v === "PAL" ? "PAL" : "NTSC", true);
+  el.displayRegion.addEventListener("change", () => switchProjectRegion(el.displayRegion.value));
   bindValue(el.refOpacity, v => { if (currentReference()) currentReference().opacity = Number(v); }, true);
   bindValue(el.refScale, v => { if (currentReference()) currentReference().scale = Number(v); }, true);
   bindValue(el.refX, v => { if (currentReference()) currentReference().xOffset = Number(v); }, true);
@@ -3818,18 +3920,34 @@ function bindEvents() {
   el.copyColorsP0P1.addEventListener("click", copyColorsP0ToP1);
   el.mirrorP0P1.addEventListener("click", mirrorP0ToP1);
   el.exportCode.addEventListener("click", exportBB);
-  el.importCode.addEventListener("click", () => openCodeDialog("Import bB Scene", "", true));
+  el.importCode.addEventListener("click", () => openCodeDialog("Import bB Data", "", true));
   el.importFromText.addEventListener("click", () => {
     if (importBBText(el.codeText.value)) el.codeDialog.close();
   });
   el.copyCode.addEventListener("click", () => navigator.clipboard?.writeText(el.codeText.value));
-  [el.exportBbData, el.exportBbDemo].forEach(control => control.addEventListener("change", () => { if (!control.checked) return; currentBbExportMode = control.value; exportBB(); }));
+  [el.exportBbTables, el.exportBbModule, el.exportBbDemo].forEach(control => control.addEventListener("change", () => {
+    if (!control.checked) return;
+    currentBbExportMode = control.value;
+    syncBbExportOptions();
+    exportBB();
+  }));
   [el.exportBbCurrent, el.exportBbAll].forEach(control => control.addEventListener("change", () => { if (!control.checked) return; currentBbExportScope = control.value; exportBB(); }));
+  el.exportWithProjectData.addEventListener("change", () => { currentBbExportWithProjectData = el.exportWithProjectData.checked; exportBB(); });
+  el.exportWithComments.addEventListener("change", () => { currentBbExportWithComments = el.exportWithComments.checked; exportBB(); });
+  [el.exportPositionSprite, el.exportPositionAnchor].forEach(control => control.addEventListener("change", () => {
+    if (!control.checked) return;
+    currentBbPositioning = control.value;
+    exportBB();
+  }));
   el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), currentBbExportFilename || animationExportFilename(state.animationName, currentBbExportMode)));
   el.exportSheet.addEventListener("click", openExportPngDialog);
   [el.exportPngSelected, el.exportPngAll].forEach(control => control.addEventListener("change", updateExportPngSummary));
   el.confirmExportPng.addEventListener("click", confirmExportPng);
-  el.saveProject.addEventListener("click", () => saveProject(false));
+  el.saveProject.addEventListener("click", async event => {
+    const desktopToolbarSave = !!window.YaJaDesktop?.isDesktop;
+    await saveProject(desktopToolbarSave);
+    if (desktopToolbarSave && event.detail > 0) el.saveProject.blur();
+  });
   el.loadProject.addEventListener("click", openProject);
   el.projectFile.addEventListener("change", e => {
     if (!e.target.files[0]) return;
@@ -4016,8 +4134,8 @@ function cacheElements() {
     "removeFrame", "moveFrameLeft", "moveFrameRight", "reverseFrames", "framesList", "currentColorSwatch", "currentColor",
     "palettePanel", "palette", "displayRegion", "paletteEyedropper", "colorBlocks", "stamps", "newColorBlock", "newStamp", "colorBlockEditor", "colorBlockEditorTitle", "colorBlockEditorHeight", "colorBlockEditorLines", "colorBlockHueOffset", "colorBlockHueOffsetValue", "colorBlockLightnessOffset", "colorBlockLightnessOffsetValue", "saveColorBlockEdit", "saveColorBlockCopy", "stampEditor", "stampEditorTitle", "stampEditorWidth", "stampEditorHeight", "stampEditorZoom", "stampEditorReadout", "stampEditorCanvasContainer", "stampEditorCanvas", "stampEditorPreviewCanvas", "saveStampEdit", "saveStampCopy",
     "refFile", "loadReference", "loadReferenceA", "loadReferenceB", "referenceImportSingle", "referenceImportDual", "refControls", "refOpacity", "refScale", "refX", "refY", "threshold", "refDither", "refFitMode", "refBrightness", "refContrast", "referenceTransform", "resetReferenceDefaults", "applyReferenceTransformAll", "toggleReference", "extractShape",
-    "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "bbExportMode", "bbExportScope", "exportBbData", "exportBbDemo", "exportBbCurrent", "exportBbAll", "bbImportHelp", "codeText", "copyCode", "downloadBas",
-    "importFromText", "codeDiagnostics", "textDialog", "textToolText", "textToolX", "textToolY", "textDirection", "placeText",
+    "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "bbExportMode", "bbExportScope", "bbExportOptions", "bbExportPositioning", "bbRamSummary", "exportBbTables", "exportBbModule", "exportBbDemo", "exportBbCurrent", "exportBbAll", "codeText", "copyCode", "downloadBas",
+    "importFromText", "codeDiagnostics", "bbProjectDataOption", "bbCommentsOption", "exportWithProjectData", "exportWithComments", "exportPositionSprite", "exportPositionAnchor", "textDialog", "textToolText", "textToolY", "textToolX", "textDirection", "placeText",
     "statusKernel", "statusFrame", "statusMessage"
   ].forEach(id => el[id] = document.getElementById(id === "fullscreenButton" ? "btn-fullscreen" : id));
 }

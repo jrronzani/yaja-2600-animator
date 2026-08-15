@@ -1,6 +1,6 @@
 import { ensureAnimationCollection, loadAnimationWorkspace } from "./animation-collection.js";
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 const SUPPORTED_THEMES = new Set(["atari-console", "atari-controller", "synthwave", "synthwave-bright", "blue", "classic-dark", "classic-light"]);
 
@@ -65,7 +65,7 @@ export function migrateProject(input) {
   if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
 
   project.schemaVersion = CURRENT_SCHEMA_VERSION;
-  project.version = "1.1.0";
+  project.version = "1.2.7";
   project.app = "YAJA 2600 Animator";
   project.projectName = String(project.projectName || "Untitled Project");
   project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -74,6 +74,7 @@ export function migrateProject(input) {
   project.compositionModel = project.compositionModel === "adjacent" ? "adjacent" : (sourceVersion >= 6 ? "adjacent" : "legacy-absolute");
   project.playerAssignments = normalizePlayerAssignments(project.playerAssignments, project.kernel);
   project.region = project.region === "PAL" ? "PAL" : "NTSC";
+  project.paletteDataVersion = Number(project.paletteDataVersion) || 0;
   project.brushWidth = Math.max(1, Math.min(8, Number.parseInt(project.brushWidth, 10) || 1));
   project.brushHeight = Math.max(1, Math.min(32, Number.parseInt(project.brushHeight, 10) || 1));
   project.onionFrames = Math.max(1, Math.min(10, Number.parseInt(project.onionFrames, 10) || 1));

@@ -1,10 +1,10 @@
 # Publishing YAJA 2600 Animator
 
-The 1.1.20 release is staged directly from `v1.1.20_export_button_background_data_order`.
+The 1.2.7 release is staged directly from `v1.2.7_import_bb_data_labels`.
 
 ## Web / itch
 
-Upload `Itch Uploads/yaja-2600-animator-web-v1.1.20.zip` as the HTML5 build and enable **This file will be played in the browser**. ZIP entries must use `/` separators and expose `index.html`, `index.css`, `app.bundle.js`, and `assets/` at the archive root.
+Upload `Itch Uploads/yaja-2600-animator-web-v1.2.7.zip` as the HTML5 build and enable **This file will be played in the browser**. The web archive is copied directly from the approved version folder rather than rebuilt from the GitHub checkout. ZIP entries must use `/` separators and expose `index.html`, `index.css`, `app.bundle.js`, and `assets/` at the archive root.
 
 ## Desktop builds
 
@@ -14,7 +14,7 @@ The desktop shell must not replace renderer controls with Unicode, emoji, OS gly
 
 ## Release checklist
 
-- Run `npm ci`, `npm run check`, `npm test`, and `npm run build` in the v1.1.20 source folder.
+- Run `npm ci`, `npm run check`, `npm test`, and `npm run build` in the v1.2.7 source folder.
 - Test the localhost build and direct-file Chrome build.
 - Test the Electron shell with File, Edit, Animation, View, Window, and Help menus.
 - Confirm all three local fonts load without a network connection.

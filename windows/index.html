@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YAJA 2600 Animator v1.1.20</title>
+  <title>YAJA 2600 Animator v1.2.7</title>
   <link rel="stylesheet" href="index.css">
 </head>
 <body class="theme-atari">
@@ -85,7 +85,7 @@
   <header class="app-header">
     <div class="brand">
       <div class="logo brand-title">YAJA 2600 Animator</div>
-      <div class="version">v1.1.20</div>
+      <div class="version">v1.2.7</div>
     </div>
     <div class="project-strip" aria-label="Project actions">
       <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
@@ -165,15 +165,15 @@
           <select id="spriteNusiz"><option value="normal">Normal</option><option value="double">Double</option><option value="quad">Quad</option></select>
         </label>
         <label id="spriteSolidColorRow" class="solid-color-row">Color <input id="spriteSolidColor" class="code-input" value="$48" maxlength="3"></label>
-        <div class="subcontrol-label frame-offset-label">Frame Offsets</div>
+        <div class="subcontrol-label frame-offset-label">Sprite Offsets</div>
         <div id="offsetControls" class="offset-controls"><label id="spriteOffsetXRow" class="hidden">X Offset <input id="spriteOffsetX" type="number" min="-160" max="160" value="0"></label><label id="spriteOffsetYRow">Y Offset <input id="spriteOffsetY" type="number" min="-255" max="255" value="0"></label></div>
         <div class="two-col bulk-actions"><button id="applySizeAll">Apply Size to All</button><button id="applyOffsetsAll" title="Copy the active sprite's current-frame X and Y offsets to every frame">Apply Offsets to All</button></div>
         <div id="twoSpriteControls" class="two-sprite-controls hidden">
           <div class="player-transfer-grid">
             <button id="swapPlayers">Swap</button>
-            <button id="copyP0P1">Copy A-&gt;B</button>
-            <button id="copyColorsP0P1" class="span-two">Copy Colors A-&gt;B</button>
-            <button id="mirrorP0P1" class="span-two">Mirror A-&gt;B</button>
+            <button id="copyP0P1">Copy A/B</button>
+            <button id="copyColorsP0P1" class="span-two">Copy Colors A/B</button>
+            <button id="mirrorP0P1" class="span-two">Mirror</button>
           </div>
         </div>
       </section>
@@ -390,8 +390,9 @@
       <h2 id="codeDialogTitle">bB Data</h2>
       <div id="codeDiagnostics" class="code-diagnostics" aria-live="polite"></div>
       <fieldset id="bbExportMode" class="import-mode-options">
-        <legend>Export Format</legend>
-        <label class="check-row"><input id="exportBbData" name="bbExportMode" type="radio" value="data" checked> Data Only</label>
+        <legend>Export Content</legend>
+        <label class="check-row"><input id="exportBbTables" name="bbExportMode" type="radio" value="tables" checked> Tables Only</label>
+        <label class="check-row"><input id="exportBbModule" name="bbExportMode" type="radio" value="module"> Animation Module</label>
         <label class="check-row"><input id="exportBbDemo" name="bbExportMode" type="radio" value="demo"> Compilable Demo</label>
       </fieldset>
       <fieldset id="bbExportScope" class="import-mode-options">
@@ -399,33 +400,51 @@
         <label class="check-row"><input id="exportBbCurrent" name="bbExportScope" type="radio" value="current" checked> Current Animation</label>
         <label class="check-row"><input id="exportBbAll" name="bbExportScope" type="radio" value="all"> All Animations</label>
       </fieldset>
-      <div id="bbImportHelp" class="bb-import-help" hidden>
-        <strong>Paste an exported YAJA scene or ordinary bB sprite data.</strong>
-        <ul>
-          <li>YAJA Data Only and Compilable Demo exports restore animation settings, frames, timing, assignments, offsets, NUSIZ, pixels, and colors.</li>
-          <li>Ordinary bB imports accept one or two <code>player#:</code> blocks, with optional <code>player#color:</code> blocks.</li>
-          <li>Keep the <code>;@YAJA</code> and frame marker comments intact for a complete scene round-trip.</li>
-        </ul>
-        <pre aria-label="Import format example">; Complete YAJA scene (recommended)
-;@YAJA PROJECT { ...exported project metadata... }
+      <fieldset id="bbExportOptions" class="import-mode-options bb-export-options">
+        <legend>Options</legend>
+        <label id="bbProjectDataOption" class="check-row"><input id="exportWithProjectData" type="checkbox"> Export with project data</label>
+        <label id="bbCommentsOption" class="check-row"><input id="exportWithComments" type="checkbox" checked> Include explanatory comments</label>
+      </fieldset>
+      <fieldset id="bbExportPositioning" class="import-mode-options bb-export-positioning" disabled>
+        <legend>How the animation moves</legend>
+        <label class="check-row" title="Uses the first sprite's existing X and Y position. This is the recommended option for most games."><input id="exportPositionSprite" name="bbPositioning" type="radio" value="sprite" checked> Follow the first sprite</label>
+        <label class="check-row" title="Adds separate X and Y variables for moving the whole animation as one object."><input id="exportPositionAnchor" name="bbPositioning" type="radio" value="anchor"> Use a separate animation position</label>
+      </fieldset>
+      <div id="bbRamSummary" class="bb-ram-summary" role="status">Tables Only uses no variables.</div>
+      <textarea id="codeText" spellcheck="false" aria-label="bB scene data" placeholder="Ordinary bB sprite data:
+
+player0:
+%00111100
+%01100110
+end
+
+player0color:
+$48
+$4A
+end
+
+— OR —
+
+YAJA export with project data:
+
+;@YAJA PROJECT { ...project settings... }
 ;@YAJA FRAME_BEGIN 0 { ...frame settings... }
 player0:
 %00111100
 %01100110
 end
+
+player0color:
+$48
+$4A
+end
 ;@YAJA FRAME_END 0
 
-; Ordinary bB sprite data
-player0:
-%00111100
-%01100110
-end</pre>
-      </div>
-      <textarea id="codeText" spellcheck="false" aria-label="bB scene data"></textarea>
+Keep every commented ;@YAJA line to restore frames, repeats, NUSIZ, offsets, assignments, and animation structure."></textarea>
       <div class="dialog-actions">
         <button id="copyCode" type="button">Copy</button>
-        <button id="downloadBas" type="button">Download .bas</button>
-        <button id="importFromText" type="button" class="btn-primary">Import Scene</button>
+        <button id="downloadBas" type="button" class="btn-primary primary">Download .bas</button>
+        <button id="importFromText" type="button" class="btn-primary">Import bB</button>
         <button value="cancel">Close</button>
       </div>
     </form>

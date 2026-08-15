@@ -6,6 +6,20 @@ function parseJsonMarker(line, prefix) {
   catch (error) { throw new Error(`${prefix.trim()} contains invalid JSON: ${error.message}`); }
 }
 
+export function unfoldYajaMetadataLines(text) {
+  const unfolded = [];
+  for (const line of String(text || "").split(/\r?\n/)) {
+    if (line.startsWith(";@YAJA+ ")) {
+      const previous = unfolded[unfolded.length - 1];
+      if (!previous?.startsWith(";@YAJA ")) throw new Error("YAJA project-data continuation is missing its opening comment line.");
+      unfolded[unfolded.length - 1] = previous + line.slice(";@YAJA+ ".length);
+    } else {
+      unfolded.push(line);
+    }
+  }
+  return unfolded;
+}
+
 function parseBlocks(text) {
   const players = [];
   const playerRegex = /player(\d+)?\s*:\s*([\s\S]*?)end/gi;
@@ -21,6 +35,39 @@ function parseBlocks(text) {
     const colors = [...match[2].matchAll(/\$[0-9A-Fa-f]{2}/g)].map(code => normalizeAtariCode(code[0]));
     const target = players.find(player => player.index === index && !player.colors.length) || players.find(player => player.index === index);
     if (target) target.colors = colors;
+  }
+  return players;
+}
+
+function firstGeneratedFrameSection(text) {
+  const source = String(text || "");
+  const frameLabel = /^\s*__[A-Za-z_][A-Za-z0-9_]*_Frame\d+\s*$/gm;
+  const first = frameLabel.exec(source);
+  if (!first) return source;
+  const start = first.index;
+  const next = frameLabel.exec(source);
+  return source.slice(start, next?.index ?? source.length);
+}
+
+function firstCoherentPlayerSet(text) {
+  const source = firstGeneratedFrameSection(text);
+  const blocks = parseBlocks(source);
+  const players = [];
+  const seen = new Set();
+  for (const block of blocks) {
+    const key = Number.isInteger(block.index) ? `P${block.index}` : "player";
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const playerNumber = Number.isInteger(block.index) ? block.index : 0;
+    const escapedNumber = String(playerNumber).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const constantMatch = source.match(new RegExp(`\\bconst\\s+[A-Za-z_][A-Za-z0-9_]*Frame\\d+P${escapedNumber}Color\\s*=\\s*(\\$[0-9A-Fa-f]{2})`, "i"));
+    const registerMatch = source.match(new RegExp(`\\b_?COLUP${escapedNumber}\\s*=\\s*(\\$[0-9A-Fa-f]{2})`, "i"));
+    const solidColor = constantMatch?.[1] || registerMatch?.[1];
+    players.push({
+      ...block,
+      solidColor: solidColor ? normalizeAtariCode(solidColor) : null
+    });
+    if (players.length === 2) break;
   }
   return players;
 }
@@ -123,7 +170,7 @@ function parseGeneratedCollection(lines) {
 }
 
 function parseGenerated(text) {
-  const lines = String(text).split(/\r?\n/);
+  const lines = unfoldYajaMetadataLines(text);
   const collection = parseGeneratedCollection(lines);
   if (collection) return collection;
   const projectLine = lines.find(line => line.startsWith(";@YAJA PROJECT "));
@@ -139,11 +186,12 @@ export function parseBatariBasicSpriteData(text) {
   try {
     const generated = parseGenerated(text);
     if (generated) return generated;
-    const players = parseBlocks(text);
-    const distinct = [...new Set(players.map(player => player.index).filter(Number.isInteger))];
-    if (distinct.length > 2) return { players: [], error: `This import contains ${distinct.length} distinct sprites (${distinct.map(number => `P${number}`).join(", ")}). YAJA Animator supports at most two sprites per project.` };
+    if (/^;@YAJA\s+(?:PROJECT|COLLECTION|ANIMATION_BEGIN|ANIMATION_END|FRAME_BEGIN|FRAME_END)\b/m.test(String(text || ""))) {
+      throw new Error("YAJA project data is incomplete or missing its PROJECT/COLLECTION marker. Keep every ;@YAJA line from the export together.");
+    }
+    const players = firstCoherentPlayerSet(text);
     const kernelMatch = String(text).match(/set\s+kernel\s+(PXE|DPC\+|multisprite)/i);
     const inferredKernel = kernelMatch ? (kernelMatch[1].toLowerCase() === "multisprite" ? "MULTISPRITE" : kernelMatch[1].toUpperCase()) : "STANDARD";
-    return { players, generated: false, inferredKernel, warning: "Legacy bB import is partial: timing and composition metadata were not available." };
+    return { players, generated: false, inferredKernel };
   } catch (error) { return { players: [], error: error.message }; }
 }

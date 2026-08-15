@@ -1578,8 +1578,9 @@ body.theme-atari { min-width: 0; overflow: hidden; }
 .dimension-control { display:grid; grid-template-columns:1fr 54px; align-items:center; gap:7px; white-space:nowrap; }
 .dimension-control input { width:54px; }
 .subcontrol-label,.rotation-label { margin:2px 0 5px; color:#fff; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; }
-.player-transfer-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.player-transfer-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:5px; width:100%; }
 .player-transfer-grid .span-two { grid-column:1/-1; }
+.player-transfer-grid button { min-width:0; width:100%; padding-inline:6px; }
 .two-sprite-controls { display:flex; flex-direction:column; gap:7px; }
 .player-canvas-group { display:flex; align-items:flex-start; gap:9px; }
 .player-canvas-group.hidden { display:none!important; }
@@ -1948,8 +1949,31 @@ button {
   margin: 0;
   padding: 10px;
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
   border: 1px solid var(--border-color);
+}
+.bb-export-options,
+.bb-export-positioning {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+#bbExportMode {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.bb-export-positioning.is-disabled {
+  opacity: .48;
+}
+.bb-ram-summary {
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-secondary);
+  font: 400 .7rem/1.4 "JetBrains Mono", monospace;
+}
+.export-project-data {
+  width: max-content;
+  margin: 0;
+  padding: 2px 0;
 }
 .import-mode-options .check-row {
   display: flex;
@@ -1974,52 +1998,22 @@ button {
   text-transform: uppercase;
 }
 
-.bb-import-dialog { width: min(980px, 94vw); }
+@media (max-width: 720px) {
+  #bbExportMode,
+  .bb-export-options,
+  .bb-export-positioning {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bb-import-dialog { width: min(760px, 94vw); }
 .bb-import-dialog .dialog-body {
-  grid-template-columns: minmax(260px, .8fr) minmax(400px, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
-.bb-import-dialog .dialog-body > h2,
-.bb-import-dialog .code-diagnostics,
-.bb-import-dialog .dialog-actions { grid-column: 1 / -1; }
-.bb-import-help {
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--border-color);
-  border-left: 3px solid var(--accent);
-  border-radius: 4px;
-  background: var(--bg-dark);
-  color: var(--text-secondary);
-  font: 400 .72rem/1.55 "JetBrains Mono", monospace;
-  letter-spacing: normal;
-}
-.bb-import-help strong {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--text-primary);
-  font-family: "Orbitron", system-ui, sans-serif;
-  letter-spacing: .08rem;
-}
-.bb-import-help ul { margin: 0 0 12px; padding-left: 18px; }
-.bb-import-help li + li { margin-top: 6px; }
-.bb-import-help code { color: var(--accent); }
-.bb-import-help pre {
-  margin: 0;
-  padding: 10px;
-  overflow: auto;
-  border: 1px solid var(--border-color);
-  background: var(--bg-darkest);
-  color: var(--text-primary);
-  font: inherit;
-  white-space: pre;
-}
-.bb-import-dialog #codeText { min-height: 510px; }
+.bb-import-dialog #codeText { min-height: 548px; }
 
 @media (max-width: 760px) {
-  .bb-import-dialog .dialog-body { grid-template-columns: minmax(0, 1fr); }
-  .bb-import-dialog .dialog-body > h2,
-  .bb-import-dialog .code-diagnostics,
-  .bb-import-dialog .dialog-actions { grid-column: 1; }
   .bb-import-dialog #codeText { min-height: 320px; }
 }
 .sequence-options { display: grid; gap: 8px; }
@@ -2399,7 +2393,7 @@ canvas[tabindex]:focus-visible {
   flex: 0 0 64px;
 }
 
-#bbExportMode { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#bbExportMode { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 #bbExportMode legend { grid-column: 1 / -1; }
 
 @media (max-width: 1120px) {
@@ -2779,7 +2773,7 @@ dialog .btn-danger {
 .theme-classic-light {
   color-scheme: light;
   --bg-darkest: #c0c0c0; --bg-dark: #b5b5b5; --bg-medium: #c8c8c8; --bg-light: #cdcdcd; --bg-lighter: #c5c5c5;
-  --accent: #0066cc; --accent-dim: #e67e22; --accent-red: #ef4444; --accent-purple: #ff903e;
+  --accent: #0066cc; --accent-dim: #0058b0; --accent-red: #ef4444; --accent-purple: #ff903e;
   --text-primary: #000000; --text-secondary: #2a2a2a; --text-dim: #4a4a4a; --border-color: #a0a0a0; --title-accent: #4a4a4a;
 }
 
