@@ -1,12 +1,10 @@
-# YAJA 2600 Animator v1.2.8
+# YAJA 2600 Animator v1.2.9
 
-YAJA 2600 Animator is a browser and desktop creative tool for creating Atari 2600 player-sprite animations and exporting reusable batari Basic data or compilable demos. It is the third application in the YAJA creative suite for the Atari 2600 homebrew community, alongside YAJA Painter for backgrounds and YAJA Composer for music.
+## v1.2.9 working notes
 
-## Built with OpenAI Codex and GPT-5.6
+- Adds the supplied YAJA 2600 Animator mark as the browser-tab icon and the canonical desktop package icon source for Windows, macOS, and Linux.
 
-YAJA 2600 Animator was developed through an extended human–AI collaboration using OpenAI Codex with GPT-5.6. Codex worked directly with the real local project, browser, tests, Atari toolchain, and versioned source folders.
-
-Codex and GPT-5.6 helped translate detailed design feedback into focused implementation passes; port proven interactions from Painter and Composer; build the raster, timeline, reference-image, project, and kernel-aware export systems; diagnose Atari pixel-aspect, NUSIZ, centering, and two-sprite issues; and run automated, browser, compiler, and packaging validation. The human creator directed the product, visual language, Atari behavior, and acceptance criteria throughout.
+## v1.2.8 working notes
 
 ## v1.2.8 working notes
 

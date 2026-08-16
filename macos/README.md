@@ -1,4 +1,10 @@
-# YAJA 2600 Animator v1.2.8
+# YAJA 2600 Animator v1.2.9
+
+## v1.2.9 working notes
+
+- Adds the supplied YAJA 2600 Animator mark as the browser-tab icon and the canonical desktop package icon source for Windows, macOS, and Linux.
+
+## v1.2.8 working notes
 
 ## v1.2.8 working notes
 

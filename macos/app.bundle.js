@@ -146,7 +146,7 @@
     const hasAnimations = Array.isArray(project.animations) && project.animations.some((animation) => Array.isArray(animation?.frames) && animation.frames.length);
     if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
     project.schemaVersion = CURRENT_SCHEMA_VERSION;
-    project.version = "1.2.8";
+    project.version = "1.2.9";
     project.app = "YAJA 2600 Animator";
     project.projectName = String(project.projectName || "Untitled Project");
     project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -2243,7 +2243,7 @@ ${backgroundData}` : ""}`;
     const project = {
       app: "YAJA 2600 Animator",
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      version: "1.2.8",
+      version: "1.2.9",
       theme: getPreferredTheme(),
       projectName: "Untitled Project",
       animationName: "Untitled Animation",
@@ -2410,7 +2410,7 @@ ${backgroundData}` : ""}`;
   }
   function normalizeProject() {
     state.schemaVersion = CURRENT_SCHEMA_VERSION;
-    state.version = "1.2.8";
+    state.version = "1.2.9";
     ensureAnimationCollection(state);
     state.theme = applyTheme(normalizeThemeId(state.theme));
     state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
