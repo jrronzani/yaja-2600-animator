@@ -65,7 +65,7 @@ export function migrateProject(input) {
   if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
 
   project.schemaVersion = CURRENT_SCHEMA_VERSION;
-  project.version = "1.2.7";
+  project.version = "1.2.8";
   project.app = "YAJA 2600 Animator";
   project.projectName = String(project.projectName || "Untitled Project");
   project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";

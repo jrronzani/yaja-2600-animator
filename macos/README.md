@@ -1,4 +1,10 @@
-# YAJA 2600 Animator v1.2.7
+# YAJA 2600 Animator v1.2.8
+
+## v1.2.8 working notes
+
+- Selection rectangles and moved selections continue tracking outside the canvas while clamping to its nearest edge.
+- The selection context is a compact two-column panel in the lower-left of the canvas workspace and no longer covers the center of the sprite.
+- Crop to Selection clears pixels outside the selected bounds on the active sprite only, including in Two Sprite Mode.
 
 ## v1.2.7 working notes
 

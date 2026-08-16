@@ -2,6 +2,31 @@ export function extractSelectionPixels(pixels, rect) {
   return Array.from({ length: rect.h }, (_, y) => Array.from({ length: rect.w }, (_, x) => pixels[rect.y + y]?.[rect.x + x] ? 1 : 0));
 }
 
+export function rasterCellFromLocal(localX, localY, cellWidth, cellHeight, width, height, clampToEdges = false) {
+  let col = Math.floor(localX / cellWidth);
+  let row = Math.floor(localY / cellHeight);
+  if (clampToEdges) {
+    col = Math.max(0, Math.min(width - 1, col));
+    row = Math.max(0, Math.min(height - 1, row));
+  } else if (col < 0 || col >= width || row < 0 || row >= height) {
+    return null;
+  }
+  return { col, row };
+}
+
+export function cropPixelsToSelection(pixels, selection, frameWidth = pixels?.[0]?.length || 8, frameHeight = pixels?.length || 0) {
+  if (!selection) return pixels.map(row => row.slice());
+  const left = Math.max(0, selection.x);
+  const top = Math.max(0, selection.y);
+  const right = Math.min(frameWidth, selection.x + selection.w);
+  const bottom = Math.min(frameHeight, selection.y + selection.h);
+  return Array.from({ length: frameHeight }, (_, y) =>
+    Array.from({ length: frameWidth }, (_, x) =>
+      x >= left && x < right && y >= top && y < bottom && pixels[y]?.[x] ? 1 : 0
+    )
+  );
+}
+
 export function placeSelectionPixels(basePixels, oldRect, data, nx, ny) {
   const height = basePixels.length;
   const width = basePixels[0]?.length || 8;

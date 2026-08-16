@@ -1,7 +1,7 @@
 import { animationExportFilename, generateAnimationCode } from "./core/codegen.js";
 import { CURRENT_SCHEMA_VERSION, migrateProject, normalizePlayerAssignments, playerLimitForKernel } from "./core/project-model.js";
 import { createRotationSession } from "./core/sprite-transform.js";
-import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, floodFillPixels, floodFillScanlines, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, rasterLineCells, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
+import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, cropPixelsToSelection, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, floodFillPixels, floodFillScanlines, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, rasterCellFromLocal, rasterLineCells, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
 import { parseBatariBasicSpriteData } from "./core/bb-parser.js";
 import { applyTheme, getPreferredTheme, normalizeThemeId } from "./themes.js";
 import { buildStoredZip } from "./core/zip.js";
@@ -168,7 +168,7 @@ function defaultState() {
   const project = {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "1.2.7",
+    version: "1.2.8",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -349,7 +349,7 @@ function restore(snap) {
 
 function normalizeProject() {
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
-  state.version = "1.2.7";
+  state.version = "1.2.8";
   ensureAnimationCollection(state);
   state.theme = applyTheme(normalizeThemeId(state.theme));
   state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
@@ -762,19 +762,20 @@ function drawPreviewPlayer(ctx, player, ox, oy, pw, ph, visible) {
   }
 }
 
-function cellFromPointer(event) {
+function cellFromPointer(event, clampToEdges = false) {
   const l = layout();
-  const canvas = event.currentTarget?.dataset?.player !== undefined ? event.currentTarget : event.target.closest?.("canvas[data-player]");
+  const canvas = event.currentTarget?.dataset?.player !== undefined
+    ? event.currentTarget
+    : event.target.closest?.("canvas[data-player]") || (clampToEdges ? dragStart?.canvas : null);
   if (!canvas) return null;
   const rect = canvas.getBoundingClientRect();
   const localX = event.clientX - rect.left;
   const localY = event.clientY - rect.top;
   const cellWidth = rect.width / state.width;
   const cellHeight = rect.height / l.rows;
-  const x = Math.floor(localX / cellWidth);
-  const y = Math.floor(localY / cellHeight);
-  if (x < 0 || x >= state.width || y < 0 || y >= state.height) return null;
-  return { col: x, row: y, player: Number(canvas.dataset.player), canvas, localX, localY, cellWidth, cellHeight };
+  const cell = rasterCellFromLocal(localX, localY, cellWidth, cellHeight, state.width, state.height, clampToEdges);
+  if (!cell) return null;
+  return { ...cell, player: Number(canvas.dataset.player), canvas, localX, localY, cellWidth, cellHeight };
 }
 
 function updateCanvasSelectionCursor(event) {
@@ -877,7 +878,8 @@ function beginPointer(event) {
 }
 
 function movePointer(event) {
-  const cell = cellFromPointer(event);
+  const clampSelectionDrag = isPointerDown && (state.tool === "select" || movingSelection);
+  const cell = cellFromPointer(event, clampSelectionDrag);
   if (!cell) return;
   const previousCell = lastCell;
   lastCell = cell;
@@ -2449,6 +2451,16 @@ function clearSelection() {
   renderAll();
 }
 
+function cropToSelection() {
+  if (!selection) return;
+  pushHistory();
+  const player = currentPlayer();
+  player.pixels = cropPixelsToSelection(player.pixels, selection, state.width, state.height);
+  selection = tightenSelectionToLivePixels(player.pixels, selection, state.width, state.height);
+  el.statusMessage.textContent = `Cropped P${state.playerAssignments[state.activePlayer]} to the selection`;
+  renderAll();
+}
+
 function clearSelectionState() {
   selection = null;
   colorSelection = null;
@@ -3709,13 +3721,18 @@ function bindEvents() {
     canvas.addEventListener("pointerleave", () => { pointerInsideCanvas = false; canvas.style.cursor = state.tool === "select" ? "crosshair" : ""; renderEditor(); });
     canvas.addEventListener("contextmenu", event => event.preventDefault());
   });
+  document.addEventListener("pointermove", event => {
+    if (!isPointerDown || !(state.tool === "select" || movingSelection)) return;
+    if (event.target.closest?.("canvas[data-player]")) return;
+    movePointer(event);
+  }, true);
   el.spriteStage.addEventListener("pointerdown", event => {
     if (event.composedPath().some(node => node.classList?.contains("player-canvas-group"))) return;
     clearSelectionState();
     renderAll();
   });
   el.editorZone.querySelector(".canvas-band").addEventListener("pointerdown", event => {
-    if (event.composedPath().some(node => node.classList?.contains("player-canvas-group"))) return;
+    if (event.composedPath().some(node => node.classList?.contains("player-canvas-group") || node.classList?.contains("selection-bar"))) return;
     clearSelectionState();
     renderAll();
   });
@@ -3872,6 +3889,7 @@ function bindEvents() {
   el.cutSelection.addEventListener("click", () => copySelection(true));
   el.pasteSelection.addEventListener("click", pasteSelection);
   el.stampFromSelection.addEventListener("click", makeStampFromSelection);
+  el.cropSelection.addEventListener("click", cropToSelection);
   el.clearSelection.addEventListener("click", clearSelection);
   el.paletteEyedropper.addEventListener("click", () => {
     paletteEyedropperArmed = true;
@@ -4130,7 +4148,7 @@ function cacheElements() {
     "nudgePixels", "nudgeColors", "scaleStep", "stretchHDown", "stretchHUp", "stretchVDown", "stretchVUp", "scaleUniformDown", "scaleUniformUp", "flipH", "flipV", "flipColor", "rotateL", "rotateR", "rotateAngle", "grow", "shrink", "clearFrame",
     "frameLabel", "pixelReadout", "canvasReadout", "showGrid", "showColorColumns", "onion", "onionOpacity", "onionFrames", "zoom", "playAnim", "loopPlayback", "timelineSummary", "timelineHeading", "framesActions", "editorZone",
     "spriteStage", "compositionBackdrop", "compositionColorColumns", "playerCanvasGroup0", "playerCanvasGroup1", "spriteCanvas", "spriteCanvas1", "previewCanvas", "previewCaption", "rowColors0", "rowColors1", "p0ColorsColumn", "p1ColorsColumn", "p0ColorsTitle", "p1ColorsTitle", "selectionBar", "selectionInfo", "copySelection",
-    "cutSelection", "pasteSelection", "stampFromSelection", "clearSelection", "insertFrame", "duplicateFrame",
+    "cutSelection", "pasteSelection", "stampFromSelection", "cropSelection", "clearSelection", "insertFrame", "duplicateFrame",
     "removeFrame", "moveFrameLeft", "moveFrameRight", "reverseFrames", "framesList", "currentColorSwatch", "currentColor",
     "palettePanel", "palette", "displayRegion", "paletteEyedropper", "colorBlocks", "stamps", "newColorBlock", "newStamp", "colorBlockEditor", "colorBlockEditorTitle", "colorBlockEditorHeight", "colorBlockEditorLines", "colorBlockHueOffset", "colorBlockHueOffsetValue", "colorBlockLightnessOffset", "colorBlockLightnessOffsetValue", "saveColorBlockEdit", "saveColorBlockCopy", "stampEditor", "stampEditorTitle", "stampEditorWidth", "stampEditorHeight", "stampEditorZoom", "stampEditorReadout", "stampEditorCanvasContainer", "stampEditorCanvas", "stampEditorPreviewCanvas", "saveStampEdit", "saveStampCopy",
     "refFile", "loadReference", "loadReferenceA", "loadReferenceB", "referenceImportSingle", "referenceImportDual", "refControls", "refOpacity", "refScale", "refX", "refY", "threshold", "refDither", "refFitMode", "refBrightness", "refContrast", "referenceTransform", "resetReferenceDefaults", "applyReferenceTransformAll", "toggleReference", "extractShape",

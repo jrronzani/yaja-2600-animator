@@ -4250,6 +4250,56 @@ dialog.color-block-editor-popover[open] {
   .canvas-stage-scroll { padding-inline: 10px; }
 }
 
+/* YAJA 2600 Animator v1.2.8 - compact, non-shifting selection context. */
+.canvas-band,
+.editor-zone.two-sprite-layout .canvas-band {
+  position: relative;
+}
+
+.canvas-band .selection-bar {
+  position: absolute;
+  inset: auto auto 42px 12px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 224px;
+  max-width: calc(100% - 24px);
+  padding: 8px;
+  gap: 6px;
+  transform: none;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-selection-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+
+.canvas-band .selection-bar.hidden {
+  display: none;
+}
+
+.canvas-band .selection-bar #selectionInfo {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0 2px 3px;
+  white-space: nowrap;
+}
+
+.canvas-band .selection-bar button {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding-inline: 7px;
+  white-space: nowrap;
+  font-size: .7rem;
+}
+
+@media (max-width: 760px) {
+  .canvas-band .selection-bar {
+    inset-inline-start: 8px;
+    bottom: 40px;
+    width: 212px;
+  }
+}
+
 /* v0.074 rotation-control ordering and full-row Clear action. */
 .tools-panel .clear-frame {
   width: 100% !important;

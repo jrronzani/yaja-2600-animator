@@ -1,68 +1,187 @@
-# YAJA 2600 Animator v1.2.7
+# YAJA 2600 Animator v1.2.8
 
-YAJA 2600 Animator is a browser and desktop creative tool for creating Atari 2600 player sprite animations and exporting batari Basic data to pasted into game code or a demo code file for easily compiling into rom previews to view how animaions will look on an emulator or real hardware.
-
-It is the third application in the YAJA creative suite for the Atari 2600 homebrew community, joining YAJA Painter for background artwork and YAJA Composer for music. The suite makes creating Atari games less technical and more intuitive while preserving hardware-aware control.
+YAJA 2600 Animator is a browser and desktop creative tool for creating Atari 2600 player-sprite animations and exporting reusable batari Basic data or compilable demos. It is the third application in the YAJA creative suite for the Atari 2600 homebrew community, alongside YAJA Painter for backgrounds and YAJA Composer for music.
 
 ## Built with OpenAI Codex and GPT-5.6
 
-YAJA 2600 Animator was developed through an extended human–AI collaboration using OpenAI Codex with GPT-5.6. Codex worked directly with the real local project, browser, tests, Atari toolchain, and versioned source folders rather than generating a one-time prototype.
+YAJA 2600 Animator was developed through an extended human–AI collaboration using OpenAI Codex with GPT-5.6. Codex worked directly with the real local project, browser, tests, Atari toolchain, and versioned source folders.
 
-Codex and GPT-5.6 helped us:
+Codex and GPT-5.6 helped translate detailed design feedback into focused implementation passes; port proven interactions from Painter and Composer; build the raster, timeline, reference-image, project, and kernel-aware export systems; diagnose Atari pixel-aspect, NUSIZ, centering, and two-sprite issues; and run automated, browser, compiler, and packaging validation. The human creator directed the product, visual language, Atari behavior, and acceptance criteria throughout.
 
-- Translate detailed design feedback and browser annotations into focused implementation passes.
-- Port proven interactions from YAJA Painter and Composer while keeping the suite visually consistent.
-- Design and refactor the project model, raster tools, timeline, selection engine, reference-image workflow, and responsive interface.
-- Build kernel-aware Standard, Multisprite, DPC+, and PXE batari Basic export and round-trip import systems.
-- Diagnose pixel-aspect, rotation, NUSIZ-centering, two-sprite composition, and scanline-color problems.
-- Run automated tests, compile generated Atari programs, inspect browser behavior, and package web and desktop releases.
+## v1.2.8 working notes
 
-The human creator directed the product, visual language, Atari behavior, and acceptance criteria. Codex accelerated implementation, testing, debugging, and documentation while each change remained subject to hands-on review and iteration.
+- Selection rectangles and moved selections continue tracking outside the canvas while clamping to its nearest edge.
+- The selection context is a compact two-column panel in the lower-left of the canvas workspace and no longer covers the center of the sprite.
+- Crop to Selection clears pixels outside the selected bounds on the active sprite only, including in Two Sprite Mode.
 
-## What it does
+## v1.2.7 working notes
 
-- Draws and colors hardware-aware Atari 2600 sprites.
-- Animates frame timing, dimensions, offsets, NUSIZ, and scanline colors.
-- Supports one- and two-sprite compositions, onion skinning, stamps, color blocks, and image references.
-- Exports PNG frames, reusable batari Basic animation data, or compilable demonstration programs.
-- Re-imports YAJA-generated bB code to reconstruct editable animation projects.
+- Renamed the import dialog to `Import bB Data`.
+- Renamed the dialog action to `Import bB` to match the toolbar control.
 
-## v1.2.7 release notes
+## v1.2.6 working notes
 
-- Uses Stella Standard NTSC and PAL color mappings with reversible regional color banks.
-- Adds lean Tables Only, Animation Module, and Compilable Demo bB export profiles with optional round-trip project data.
-- Improves import compatibility for ordinary bB, generated tables, animation modules, and complete YAJA exports.
-- Renames the import workflow consistently to `Import bB Data` and `Import bB`.
-- Preserves the native desktop Save/Save As workflow and RAM-conserving generated animation code.
+- Enlarged the Import bB dialog just enough for the complete ordinary/YAJA example to fit without a textarea scrollbar at desktop sizes.
+- Added root-level validation artifacts for lean/full import fidelity and moving NUSIZ-centering ROM compilation.
 
-## v1.1.20 release notes
+## v1.2.5 working notes
 
-- Vertically centers the Download `.bas` action to match YAJA Painter's export controls.
-- Moves DPC+ and PXE scanline background tables to the end of compilable exports while retaining compact register-based background setup near the top for Standard and Multisprite.
+- Matched the ordinary and YAJA import examples by separating sprite pixels and scanline-color tables with a blank line.
 
-## v1.1.17 release notes
+## v1.2.4 working notes
 
-- Adds a four-row scrolling animation picker for projects with multiple animations.
-- Makes timeline previews accurately display Normal, Double, and Quad NUSIZ widths while preserving Atari pixel aspect and kernel stretch.
+- Simplified Import bB to a single Painter-style text area with ordinary bB and YAJA project-data examples.
+- Complete project-data exports round-trip frames, repeats, NUSIZ, offsets, assignments, pixels, and colors.
+- Lean and ordinary bB imports recover the first readable one- or two-sprite frame and its available color data without unnecessary warnings.
+- Added solid-kernel frame-color recovery and strict, atomic errors for malformed YAJA metadata.
 
-## v1.1.12 release notes
+## v1.2.3 working notes
 
-- Fixes Fill so left-click fills connected empty canvas pixels, while right-click erases connected painted pixels.
-- Adds connected color-run Fill in the scanline color columns.
-- Locks palette swatches to their grid cells, eliminating hover overlap and active-row flicker.
+- Classic Light primary buttons now darken subtly on hover while remaining blue.
 
-## v1.1.9 release notes
+## v1.2.2 working notes
 
-- Reflows the animation picker with the timeline heading, preserving its title-row placement until a clean dedicated row is necessary.
-- Prevents responsive picker/title changes from overlapping playback and frame controls.
+- Download `.bas` now uses the active theme's primary action color in the export dialog.
 
-## v1.1.8 release notes
+YAJA 2600 Animator is a browser and desktop creative tool for authoring Atari 2600 player-sprite animations and exporting round-trip batari Basic data or compilable demos.
 
-- Finalizes the multi-animation project workspace, themed animation picker, and continuous raster stroke interpolation.
-- Uses Chrome-safe, full four-edge theme focus rings for Project and Theme fields.
-- Packages the matching web, Windows, macOS, and Linux desktop builds from one verified source version.
+## v1.2.1 working notes
 
-## v1.0.5 working notes
+- Harmonizes Classic Light hover colors with Painter so blue theme actions remain blue instead of changing to orange.
+- Wraps YAJA bB project metadata into compiler-safe comment lines, with a semicolon on every exported line.
+- Rewords positioning choices and variable-use summaries in clearer, user-facing language.
+
+## v1.2.0 working notes
+
+- Replaces the displayed NTSC and PAL colors with Stella Standard RGB mappings shared by every editor, preview, reference, and export surface.
+- Adds reversible NTSC/PAL color banks so each region remembers its exact project colors without repeated conversion drift.
+- Displays all 128 NTSC choices and the 104 canonical PAL choices while continuing to load every PAL `$XX` value.
+- Advances Animator projects to schema 11 and migrates older PAL projects once from the former YAJA palette appearance.
+
+## v1.1.23 working notes
+
+- The desktop toolbar Save button now always opens Save As while native Save and Save As shortcuts retain their conventional behavior.
+- bB export now offers Tables Only, Animation Module, and Compilable Demo profiles with optional project metadata, explanatory comments, and two positioning approaches.
+- Generated variables use ordinary names, labels retain double underscores, and the default module uses only the Frame and Timer variables.
+- PXE demos omit Standard-only TV and score directives, and thumbnail timing is again shown as `x#`.
+
+## v1.1.22 working notes
+
+- Targets brush and stamp hover feedback to the sprite canvas currently under the pointer in Two Sprite Mode.
+- Keeps click-to-activate behavior while preventing hover previews from appearing on the previously active sprite.
+
+## v1.1.21 working notes
+
+- Preserves relative NUSIZ scale in two-sprite timeline thumbnails.
+- Automatically activates whichever visible sprite receives a canvas tool action.
+- Refreshes thumbnails immediately after scanline recoloring.
+- Clarifies Sprite Offsets, repeat labels, and compact two-sprite transfer actions.
+- Adds an optional `Export with project data` interchange layer; lean bB is now the default.
+- Harmonizes export format/scope layout and suppresses non-actionable info banners.
+
+## v1.1.20 working notes
+
+- Centers every export-dialog action label vertically, including `Download .bas`, using Painter's 36px inline-flex button treatment.
+- Moves PXE and DPC+ compilable-demo `bkcolors:` scanline data to the bottom of the generated source so executable animation code is easier to reach.
+- Keeps Standard and Multisprite `COLUBK` setup near the top because those kernels use a compact register assignment rather than a full scanline table.
+
+## v1.1.19 working notes
+
+- Canvas eyedropper picks the visible sprite color and immediately updates the palette, swatch, and color field.
+- Web Save opens the native file picker with `<Project Name>.json`, matching YAJA Painter, without an extra filename prompt or Animator suffix.
+
+## v1.1.18 working notes
+
+- Matches Painter's full-width Hue Offset and Lightness Offset controls in the Color Block Editor.
+- Stamp previews use the same uniform Atari pixel-aspect, kernel-stretch, and current-frame NUSIZ fitting as timeline thumbnails.
+- Space toggles animation playback outside text-entry controls; Ctrl/Cmd+C, X, V, Z, Y, Shift+Z, and Shift+R follow standard edit behavior.
+- Timeline multi-selection now targets all selected frames for Transform and per-frame Sprite Settings commands as one history action.
+
+## v1.1.17 working notes
+
+- The animation picker displays four animation rows at a time and scrolls for larger libraries.
+- Timeline previews now render Normal, Double, and Quad NUSIZ widths accurately.
+- NUSIZ-aware previews retain uniform X/Y fitting and the kernel-specific Atari pixel ratio.
+
+## v1.1.16 working notes
+
+- Timeline frame previews now use the same Atari 1.7 pixel aspect and kernel-specific vertical stretch as the main canvas.
+- Preview sprites are letterboxed and centered without independent horizontal or vertical CSS scaling.
+- Frame width and height are respected in preview rendering, including two-sprite layouts.
+
+## v1.1.15 working notes
+
+- Replaces CSS-pixel-only canvas rounding with one device-pixel-aware backing-store geometry shared by pixels, grid lines, and brush feedback.
+- Removes the 4/4 midpoint seam at fractional browser/display scaling without changing the original one-cell ghost design.
+
+## v1.1.13 working notes
+
+- Aligns every canvas grid stroke to the same rounded cell boundary used by raster rendering, eliminating the faint fractional center grid line.
+- Draws selection, stamp, and brush ghost feedback above the grid so every hover outline remains complete around its cell.
+
+## v1.1.12 working notes
+
+- Prevents palette swatches from expanding into adjacent cells on hover; hover and active states now use stable inset outlines within fixed grid cells.
+
+## v1.1.11 working notes
+
+- Left-click Fill now fills contiguous empty canvas pixels without erasing existing art; right-click Fill erases a contiguous painted region.
+- Left-click Fill in a scanline color column now fills the connected matching color run, instead of changing only one row.
+
+## v1.1.10 working notes
+
+- Stabilizes scanline-color painting while selecting a new palette color by reconciling only the live color-column row and completing its stroke before palette rerenders.
+
+## v1.1.9 working notes
+
+- Keeps the animation picker in the timeline-heading grid and gives it a dedicated responsive row before it can overlap timeline controls.
+
+## v1.1.8 working notes
+
+- Replaces the Chrome-clipped Project and Theme focus treatment with a complete inset theme ring.
+
+## v1.1.7 working notes
+
+- Raises Project and Theme controls above adjacent header layers and draws their complete border inset, preventing edge clipping.
+
+## v1.1.6 working notes
+
+- Restores complete, theme-aware borders around the Project and Theme header fields.
+
+## v1.1.5 working notes
+
+- Interpolates every raster cell crossed by rapid Pencil and Eraser strokes, preventing skipped pixels.
+- Shares the same raster-line helper with the Stamp Editor, keeping its brush behavior in parity with the main canvas.
+
+## v1.1.4 working notes
+
+- Places focused brush dimension controls above adjacent controls so their theme focus rings never get clipped.
+- Brings the animation-name field focus ring above the dropdown seam while preserving the arrow’s own active layering.
+
+## v1.1.3 working notes
+
+- Overrides the timeline heading’s inherited baseline and gap so all animation-library controls align as one compact row.
+
+## v1.1.2 working notes
+
+- Aligns the animation picker and library actions with the timeline title baseline.
+- Matches picker entries to the animation-name field’s JetBrains Mono treatment.
+- Enlarges the shared down-chevron and layers its highlighted border cleanly over the name field.
+
+## v1.1.1 working notes
+
+- Refines the multi-animation selector into the established 36px timeline-control language.
+- Enlarges the animation-name field, uses the shared down-chevron icon, and gives the menu an opaque theme-aware input surface.
+- Keeps New, Duplicate, and Delete at standard timeline-tool dimensions with compact, even spacing.
+
+## v1.1.0 working notes
+
+- Projects can contain multiple named animations with editable switching, blank creation, duplication, and deletion.
+- Legacy single-animation projects migrate into the first animation slot without losing frame data or settings.
+- bB export supports the current animation or an all-animation selector library; demos switch animations with joystick Up/Down.
+- Timeline thumbnails remain individually selectable after duplicating one or more frames.
+
+## v1.0.5 notes
 
 - Opens a native Save As picker in supported browsers instead of silently downloading projects to the default folder.
 - Shares the most recently used project folder between Save and Open, matching YAJA Painter.

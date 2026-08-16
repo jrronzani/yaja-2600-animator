@@ -146,7 +146,7 @@
     const hasAnimations = Array.isArray(project.animations) && project.animations.some((animation) => Array.isArray(animation?.frames) && animation.frames.length);
     if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
     project.schemaVersion = CURRENT_SCHEMA_VERSION;
-    project.version = "1.2.7";
+    project.version = "1.2.8";
     project.app = "YAJA 2600 Animator";
     project.projectName = String(project.projectName || "Untitled Project");
     project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -1012,6 +1012,31 @@ ${backgroundData}` : ""}`;
   // src/core/editor-ops.js
   function extractSelectionPixels(pixels, rect) {
     return Array.from({ length: rect.h }, (_, y) => Array.from({ length: rect.w }, (_2, x) => pixels[rect.y + y]?.[rect.x + x] ? 1 : 0));
+  }
+  function rasterCellFromLocal(localX, localY, cellWidth, cellHeight, width, height, clampToEdges = false) {
+    let col = Math.floor(localX / cellWidth);
+    let row = Math.floor(localY / cellHeight);
+    if (clampToEdges) {
+      col = Math.max(0, Math.min(width - 1, col));
+      row = Math.max(0, Math.min(height - 1, row));
+    } else if (col < 0 || col >= width || row < 0 || row >= height) {
+      return null;
+    }
+    return { col, row };
+  }
+  function cropPixelsToSelection(pixels, selection2, frameWidth = pixels?.[0]?.length || 8, frameHeight = pixels?.length || 0) {
+    if (!selection2) return pixels.map((row) => row.slice());
+    const left = Math.max(0, selection2.x);
+    const top = Math.max(0, selection2.y);
+    const right = Math.min(frameWidth, selection2.x + selection2.w);
+    const bottom = Math.min(frameHeight, selection2.y + selection2.h);
+    return Array.from(
+      { length: frameHeight },
+      (_, y) => Array.from(
+        { length: frameWidth },
+        (_2, x) => x >= left && x < right && y >= top && y < bottom && pixels[y]?.[x] ? 1 : 0
+      )
+    );
   }
   function brushCells(x, y, brushWidth, brushHeight, width = 8, height = 255) {
     const ox = Math.floor(brushWidth / 2);
@@ -2218,7 +2243,7 @@ ${backgroundData}` : ""}`;
     const project = {
       app: "YAJA 2600 Animator",
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      version: "1.2.7",
+      version: "1.2.8",
       theme: getPreferredTheme(),
       projectName: "Untitled Project",
       animationName: "Untitled Animation",
@@ -2385,7 +2410,7 @@ ${backgroundData}` : ""}`;
   }
   function normalizeProject() {
     state.schemaVersion = CURRENT_SCHEMA_VERSION;
-    state.version = "1.2.7";
+    state.version = "1.2.8";
     ensureAnimationCollection(state);
     state.theme = applyTheme(normalizeThemeId(state.theme));
     state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
@@ -2768,19 +2793,18 @@ ${backgroundData}` : ""}`;
       }
     }
   }
-  function cellFromPointer(event) {
+  function cellFromPointer(event, clampToEdges = false) {
     const l = layout();
-    const canvas = event.currentTarget?.dataset?.player !== void 0 ? event.currentTarget : event.target.closest?.("canvas[data-player]");
+    const canvas = event.currentTarget?.dataset?.player !== void 0 ? event.currentTarget : event.target.closest?.("canvas[data-player]") || (clampToEdges ? dragStart?.canvas : null);
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const localX = event.clientX - rect.left;
     const localY = event.clientY - rect.top;
     const cellWidth = rect.width / state.width;
     const cellHeight = rect.height / l.rows;
-    const x = Math.floor(localX / cellWidth);
-    const y = Math.floor(localY / cellHeight);
-    if (x < 0 || x >= state.width || y < 0 || y >= state.height) return null;
-    return { col: x, row: y, player: Number(canvas.dataset.player), canvas, localX, localY, cellWidth, cellHeight };
+    const cell = rasterCellFromLocal(localX, localY, cellWidth, cellHeight, state.width, state.height, clampToEdges);
+    if (!cell) return null;
+    return { ...cell, player: Number(canvas.dataset.player), canvas, localX, localY, cellWidth, cellHeight };
   }
   function updateCanvasSelectionCursor(event) {
     const canvas = event?.currentTarget?.dataset?.player !== void 0 ? event.currentTarget : event?.target?.closest?.("canvas[data-player]");
@@ -2888,7 +2912,8 @@ ${backgroundData}` : ""}`;
     renderFrames();
   }
   function movePointer(event) {
-    const cell = cellFromPointer(event);
+    const clampSelectionDrag = isPointerDown && (state.tool === "select" || movingSelection);
+    const cell = cellFromPointer(event, clampSelectionDrag);
     if (!cell) return;
     const previousCell = lastCell;
     lastCell = cell;
@@ -4416,6 +4441,15 @@ ${backgroundData}` : ""}`;
     clearSelectionState();
     renderAll();
   }
+  function cropToSelection() {
+    if (!selection) return;
+    pushHistory();
+    const player = currentPlayer();
+    player.pixels = cropPixelsToSelection(player.pixels, selection, state.width, state.height);
+    selection = tightenSelectionToLivePixels(player.pixels, selection, state.width, state.height);
+    el.statusMessage.textContent = `Cropped P${state.playerAssignments[state.activePlayer]} to the selection`;
+    renderAll();
+  }
   function clearSelectionState() {
     selection = null;
     colorSelection = null;
@@ -5703,13 +5737,18 @@ ${backgroundData}` : ""}`;
       });
       canvas.addEventListener("contextmenu", (event) => event.preventDefault());
     });
+    document.addEventListener("pointermove", (event) => {
+      if (!isPointerDown || !(state.tool === "select" || movingSelection)) return;
+      if (event.target.closest?.("canvas[data-player]")) return;
+      movePointer(event);
+    }, true);
     el.spriteStage.addEventListener("pointerdown", (event) => {
       if (event.composedPath().some((node) => node.classList?.contains("player-canvas-group"))) return;
       clearSelectionState();
       renderAll();
     });
     el.editorZone.querySelector(".canvas-band").addEventListener("pointerdown", (event) => {
-      if (event.composedPath().some((node) => node.classList?.contains("player-canvas-group"))) return;
+      if (event.composedPath().some((node) => node.classList?.contains("player-canvas-group") || node.classList?.contains("selection-bar"))) return;
       clearSelectionState();
       renderAll();
     });
@@ -5914,6 +5953,7 @@ ${backgroundData}` : ""}`;
     el.cutSelection.addEventListener("click", () => copySelection(true));
     el.pasteSelection.addEventListener("click", pasteSelection);
     el.stampFromSelection.addEventListener("click", makeStampFromSelection);
+    el.cropSelection.addEventListener("click", cropToSelection);
     el.clearSelection.addEventListener("click", clearSelection);
     el.paletteEyedropper.addEventListener("click", () => {
       paletteEyedropperArmed = true;
@@ -6384,6 +6424,7 @@ ${backgroundData}` : ""}`;
       "cutSelection",
       "pasteSelection",
       "stampFromSelection",
+      "cropSelection",
       "clearSelection",
       "insertFrame",
       "duplicateFrame",
