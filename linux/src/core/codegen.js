@@ -70,21 +70,23 @@ export function createAnimationIR(project, options = {}) {
     const height = Math.max(1, Math.min(255, Number.parseInt(frame.height, 10) || frame.players?.[0]?.pixels?.length || 16));
     const players = activeSlots.map(slot => {
       const source = frame.players?.[slot] || {};
+      const playerWidth = Math.max(1, Math.min(8, Number.parseInt(source.width, 10) || width));
+      const playerHeight = Math.max(1, Math.min(255, Number.parseInt(source.height, 10) || source.pixels?.length || height));
       const nusiz = NUSIZ[source.nusiz] ? source.nusiz : "normal";
       const mode = nusizMode(nusiz);
       return {
-        slot, player: assignments[slot], nusiz, nusizCode: mode.code, scale: mode.scale,
+        slot, player: assignments[slot], nusiz, nusizCode: mode.code, scale: mode.scale, width: playerWidth, height: playerHeight,
         xOffset: Math.trunc(Number(source.xOffset) || 0), yOffset: Math.trunc(Number(source.yOffset) || 0),
         solidColor: normalizeAtariCode(source.solidColor || source.colors?.[0]),
-        pixels: rowsFor(source, width, height),
-        colors: Array.from({ length: height }, (_, y) => normalizeAtariCode(source.colors?.[y] || source.solidColor))
+        pixels: rowsFor(source, playerWidth, playerHeight),
+        colors: Array.from({ length: playerHeight }, (_, y) => normalizeAtariCode(source.colors?.[y] || source.solidColor))
       };
     });
     const composition = centeredCompositionGeometry(width, players);
     players.forEach((player, index) => {
       const widePlayerBias = player.scale > 1 ? -1 : 0;
       player.centeredXDelta = composition.centeredX[index] + widePlayerBias;
-      player.centeredYDelta = spriteBottomAnchorYDelta(height, player.yOffset);
+      player.centeredYDelta = spriteBottomAnchorYDelta(player.height, player.yOffset);
     });
     return {
       index: frameIndex, width, height,
@@ -124,8 +126,8 @@ export function validateAnimationIR(ir) {
     if (player < 0 || player > max) diagnostics.push({ severity: "error", code: "PLAYER_RANGE", message: `${ir.kernel} supports P0 through P${max}; P${player} cannot be exported.` });
   });
   ir.frames.forEach(frame => frame.players.forEach(player => {
-    if (player.pixels.length !== frame.height) diagnostics.push({ severity: "error", code: "SPRITE_HEIGHT", message: `Frame ${frame.index}, P${player.player} data does not match its ${frame.height}-row height.` });
-    if (!isSolidKernel(ir.kernel) && player.colors.length !== frame.height) diagnostics.push({ severity: "error", code: "COLOR_HEIGHT", message: `Frame ${frame.index}, P${player.player} color rows do not match sprite height.` });
+    if (player.pixels.length !== player.height) diagnostics.push({ severity: "error", code: "SPRITE_HEIGHT", message: `Frame ${frame.index}, P${player.player} data does not match its ${player.height}-row height.` });
+    if (!isSolidKernel(ir.kernel) && player.colors.length !== player.height) diagnostics.push({ severity: "error", code: "COLOR_HEIGHT", message: `Frame ${frame.index}, P${player.player} color rows do not match sprite height.` });
   }));
   if (ir.twoSpriteMode && ir.activePlayers.every(player => player > 0)) diagnostics.push({ severity: "warning", code: "VIRTUAL_OVERLAP", message: "Two virtual P1+ sprites may flicker when their vertical ranges overlap; export will continue." });
   diagnostics.push({
@@ -168,7 +170,7 @@ function frameMetadata(frame) {
     index: frame.index, width: frame.width, height: frame.height, duration: frame.duration,
     players: frame.players.map(player => ({
       slot: player.slot, player: player.player, nusiz: player.nusiz,
-      xOffset: player.xOffset, yOffset: player.yOffset, solidColor: player.solidColor
+      width: player.width, height: player.height, xOffset: player.xOffset, yOffset: player.yOffset, solidColor: player.solidColor
     }))
   });
 }
@@ -203,7 +205,7 @@ function emitTableColor(ir, frame, player) {
 function emitPlayerSetup(ir, frame, player) {
   const lines = [`  ${nusizSymbol(ir.kernel, player.player)} = ${player.nusizCode}`];
   if (isSolidKernel(ir.kernel)) lines.push(`  ${colorSymbol(ir.kernel, player.player)} = ${player.solidColor}`);
-  lines.push(`  player${player.player}height = ${frame.height}`);
+  lines.push(`  player${player.player}height = ${player.height}`);
   return lines;
 }
 

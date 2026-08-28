@@ -3845,15 +3845,15 @@ dialog.stamp-editor-popover {
   display: none;
 }
 
-/* Painter-width labels with Orbitron's intended tracking and no clipping. */
+/* Painter-matched fixed-width labels with Orbitron's intended tracking. */
 .canvas-colors,
 .canvas-colors .row-colors,
 .canvas-colors .color-row,
 .canvas-colors .row-colors-title {
-  width: 28px !important;
-  min-width: 28px !important;
-  max-width: 28px !important;
-  flex-basis: 28px !important;
+  width: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  flex: 0 0 24px !important;
 }
 .canvas-colors .row-colors-title {
   overflow: visible;
@@ -4399,6 +4399,40 @@ dialog.color-block-editor-popover[open] {
   flex: 0 0 auto;
   max-width: none;
   margin: auto;
+}
+
+/* Hardware copies share a contiguous TIA composition baseline. The only
+   intentional space is the margin before the external color columns. */
+.editor-zone.two-sprite-layout .sprite-stage { gap: 0; }
+
+/* v1.3.1: transparent, bounds-aware two-sprite composition. Hardware-copy
+   gaps are workspace, never opaque sprite surfaces. */
+.canvas-stage-scroll > .sprite-stage {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+}
+.sprite-stage .player-canvas-group {
+  position: absolute;
+  display: block;
+  gap: 0;
+}
+.sprite-stage .player-canvas-group.hidden { display: none !important; }
+.sprite-stage .canvas-wrap { padding: 0 !important; background: transparent !important; }
+.sprite-stage .player-canvas-group canvas { display: block; background: transparent !important; }
+.composition-backdrop { display: none !important; }
+.composition-color-columns { margin: 0 !important; z-index: 5; }
+
+/* v1.3.2: each NUSIZ copy retains its own grid edge. Do not draw an active
+   outline around the transparent canvas spanning the complete copy group. */
+.player-canvas-group.nusiz-copies canvas,
+.editor-zone.two-sprite-layout .player-canvas-group.active-slot canvas {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .onion-control-group .onion-count {

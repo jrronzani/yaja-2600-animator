@@ -1,6 +1,8 @@
 import { ensureAnimationCollection, loadAnimationWorkspace } from "./animation-collection.js";
 
-export const CURRENT_SCHEMA_VERSION = 11;
+export const CURRENT_SCHEMA_VERSION = 13;
+
+const NUSIZ_VALUES = new Set(["normal", "doubleClose", "doubleMedium", "tripleClose", "doubleWide", "double", "tripleMedium", "quad"]);
 
 const SUPPORTED_THEMES = new Set(["atari-console", "atari-controller", "synthwave", "synthwave-bright", "blue", "classic-dark", "classic-light"]);
 
@@ -43,15 +45,17 @@ function normalizeReference(reference) {
   };
 }
 
-function normalizePlayer(player, legacyNusiz = "normal", legacyX = 0) {
+function normalizePlayer(player, legacyNusiz = "normal", legacyX = 0, legacyWidth = 8, legacyHeight = 16) {
   const normalized = player && typeof player === "object" ? { ...player } : {};
   normalized.pixels = Array.isArray(normalized.pixels) ? normalized.pixels : [];
   normalized.colors = Array.isArray(normalized.colors) ? normalized.colors : [];
   normalized.solidColor = String(normalized.solidColor || normalized.colors[0] || "$48");
-  normalized.nusiz = ["normal", "double", "quad"].includes(normalized.nusiz) ? normalized.nusiz : legacyNusiz;
+  normalized.nusiz = NUSIZ_VALUES.has(normalized.nusiz) ? normalized.nusiz : (NUSIZ_VALUES.has(legacyNusiz) ? legacyNusiz : "normal");
   normalized.xOffset = Number.isFinite(Number(normalized.xOffset)) ? Number(normalized.xOffset) : legacyX;
   normalized.yOffset = Number.isFinite(Number(normalized.yOffset)) ? Number(normalized.yOffset) : 0;
   normalized.reference = normalizeReference(normalized.reference);
+  normalized.width = Math.max(1, Math.min(8, Number.parseInt(normalized.width, 10) || legacyWidth || 8));
+  normalized.height = Math.max(1, Math.min(255, Number.parseInt(normalized.height, 10) || normalized.pixels.length || legacyHeight || 16));
   return normalized;
 }
 
@@ -65,7 +69,7 @@ export function migrateProject(input) {
   if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
 
   project.schemaVersion = CURRENT_SCHEMA_VERSION;
-  project.version = "1.2.9";
+  project.version = "1.3.4";
   project.app = "YAJA 2600 Animator";
   project.projectName = String(project.projectName || "Untitled Project");
   project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
@@ -95,7 +99,7 @@ export function migrateProject(input) {
     const payloadHeight = Math.max(frame?.players?.[0]?.pixels?.length || 0, frame?.players?.[1]?.pixels?.length || 0);
     const height = Math.max(1, Math.min(255, Number.parseInt(frame?.height, 10) || payloadHeight || project.height || 16));
     const width = Math.max(1, Math.min(8, Number.parseInt(frame?.width, 10) || project.width || 8));
-    const players = [0, 1].map(slot => normalizePlayer(frame?.players?.[slot], legacyNusiz[slot] || "normal", slot === 1 ? legacyP1Offset : 0));
+    const players = [0, 1].map(slot => normalizePlayer(frame?.players?.[slot], legacyNusiz[slot] || "normal", slot === 1 ? legacyP1Offset : 0, width, height));
     return {
       ...frame,
       name: String(frame?.name || `Frame ${index}`),
@@ -128,9 +132,16 @@ export function migrateProject(input) {
     playerAssignments: normalizePlayerAssignments(animation.playerAssignments, project.kernel)
   }));
   if (project.compositionModel === "legacy-absolute") {
-    const scales = { normal: 1, double: 2, quad: 4 };
+    const spans = { normal: 1, doubleClose: 3, doubleMedium: 5, tripleClose: 5, doubleWide: 9, double: 2, tripleMedium: 9, quad: 4 };
     project.animations.forEach(animation => animation.frames.forEach(frame => {
-      frame.players[1].xOffset -= frame.width * (scales[frame.players[0].nusiz] || 1);
+      const mode = frame.players[0].nusiz;
+      const span = mode === "doubleClose" ? 16 + frame.width
+        : mode === "doubleMedium" ? 32 + frame.width
+          : mode === "tripleClose" ? 32 + frame.width
+            : mode === "doubleWide" ? 64 + frame.width
+              : mode === "tripleMedium" ? 64 + frame.width
+                : frame.width * (spans[mode] || 1);
+      frame.players[1].xOffset -= span;
     }));
     project.compositionModel = "adjacent";
   }

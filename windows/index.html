@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YAJA 2600 Animator v1.2.9</title>
+  <title>YAJA 2600 Animator v1.3.4</title>
   <link rel="icon" type="image/png" sizes="512x512" href="assets/branding/yaja-2600-animator-logo.png">
   <link rel="stylesheet" href="index.css">
 </head>
@@ -86,7 +86,7 @@
   <header class="app-header">
     <div class="brand">
       <div class="logo brand-title">YAJA 2600 Animator</div>
-      <div class="version">v1.2.9</div>
+      <div class="version">v1.3.4</div>
     </div>
     <div class="project-strip" aria-label="Project actions">
       <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
@@ -162,8 +162,21 @@
         <label id="playerAssignment0Row" class="sprite-assignment-row"><span id="playerAssignment0Label">Sprite #</span><select id="playerAssignment0"></select></label>
         <label id="playerAssignment1Row" class="sprite-assignment-row hidden"><span id="playerAssignment1Label">Sprite B #</span><select id="playerAssignment1"></select></label>
         <div class="two-col frame-dimensions"><label>Width <input id="spriteWidth" type="number" min="1" max="8" value="8"></label><label>Height <input id="spriteHeight" type="number" min="1" max="255" value="16"></label></div>
-        <label id="spriteNusizLabel">NUSIZ
-          <select id="spriteNusiz"><option value="normal">Normal</option><option value="double">Double</option><option value="quad">Quad</option></select>
+        <label id="spriteNusizLabel">NUSIZ Mode
+          <select id="spriteNusiz">
+            <optgroup label="Single Sprite Size">
+              <option value="normal">$00 — Normal (1x)</option>
+              <option value="double">$05 — Double Width (2x)</option>
+              <option value="quad">$07 — Quad Width (4x)</option>
+            </optgroup>
+            <optgroup label="Sprite Copies">
+              <option value="doubleClose">$01 — Double - Close</option>
+              <option value="doubleMedium">$02 — Double - Medium</option>
+              <option value="doubleWide">$04 — Double - Wide</option>
+              <option value="tripleClose">$03 — Triple - Close</option>
+              <option value="tripleMedium">$06 — Triple - Medium</option>
+            </optgroup>
+          </select>
         </label>
         <label id="spriteSolidColorRow" class="solid-color-row">Color <input id="spriteSolidColor" class="code-input" value="$48" maxlength="3"></label>
         <div class="subcontrol-label frame-offset-label">Sprite Offsets</div>
@@ -250,7 +263,7 @@
       </div>
 
       <div class="canvas-band">
-        <div class="canvas-stage-scroll">
+        <div class="canvas-stage-scroll" id="canvasStageScroll">
         <div class="sprite-stage" id="spriteStage">
           <div id="compositionBackdrop" class="composition-backdrop hidden" aria-hidden="true"></div>
           <div id="playerCanvasGroup0" class="player-canvas-group"><div class="canvas-wrap"><canvas id="spriteCanvas" data-player="0" tabindex="0"></canvas></div></div>

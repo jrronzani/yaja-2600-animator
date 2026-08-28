@@ -1,4 +1,33 @@
-# YAJA 2600 Animator v1.2.9
+# YAJA 2600 Animator v1.3.4
+
+## v1.3.4 working notes
+
+- Removed project-background fill from the spaces between hardware copies in Single Sprite Mode.
+- Background painting now follows NUSIZ copy geometry consistently in both one- and two-sprite compositions.
+
+## v1.3.3 working notes
+
+- Restored the Painter-matched fixed 24px player-color columns after the wider 28px regression.
+- Added sparse-art browser QA coverage for double/triple NUSIZ backgrounds, transparent copy gaps, and separated outlines.
+
+## v1.3.2 working notes
+
+- Restored the project background beneath every visible NUSIZ hardware copy while keeping the copy-spacing gaps transparent for two-sprite composition.
+- Removed the single active outline that connected duplicate copies; each copy keeps only its own grid boundary.
+- Simplified NUSIZ technical labels to the `$00`–`$07` register notation.
+
+## v1.3.1 working notes
+
+- Shows each NUSIZ mode's lower-three-bit binary and hexadecimal register value beside its friendly name.
+- Rebuilds Two Sprite Mode as a transparent composition so hardware-copy gaps never obscure the other sprite.
+- Gives Sprite A and Sprite B independent width and height while keeping legacy projects compatible.
+- Keeps negative-offset sprites, color columns, and scroll bounds reachable, with Sprite B adjacent to Sprite A's complete NUSIZ span by default.
+
+## v1.3.0 working notes
+
+- Adds all eight hardware NUSIZ player modes, including synchronized double- and triple-copy editing.
+- Makes every displayed hardware copy directly editable while retaining one bitmap per sprite frame.
+- Updates two-sprite composition, thumbnails, stamps, PNG output, import/export metadata, and centering for complete NUSIZ spans.
 
 ## v1.2.9 working notes
 

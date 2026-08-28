@@ -5,7 +5,7 @@ import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRas
 import { parseBatariBasicSpriteData } from "./core/bb-parser.js";
 import { applyTheme, getPreferredTheme, normalizeThemeId } from "./themes.js";
 import { buildStoredZip } from "./core/zip.js";
-import { canvasCellSize, NUSIZ_MODES as NUSIZ, rasterCellBoundary, rasterCellRect, rasterSurfaceGeometry, timelineThumbnailGeometry } from "./core/display-geometry.js";
+import { canvasCellSize, NUSIZ_MODES as NUSIZ, nusizMode, nusizSourceColumn, rasterCellBoundary, rasterCellRect, rasterSurfaceGeometry, renderedSpriteSpan, timelineThumbnailGeometry } from "./core/display-geometry.js";
 import { averageReferenceGridRow, estimateUniformBorderColor, fittedReferenceRect, nearestPaletteColor, referenceCellGrid, referenceCellIsForeground } from "./core/reference-image.js";
 import { animationRecordFromWorkspace, duplicateAnimationRecord, ensureAnimationCollection, loadAnimationWorkspace, nextAnimationId, syncActiveAnimation, uniqueAnimationName } from "./core/animation-collection.js";
 import { ATARI_NTSC, ATARI_PAL, convertColorCode, displayCodesForRegion, migrateLegacyPalCode, paletteForRegion } from "./core/atari-palettes.js";
@@ -140,7 +140,7 @@ function normalizeCode(value, fallback = "$0E") {
   return ATARI_NTSC[text] ? text : fallback;
 }
 
-function makePlayer(height, color = "$48") {
+function makePlayer(height, color = "$48", width = 8) {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     pixels: Array.from({ length: height }, () => Array(8).fill(0)),
@@ -150,6 +150,8 @@ function makePlayer(height, color = "$48") {
     xOffset: 0,
     yOffset: 0,
     reference: null
+    ,width: Math.max(1, Math.min(8, Number(width) || 8))
+    ,height: Math.max(1, Math.min(255, Number(height) || 16))
   };
 }
 
@@ -159,7 +161,7 @@ function makeFrame(height, index = 0, width = 8, duration = 3) {
     duration: Math.max(1, Math.min(60, Number.parseInt(duration, 10) || 3)),
     height,
     width,
-    players: [makePlayer(height), makePlayer(height)]
+    players: [makePlayer(height, "$48", width), makePlayer(height, "$48", width)]
   };
 }
 
@@ -168,7 +170,7 @@ function defaultState() {
   const project = {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "1.2.9",
+    version: "1.3.4",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -213,6 +215,14 @@ function currentPlayer() {
   return currentFrame().players[state.activePlayer];
 }
 
+function playerWidth(frame, slot) {
+  return Math.max(1, Math.min(8, Number.parseInt(frame?.players?.[slot]?.width, 10) || Number.parseInt(frame?.width, 10) || 8));
+}
+
+function playerHeight(frame, slot) {
+  return Math.max(1, Math.min(255, Number.parseInt(frame?.players?.[slot]?.height, 10) || frame?.players?.[slot]?.pixels?.length || Number.parseInt(frame?.height, 10) || 16));
+}
+
 function forEachSelectedFrame(callback) {
   selectedFrameIndices().forEach(index => callback(state.frames[index], index));
 }
@@ -248,7 +258,7 @@ function captureRegionColors(project, region) {
     player.regionalColors ||= {};
     player.regionalColors[region] = {
       solidColor: normalizeCode(player.solidColor, "$48"),
-      colors: resizeRegionColorStream(player.colors, frame.height, player.solidColor || "$48")
+      colors: resizeRegionColorStream(player.colors, player.height || player.pixels?.length || frame.height, player.solidColor || "$48")
     };
   });
   project.colorBlocks.forEach(block => {
@@ -273,7 +283,7 @@ function restoreRegionColors(project, fromRegion, toRegion) {
     };
     player.regionalColors[toRegion] = cloneData(target);
     player.solidColor = normalizeCode(target.solidColor, "$48");
-    player.colors = resizeRegionColorStream(target.colors, frame.height, player.solidColor);
+    player.colors = resizeRegionColorStream(target.colors, player.height || player.pixels?.length || frame.height, player.solidColor);
   });
   project.colorBlocks.forEach(block => {
     block.regionalColors ||= {};
@@ -349,7 +359,7 @@ function restore(snap) {
 
 function normalizeProject() {
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
-  state.version = "1.2.9";
+  state.version = "1.3.4";
   ensureAnimationCollection(state);
   state.theme = applyTheme(normalizeThemeId(state.theme));
   state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
@@ -384,8 +394,10 @@ function normalizeProject() {
     frame.width = Math.max(1, Math.min(8, parseInt(frame.width) || state.width || 8));
     if (!frame.players) frame.players = [makePlayer(frame.height), makePlayer(frame.height)];
     for (let p = 0; p < 2; p++) {
-      if (!frame.players[p]) frame.players[p] = makePlayer(frame.height, "$48");
-      resizePlayer(frame.players[p], frame.height);
+      if (!frame.players[p]) frame.players[p] = makePlayer(frame.height, "$48", frame.width);
+      frame.players[p].width = playerWidth(frame, p);
+      frame.players[p].height = playerHeight(frame, p);
+      resizePlayer(frame.players[p], frame.players[p].height);
       frame.players[p].nusiz = NUSIZ[frame.players[p].nusiz] ? frame.players[p].nusiz : "normal";
       frame.players[p].solidColor = normalizeCode(frame.players[p].solidColor || frame.players[p].colors[0], "$48");
       frame.players[p].xOffset = Number(frame.players[p].xOffset) || 0;
@@ -399,7 +411,12 @@ function normalizeProject() {
 
 function syncFrameSize() {
   const frame = state?.frames?.[state.currentFrame];
-  if (frame) { state.height = frame.height || frame.players?.[0]?.pixels?.length || 16; state.width = frame.width || 8; }
+  if (frame) {
+    state.height = playerHeight(frame, state.activePlayer);
+    state.width = playerWidth(frame, state.activePlayer);
+    frame.height = state.height;
+    frame.width = state.width;
+  }
 }
 
 function resizePlayer(player, height) {
@@ -409,6 +426,7 @@ function resizePlayer(player, height) {
   player.colors.length = height;
   player.pixels = player.pixels.map(row => Array.from({ length: 8 }, (_, x) => row?.[x] ? 1 : 0));
   player.colors = player.colors.map(c => normalizeCode(c, state.currentColor || "$48"));
+  player.height = height;
 }
 
 function normalizeReference(ref) {
@@ -430,17 +448,17 @@ function aspectForKernel() {
   return { w: 1.7, h: 1.0, label: `${state.kernel} pixel aspect 1.7:1` };
 }
 
-function layout() {
+function layout(playerIndex = state.activePlayer, frame = currentFrame()) {
   const requested = canvasCellSize(state.zoom, state.verticalStretch, state.kernel === "STANDARD" ? 2 : 1);
-  const p0 = 0, p1 = 0, cols = state.width;
-  const surface = rasterSurfaceGeometry(requested.cellW, requested.cellH, cols, state.height, window.devicePixelRatio || 1);
+  const p0 = 0, p1 = 0, cols = playerWidth(frame, playerIndex), rows = playerHeight(frame, playerIndex);
+  const surface = rasterSurfaceGeometry(requested.cellW, requested.cellH, cols, rows, window.devicePixelRatio || 1);
   return {
     cellW: surface.cellW,
     cellH: surface.cellH,
     p0,
     p1,
     cols,
-    rows: state.height,
+    rows,
     w: surface.width,
     h: surface.height,
     dpr: surface.pixelRatio,
@@ -466,6 +484,14 @@ function fillRasterCell(ctx, l, x, y, offsetX = 0, offsetY = 0) {
   return rect;
 }
 
+function copyOriginsInCells(l) {
+  return Array.isArray(l.copyOrigins) && l.copyOrigins.length ? l.copyOrigins : [0];
+}
+
+function forEachDisplayedCopy(l, callback) {
+  copyOriginsInCells(l).forEach((origin, copyIndex) => callback(origin, copyIndex));
+}
+
 function colorHex(code) {
   const normalized = normalizeCode(code, "$00");
   return (state?.region === "PAL" ? ATARI_PAL[normalized] : ATARI_NTSC[normalized]) || ATARI_NTSC[normalized] || "#000";
@@ -487,30 +513,32 @@ function renderEditor() {
   const solidKernel = ["STANDARD", "MULTISPRITE"].includes(state.kernel);
   el.spriteStage.classList.toggle("solid-color-kernel", solidKernel);
   const frame = currentFrame();
-  const p0Width = state.width * NUSIZ[frame.players[0].nusiz].scale;
-  const p1Width = state.width * NUSIZ[frame.players[1].nusiz].scale;
-  const baseWidth = state.twoSpriteMode ? p0Width + p1Width : p0Width;
-  const leftEdges = [frame.players[0].xOffset];
-  const rightEdges = [frame.players[0].xOffset + p0Width];
-  if (state.twoSpriteMode) {
-    leftEdges.push(p0Width + frame.players[1].xOffset);
-    rightEdges.push(p0Width + frame.players[1].xOffset + p1Width);
-  }
-  const rightOverflow = Math.max(0, Math.max(...rightEdges) - baseWidth);
-  el.compositionColorColumns.style.marginLeft = `${10 + rightOverflow * base.cellW}px`;
-  if (state.twoSpriteMode) {
-    const topEdge = Math.min(frame.players[0].yOffset, frame.players[1].yOffset);
-    const bottomEdge = Math.max(frame.players[0].yOffset + state.height, frame.players[1].yOffset + state.height);
-    el.compositionBackdrop.classList.remove("hidden");
-    Object.assign(el.compositionBackdrop.style, {
-      left: `${Math.min(...leftEdges) * base.cellW}px`,
-      top: `${topEdge * base.cellH}px`,
-      width: `${(Math.max(...rightEdges) - Math.min(...leftEdges)) * base.cellW}px`,
-      height: `${(bottomEdge - topEdge) * base.cellH}px`,
-      backgroundColor: colorHex(state.background)
-    });
-  } else {
-    el.compositionBackdrop.classList.add("hidden");
+  const visibleSlots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
+  const spans = [0, 1].map(slot => renderedSpriteSpan(playerWidth(frame, slot), frame.players[slot].nusiz));
+  const startsX = [frame.players[0].xOffset, spans[0] + frame.players[1].xOffset];
+  if (!state.twoSpriteMode && state.activePlayer === 1) startsX[1] = frame.players[1].xOffset;
+  const left = Math.min(...visibleSlots.map(slot => startsX[slot]));
+  const right = Math.max(...visibleSlots.map(slot => startsX[slot] + spans[slot]));
+  const top = Math.min(...visibleSlots.map(slot => frame.players[slot].yOffset));
+  const bottom = Math.max(...visibleSlots.map(slot => frame.players[slot].yOffset + playerHeight(frame, slot)));
+  const titlePad = 22;
+  const columnGap = solidKernel || !state.showColorColumns ? 0 : 10;
+  const columnsWidth = solidKernel || !state.showColorColumns ? 0 : (state.twoSpriteMode ? 51 : 24);
+  const stageWidth = Math.max(1, (right - left) * base.cellW + columnGap + columnsWidth);
+  const stageHeight = Math.max(1, (bottom - top) * base.cellH + titlePad);
+  Object.assign(el.spriteStage.style, { width: `${stageWidth}px`, height: `${stageHeight}px` });
+  el.compositionBackdrop.classList.add("hidden");
+  Object.assign(el.compositionColorColumns.style, {
+    position: "absolute",
+    left: `${(right - left) * base.cellW + columnGap}px`,
+    top: `${titlePad}px`,
+    marginLeft: "0"
+  });
+  if (el.canvasStageScroll) {
+    const centerX = Math.max(0, (el.canvasStageScroll.clientWidth - stageWidth) / 2);
+    const centerY = Math.max(0, (el.canvasStageScroll.clientHeight - stageHeight) / 2);
+    el.spriteStage.style.marginLeft = `${centerX}px`;
+    el.spriteStage.style.marginTop = `${centerY}px`;
   }
   [0, 1].forEach(playerIndex => {
     const group = el[`playerCanvasGroup${playerIndex}`];
@@ -522,12 +550,38 @@ function renderEditor() {
     group.style.pointerEvents = "auto";
     if (!visible) return;
     const player = currentFrame().players[playerIndex];
-    const scale = NUSIZ[player.nusiz].scale;
-    const l = { ...base, p0: 0, p1: 0, cols: state.width, cellW: base.cellW * scale, w: state.width * base.cellW * scale };
+    const playerBase = layout(playerIndex, frame);
+    const mode = nusizMode(player.nusiz);
+    group.classList.toggle("nusiz-copies", mode.copyOrigins.length > 1);
+    const scale = mode.scale;
+    const width = playerWidth(frame, playerIndex);
+    const height = playerHeight(frame, playerIndex);
+    const span = renderedSpriteSpan(width, player.nusiz);
+    const l = {
+      ...playerBase,
+      p0: 0,
+      p1: 0,
+      cols: width,
+      spanUnits: span,
+      mode,
+      normalCellW: playerBase.cellW,
+      copyOrigins: mode.copyOrigins.map(origin => origin / scale),
+      cellW: playerBase.cellW * scale,
+      w: span * playerBase.cellW,
+      rows: height,
+      h: height * playerBase.cellH
+    };
     const canvas = playerIndex ? el.spriteCanvas1 : el.spriteCanvas;
     const ctx = setCanvasSize(canvas, l.w, l.h, l.dpr);
-    if (!state.twoSpriteMode) {
-      ctx.fillStyle = colorHex(state.background);
+    ctx.fillStyle = colorHex(state.background);
+    if (mode.copyOrigins.length > 1) {
+      // Hardware copies share one bitmap but occupy separate visible regions.
+      // Paint the project background beneath each real copy only, leaving the
+      // spacing between copies transparent in both one- and two-sprite modes.
+      forEachDisplayedCopy(l, origin => {
+        ctx.fillRect(origin * l.cellW, 0, l.cols * l.cellW, l.h);
+      });
+    } else {
       ctx.fillRect(0, 0, l.w, l.h);
     }
     if (playerIndex === state.activePlayer) drawReference(ctx, l, playerIndex);
@@ -541,8 +595,13 @@ function renderEditor() {
       drawStampPlacementPreview(ctx, l);
       drawBrushGhost(ctx, l);
     }
-    group.style.transform = `translate(${player.xOffset * base.cellW}px, ${player.yOffset * base.cellH}px)`;
-    el[`p${playerIndex}ColorsColumn`].style.transform = `translateY(${player.yOffset * base.cellH}px)`;
+    Object.assign(group.style, {
+      position: "absolute",
+      left: `${(startsX[playerIndex] - left) * base.cellW}px`,
+      top: `${titlePad + (player.yOffset - top) * base.cellH}px`,
+      transform: "none"
+    });
+    el[`p${playerIndex}ColorsColumn`].style.transform = `translateY(${(player.yOffset - top) * base.cellH}px)`;
     group.style.zIndex = state.playerAssignments[playerIndex] === 0 ? "3" : (playerIndex === 0 ? "2" : "1");
   });
 }
@@ -555,14 +614,16 @@ function drawBrushGhost(ctx, l) {
   ctx.strokeStyle = erase ? "rgba(255,110,110,.9)" : "rgba(255,255,255,.9)";
   ctx.lineWidth = 1 / l.dpr;
   const halfDevicePixel = .5 / l.dpr;
-  brushCells(lastCell.col, lastCell.row, state.brushWidth, state.brushHeight, state.width, state.height).forEach(([x, y]) => {
-    const rect = fillRasterCell(ctx, l, x, y);
-    ctx.strokeRect(
-      rect.x + halfDevicePixel,
-      rect.y + halfDevicePixel,
-      Math.max(0, rect.w - 1 / l.dpr),
-      Math.max(0, rect.h - 1 / l.dpr)
-    );
+  forEachDisplayedCopy(l, origin => {
+    brushCells(lastCell.col, lastCell.row, state.brushWidth, state.brushHeight, l.cols, l.rows).forEach(([x, y]) => {
+      const rect = fillRasterCell(ctx, l, origin + x, y);
+      ctx.strokeRect(
+        rect.x + halfDevicePixel,
+        rect.y + halfDevicePixel,
+        Math.max(0, rect.w - 1 / l.dpr),
+        Math.max(0, rect.h - 1 / l.dpr)
+      );
+    });
   });
   ctx.restore();
 }
@@ -571,15 +632,14 @@ function drawStampPlacementPreview(ctx, l) {
   if (state.tool !== "stamp" || activeStampIndex === null) return;
   const stamp = state.stamps[activeStampIndex];
   if (!stamp) return;
-  const origin = playerOrigin(l, state.activePlayer);
   const startX = lastCell.col - Math.floor(stamp.w / 2);
   const startY = lastCell.row - Math.floor(stamp.h / 2);
   ctx.save();
   ctx.globalAlpha = .42;
   ctx.fillStyle = colorHex(state.currentColor);
-  stamp.pixels.forEach((row, y) => row.forEach((value, x) => {
+  forEachDisplayedCopy(l, origin => stamp.pixels.forEach((row, y) => row.forEach((value, x) => {
     if (value) fillRasterCell(ctx, l, origin + startX + x, startY + y);
-  }));
+  })));
   ctx.restore();
 }
 
@@ -589,15 +649,16 @@ function playerOrigin(l, playerIndex) {
 
 function drawPlayer(ctx, l, playerIndex, alpha) {
   const player = currentFrame().players[playerIndex];
-  const origin = playerOrigin(l, playerIndex);
   ctx.save();
   ctx.globalAlpha = alpha;
-  for (let y = 0; y < state.height; y++) {
-    ctx.fillStyle = colorHex(["STANDARD", "MULTISPRITE"].includes(state.kernel) ? player.solidColor : player.colors[y]);
-    for (let x = 0; x < 8; x++) {
-      if (player.pixels[y][x]) fillRasterCell(ctx, l, origin + x, y);
+  forEachDisplayedCopy(l, origin => {
+    for (let y = 0; y < l.rows; y++) {
+      ctx.fillStyle = colorHex(["STANDARD", "MULTISPRITE"].includes(state.kernel) ? player.solidColor : player.colors[y]);
+      for (let x = 0; x < l.cols; x++) {
+        if (player.pixels[y]?.[x]) fillRasterCell(ctx, l, origin + x, y);
+      }
     }
-  }
+  });
   ctx.restore();
 }
 
@@ -611,14 +672,23 @@ function drawOnion(ctx, l, playerIndex) {
     ctx.globalAlpha = (state.onionOpacity / 100) * ((count - step + 1) / count);
     const player = frame.players[playerIndex];
     const current = currentFrame().players[playerIndex];
-    const dx = (player.xOffset - current.xOffset) * l.cellW;
+    const mode = nusizMode(player.nusiz);
+    const normalCellW = l.normalCellW || (l.cellW / nusizMode(current.nusiz).scale);
+    const dx = (player.xOffset - current.xOffset) * normalCellW;
     const dy = (player.yOffset - current.yOffset) * l.cellH;
     const rows = Math.min(state.height, player.pixels.length);
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < 8; x++) {
-        if (player.pixels[y][x]) fillRasterCell(ctx, l, x, y, dx, dy);
+    mode.copyOrigins.forEach(copyOrigin => {
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < state.width; x++) {
+          if (!player.pixels[y]?.[x]) continue;
+          const left = dx + (copyOrigin + x * mode.scale) * normalCellW;
+          const right = dx + (copyOrigin + (x + 1) * mode.scale) * normalCellW;
+          const top = dy + y * l.cellH;
+          const bottom = dy + (y + 1) * l.cellH;
+          ctx.fillRect(left, top, right - left, bottom - top);
+        }
       }
-    }
+    });
   }
   ctx.restore();
 }
@@ -659,12 +729,17 @@ function drawReference(ctx, l, playerIndex) {
   ctx.save();
   ctx.globalAlpha = ref.opacity / 100;
   ctx.filter = `brightness(${ref.brightness}%) contrast(${ref.contrast}%)`;
-  ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
-  if (referenceTransformActive) {
-    ctx.globalAlpha = 1; ctx.filter = "none"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-    [[rect.x, rect.y], [rect.x + rect.w, rect.y], [rect.x, rect.y + rect.h], [rect.x + rect.w, rect.y + rect.h]].forEach(([x,y]) => ctx.fillRect(x - 4, y - 4, 8, 8));
-  }
+  forEachDisplayedCopy(l, origin => {
+    ctx.globalAlpha = ref.opacity / 100;
+    ctx.filter = `brightness(${ref.brightness}%) contrast(${ref.contrast}%)`;
+    const copyX = rect.x + origin * l.cellW;
+    ctx.drawImage(image, copyX, rect.y, rect.w, rect.h);
+    if (referenceTransformActive) {
+      ctx.globalAlpha = 1; ctx.filter = "none"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+      ctx.strokeRect(copyX, rect.y, rect.w, rect.h);
+      [[copyX, rect.y], [copyX + rect.w, rect.y], [copyX, rect.y + rect.h], [copyX + rect.w, rect.y + rect.h]].forEach(([x,y]) => ctx.fillRect(x - 4, y - 4, 8, 8));
+    }
+  });
   ctx.restore();
 }
 
@@ -676,20 +751,25 @@ function drawGrid(ctx, l) {
   const deviceLineWidth = Math.max(1, Math.round(requestedLineWidth * l.dpr));
   ctx.lineWidth = deviceLineWidth / l.dpr;
   const halfLine = deviceLineWidth / (2 * l.dpr);
-  for (let x = 1; x < l.cols; x++) {
-    const boundary = rasterCellBoundary(l.cellW, x, 0, l.dpr);
-    ctx.beginPath();
-    ctx.moveTo(boundary + halfLine, 0);
-    ctx.lineTo(boundary + halfLine, l.h);
-    ctx.stroke();
-  }
-  for (let y = 1; y < l.rows; y++) {
-    const boundary = rasterCellBoundary(l.cellH, y, 0, l.dpr);
-    ctx.beginPath();
-    ctx.moveTo(0, boundary + halfLine);
-    ctx.lineTo(l.w, boundary + halfLine);
-    ctx.stroke();
-  }
+  forEachDisplayedCopy(l, origin => {
+    const left = origin * l.cellW;
+    const right = (origin + l.cols) * l.cellW;
+    for (let x = 1; x < l.cols; x++) {
+      const boundary = rasterCellBoundary(l.cellW, origin + x, 0, l.dpr);
+      ctx.beginPath();
+      ctx.moveTo(boundary + halfLine, 0);
+      ctx.lineTo(boundary + halfLine, l.h);
+      ctx.stroke();
+    }
+    for (let y = 1; y < l.rows; y++) {
+      const boundary = rasterCellBoundary(l.cellH, y, 0, l.dpr);
+      ctx.beginPath();
+      ctx.moveTo(left, boundary + halfLine);
+      ctx.lineTo(right, boundary + halfLine);
+      ctx.stroke();
+    }
+    ctx.strokeRect(left + halfLine, halfLine, Math.max(0, right - left - deviceLineWidth / l.dpr), Math.max(0, l.h - deviceLineWidth / l.dpr));
+  });
   ctx.restore();
 }
 
@@ -714,56 +794,66 @@ function drawSelection(ctx, l) {
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 4]);
   const mask = selection.mask || fullSelectionMask(selection.w, selection.h);
-  for (let y = 0; y < selection.h; y++) for (let x = 0; x < selection.w; x++) {
-    if (!mask[y]?.[x]) continue;
-    fillRasterCell(ctx, l, selection.x + x, selection.y + y);
-  }
-  ctx.beginPath();
-  maskBoundarySegments(mask).forEach(([x1, y1, x2, y2]) => {
-    ctx.moveTo((selection.x + x1) * l.cellW, (selection.y + y1) * l.cellH);
-    ctx.lineTo((selection.x + x2) * l.cellW, (selection.y + y2) * l.cellH);
+  forEachDisplayedCopy(l, origin => {
+    for (let y = 0; y < selection.h; y++) for (let x = 0; x < selection.w; x++) {
+      if (!mask[y]?.[x]) continue;
+      fillRasterCell(ctx, l, origin + selection.x + x, selection.y + y);
+    }
+    ctx.beginPath();
+    maskBoundarySegments(mask).forEach(([x1, y1, x2, y2]) => {
+      ctx.moveTo((origin + selection.x + x1) * l.cellW, (selection.y + y1) * l.cellH);
+      ctx.lineTo((origin + selection.x + x2) * l.cellW, (selection.y + y2) * l.cellH);
+    });
+    ctx.stroke();
   });
-  ctx.stroke();
   ctx.restore();
 }
 
 function renderPreview() {
   const aspect = aspectForKernel();
   const p0 = currentFrame().players[0], p1 = currentFrame().players[1];
-  const p0Scale = NUSIZ[p0.nusiz].scale;
-  const p1Scale = NUSIZ[p1.nusiz].scale;
+  const p0Mode = nusizMode(p0.nusiz);
+  const p1Mode = nusizMode(p1.nusiz);
+  const p0Span = renderedSpriteSpan(playerWidth(currentFrame(), 0), p0.nusiz);
+  const p1Span = renderedSpriteSpan(playerWidth(currentFrame(), 1), p1.nusiz);
   const pixelW = 17;
   const pixelH = (state.kernel === "STANDARD" ? 20 : 10) * state.verticalStretch;
   const p0Start = p0.xOffset;
-  const p1Start = state.width * p0Scale + p1.xOffset;
+  const p1Start = p0Span + p1.xOffset;
   const minPlayerX = state.twoSpriteMode ? Math.min(p0Start, p1Start) : p0Start;
   const p0PreviewX = p0Start - minPlayerX;
   const p1PreviewX = p1Start - minPlayerX;
-  const widthPixels = state.twoSpriteMode ? Math.max(p0PreviewX + state.width * p0Scale, p1PreviewX + state.width * p1Scale) : state.width * p0Scale;
+  const widthPixels = state.twoSpriteMode ? Math.max(p0PreviewX + p0Span, p1PreviewX + p1Span) : p0Span;
   const cssW = Math.max(180, widthPixels * pixelW + 36);
-  const cssH = Math.max(220, state.height * pixelH + 36);
+  const minY = Math.min(p0.yOffset, state.twoSpriteMode ? p1.yOffset : p0.yOffset);
+  const maxY = Math.max(p0.yOffset + playerHeight(currentFrame(), 0), state.twoSpriteMode ? p1.yOffset + playerHeight(currentFrame(), 1) : p0.yOffset + playerHeight(currentFrame(), 0));
+  const cssH = Math.max(220, (maxY - minY) * pixelH + 36);
   const ctx = setCanvasSize(el.previewCanvas, cssW, cssH);
   ctx.fillStyle = colorHex(state.background);
   ctx.fillRect(0, 0, cssW, cssH);
   const ox = 18;
   const oy = 18;
-  drawPreviewPlayer(ctx, currentFrame().players[0], ox + p0PreviewX * pixelW, oy, pixelW * p0Scale, pixelH, state.twoSpriteMode || state.activePlayer === 0);
-  if (state.twoSpriteMode) drawPreviewPlayer(ctx, currentFrame().players[1], ox + p1PreviewX * pixelW, oy, pixelW * p1Scale, pixelH, true);
+  drawPreviewPlayer(ctx, currentFrame().players[0], ox + p0PreviewX * pixelW, oy + (p0.yOffset - minY) * pixelH, pixelW, pixelH, state.twoSpriteMode || state.activePlayer === 0);
+  if (state.twoSpriteMode) drawPreviewPlayer(ctx, currentFrame().players[1], ox + p1PreviewX * pixelW, oy + (p1.yOffset - minY) * pixelH, pixelW, pixelH, true);
   el.previewCaption.textContent = `${aspect.label} / ${state.twoSpriteMode ? `P${state.playerAssignments[0]}+P${state.playerAssignments[1]}` : `P${state.playerAssignments[state.activePlayer]}`} / ${NUSIZ[currentPlayer().nusiz].label}`;
 }
 
-function drawPreviewPlayer(ctx, player, ox, oy, pw, ph, visible) {
+function drawPreviewPlayer(ctx, player, ox, oy, unitW, ph, visible) {
   if (!visible) return;
-  for (let y = 0; y < state.height; y++) {
-    ctx.fillStyle = colorHex(usesSolidColor() ? player.solidColor : player.colors[y]);
-    for (let x = 0; x < 8; x++) {
-      if (player.pixels[y][x]) ctx.fillRect(ox + x * pw, oy + y * ph, pw, ph);
+  const mode = nusizMode(player.nusiz);
+  mode.copyOrigins.forEach(copyOrigin => {
+    const rows = Math.max(1, player.height || player.pixels.length);
+    const columns = Math.max(1, player.width || 8);
+    for (let y = 0; y < rows; y++) {
+      ctx.fillStyle = colorHex(usesSolidColor() ? player.solidColor : player.colors[y]);
+      for (let x = 0; x < columns; x++) {
+        if (player.pixels[y]?.[x]) ctx.fillRect(ox + (copyOrigin + x * mode.scale) * unitW, oy + y * ph, unitW * mode.scale, ph);
+      }
     }
-  }
+  });
 }
 
 function cellFromPointer(event, clampToEdges = false) {
-  const l = layout();
   const canvas = event.currentTarget?.dataset?.player !== undefined
     ? event.currentTarget
     : event.target.closest?.("canvas[data-player]") || (clampToEdges ? dragStart?.canvas : null);
@@ -771,11 +861,44 @@ function cellFromPointer(event, clampToEdges = false) {
   const rect = canvas.getBoundingClientRect();
   const localX = event.clientX - rect.left;
   const localY = event.clientY - rect.top;
-  const cellWidth = rect.width / state.width;
+  const playerIndex = Number(canvas.dataset.player);
+  const l = layout(playerIndex);
+  const player = currentFrame().players[playerIndex];
+  const width = playerWidth(currentFrame(), playerIndex);
+  const height = playerHeight(currentFrame(), playerIndex);
+  const mode = nusizMode(player.nusiz);
+  const spanUnits = renderedSpriteSpan(width, player.nusiz);
+  const unitWidth = rect.width / spanUnits;
+  const cellWidth = unitWidth * mode.scale;
   const cellHeight = rect.height / l.rows;
-  const cell = rasterCellFromLocal(localX, localY, cellWidth, cellHeight, state.width, state.height, clampToEdges);
-  if (!cell) return null;
-  return { ...cell, player: Number(canvas.dataset.player), canvas, localX, localY, cellWidth, cellHeight };
+  let displayX = localX / unitWidth;
+  let hit = nusizSourceColumn(displayX, width, player.nusiz);
+  if (!hit && clampToEdges) {
+    const preferredCopy = Math.max(0, Math.min(mode.copyOrigins.length - 1, dragStart?.copyIndex || 0));
+    const origin = mode.copyOrigins[preferredCopy];
+    displayX = Math.max(origin, Math.min(origin + width * mode.scale - Number.EPSILON, displayX));
+    hit = nusizSourceColumn(displayX, width, player.nusiz);
+  }
+  let row = Math.floor(localY / cellHeight);
+  if (clampToEdges) row = Math.max(0, Math.min(height - 1, row));
+  if (!hit || row < 0 || row >= height) return null;
+  const copyLocalX = localX - hit.origin * unitWidth;
+  return { col: hit.column, row, copyIndex: hit.copyIndex, player: playerIndex, canvas, localX: copyLocalX, localY, cellWidth, cellHeight, unitWidth };
+}
+
+function compositionCellFromPointer(event, clampToEdges = false) {
+  const direct = cellFromPointer(event, clampToEdges);
+  if (direct || !state.twoSpriteMode || clampToEdges) return direct;
+  const canvases = document.elementsFromPoint(event.clientX, event.clientY)
+    .filter(node => node instanceof HTMLCanvasElement && node.dataset.player !== undefined);
+  for (const canvas of canvases) {
+    const cell = cellFromPointer({
+      clientX: event.clientX, clientY: event.clientY,
+      currentTarget: canvas, target: canvas
+    });
+    if (cell) return cell;
+  }
+  return null;
 }
 
 function updateCanvasSelectionCursor(event) {
@@ -784,7 +907,7 @@ function updateCanvasSelectionCursor(event) {
   if (referenceTransformActive) { canvas.style.cursor = referenceDrag ? "grabbing" : "grab"; return; }
   if (state.tool !== "select") { canvas.style.cursor = "crosshair"; return; }
   if (movingSelection) { canvas.style.cursor = "grabbing"; return; }
-  const cell = cellFromPointer(event);
+  const cell = compositionCellFromPointer(event);
   const modifiers = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
   canvas.style.cursor = cell && cell.player === state.activePlayer && !modifiers && selectionContains(selection, cell.col, cell.row) ? "grab" : "crosshair";
 }
@@ -797,6 +920,7 @@ function setActivePlayer(playerIndex, render = true) {
   rotationSession = null;
   referenceTransformActive = false;
   state.activePlayer = nextPlayer;
+  syncFrameSize();
   if (usesSolidColor()) state.currentColor = currentPlayer().solidColor;
   syncControls();
   if (render) renderAll();
@@ -804,7 +928,7 @@ function setActivePlayer(playerIndex, render = true) {
 
 function beginPointer(event) {
   event.preventDefault();
-  const cell = cellFromPointer(event);
+  const cell = compositionCellFromPointer(event);
   if (!cell) return;
   if (cell.player !== state.activePlayer) setActivePlayer(cell.player, false);
   pointerInsideCanvas = true;
@@ -814,14 +938,14 @@ function beginPointer(event) {
   if (referenceTransformActive && currentReference()) {
     pushHistory();
     const canvasRect = cell.canvas.getBoundingClientRect();
-    const l = { ...layout(), p0: 0, p1: 0, cols: 8, w: canvasRect.width, h: canvasRect.height, cellW: canvasRect.width / 8, cellH: canvasRect.height / state.height };
+    const l = { ...layout(), p0: 0, p1: 0, cols: 8, w: state.width * cell.cellWidth, h: canvasRect.height, cellW: cell.cellWidth, cellH: cell.cellHeight };
     const image = imageForReference(currentReference());
-    const rect = image ? referenceRect(currentReference(), image, l) : { x: 0, y: 0, w: canvasRect.width, h: canvasRect.height };
-    const px = event.clientX - canvasRect.left, py = event.clientY - canvasRect.top;
+    const rect = image ? referenceRect(currentReference(), image, l) : { x: 0, y: 0, w: l.w, h: l.h };
+    const px = cell.localX, py = event.clientY - canvasRect.top;
     const corners = [[rect.x,rect.y],[rect.x+rect.w,rect.y],[rect.x,rect.y+rect.h],[rect.x+rect.w,rect.y+rect.h]];
     const nearCorner = corners.some(([x,y]) => Math.hypot(px-x,py-y) <= 14);
     const centerX = rect.x + rect.w/2, centerY = rect.y + rect.h/2;
-    referenceDrag = { mode: nearCorner ? "scale" : "move", pointerX: event.clientX, pointerY: event.clientY, x: currentReference().xOffset, y: currentReference().yOffset, scale: currentReference().scale, centerX, centerY, distance: Math.max(1, Math.hypot(px-centerX,py-centerY)), canvasRect };
+    referenceDrag = { mode: nearCorner ? "scale" : "move", pointerX: event.clientX, pointerY: event.clientY, x: currentReference().xOffset, y: currentReference().yOffset, scale: currentReference().scale, centerX, centerY, distance: Math.max(1, Math.hypot(px-centerX,py-centerY)), canvasRect, copyOffsetX: nusizMode(currentPlayer().nusiz).copyOrigins[cell.copyIndex] * cell.unitWidth, cellWidth: cell.cellWidth, cellHeight: cell.cellHeight };
     cell.canvas.style.cursor = nearCorner ? "nwse-resize" : "grabbing";
     isPointerDown = true;
     return;
@@ -879,18 +1003,22 @@ function beginPointer(event) {
 
 function movePointer(event) {
   const clampSelectionDrag = isPointerDown && (state.tool === "select" || movingSelection);
-  const cell = cellFromPointer(event, clampSelectionDrag);
-  if (!cell) return;
+  const cell = clampSelectionDrag ? cellFromPointer(event, true) : compositionCellFromPointer(event);
+  if (!cell) {
+    if (!isPointerDown) pointerInsideCanvas = false;
+    return;
+  }
+  pointerInsideCanvas = true;
   const previousCell = lastCell;
   lastCell = cell;
   if (!isPointerDown) { updateCanvasSelectionCursor(event); return; }
   if (referenceDrag && currentReference()) {
     if (referenceDrag.mode === "scale") {
-      const px = event.clientX - referenceDrag.canvasRect.left, py = event.clientY - referenceDrag.canvasRect.top;
+      const px = event.clientX - referenceDrag.canvasRect.left - referenceDrag.copyOffsetX, py = event.clientY - referenceDrag.canvasRect.top;
       currentReference().scale = Math.max(10, Math.min(500, Math.round(referenceDrag.scale * Math.hypot(px-referenceDrag.centerX, py-referenceDrag.centerY) / referenceDrag.distance)));
     } else {
-      const cellW = referenceDrag.canvasRect.width / 8;
-      const cellH = referenceDrag.canvasRect.height / state.height;
+      const cellW = referenceDrag.cellWidth;
+      const cellH = referenceDrag.cellHeight;
       const fine = value => Math.round(value * 20) / 20;
       currentReference().xOffset = Math.max(-100, Math.min(100, fine(referenceDrag.x + (event.clientX - referenceDrag.pointerX) / cellW)));
       currentReference().yOffset = Math.max(-200, Math.min(200, fine(referenceDrag.y + (event.clientY - referenceDrag.pointerY) / cellH)));
@@ -1131,11 +1259,12 @@ function renderRowColors() {
 function renderPlayerRowColors(playerIndex, container) {
   container.innerHTML = "";
   const player = currentFrame().players[playerIndex];
-  const l = layout();
+  const l = layout(playerIndex);
+  const height = playerHeight(currentFrame(), playerIndex);
   container.style.height = `${l.h}px`;
   container.style.display = "grid";
-  container.style.gridTemplateRows = `repeat(${state.height}, minmax(0, 1fr))`;
-  for (let y = 0; y < state.height; y++) {
+  container.style.gridTemplateRows = `repeat(${height}, minmax(0, 1fr))`;
+  for (let y = 0; y < height; y++) {
     const row = document.createElement("div");
     row.className = "color-row";
     row.dataset.row = y;
@@ -1164,7 +1293,7 @@ function renderPlayerRowColors(playerIndex, container) {
         colorSelectionAnchor = y;
         colorSelectionBefore = colorSelection?.player === playerIndex ? cloneData(colorSelection) : null;
         colorSelectionMode = e.altKey ? "subtract" : (e.shiftKey || e.ctrlKey || e.metaKey) ? "add" : "replace";
-        const mask = colorSelectionMode === "replace" ? Array(state.height).fill(false) : (colorSelectionBefore?.mask?.slice() || Array(state.height).fill(false));
+        const mask = colorSelectionMode === "replace" ? Array(height).fill(false) : (colorSelectionBefore?.mask?.slice() || Array(height).fill(false));
         mask[y] = colorSelectionMode === "subtract" ? false : true;
         colorSelection = { player: playerIndex, mask, start: y, end: y };
         isSelectingColors = true;
@@ -1185,7 +1314,7 @@ function renderPlayerRowColors(playerIndex, container) {
     row.addEventListener("pointermove", e => {
       colorBlockHoverRow = y;
       if (isSelectingColors && e.buttons) {
-        const mask = colorSelectionMode === "replace" ? Array(state.height).fill(false) : (colorSelectionBefore?.mask?.slice() || Array(state.height).fill(false));
+        const mask = colorSelectionMode === "replace" ? Array(height).fill(false) : (colorSelectionBefore?.mask?.slice() || Array(height).fill(false));
         const start = Math.min(colorSelectionAnchor, y), end = Math.max(colorSelectionAnchor, y);
         for (let rowIndex = start; rowIndex <= end; rowIndex++) mask[rowIndex] = colorSelectionMode === "subtract" ? false : true;
         colorSelection = mask.some(Boolean) ? { player: playerIndex, mask, start, end } : null;
@@ -1609,40 +1738,46 @@ function drawFrameThumb(canvas, frame) {
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = colorHex(state.background);
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const rows = frame.height || frame.players[0].pixels.length;
-  const columns = Math.max(1, Math.min(8, frame.width || state.width || 8));
   if (state.twoSpriteMode) {
-    const scales = frame.players.map(player => NUSIZ[player.nusiz].scale);
-    const starts = [frame.players[0].xOffset, columns * scales[0] + frame.players[1].xOffset];
+    const widths = frame.players.map((_, slot) => playerWidth(frame, slot));
+    const heights = frame.players.map((_, slot) => playerHeight(frame, slot));
+    const spans = frame.players.map((player, slot) => renderedSpriteSpan(widths[slot], player.nusiz));
+    const starts = [frame.players[0].xOffset, spans[0] + frame.players[1].xOffset];
     const minX = Math.min(...starts);
-    const maxX = Math.max(starts[0] + columns * scales[0], starts[1] + columns * scales[1]);
+    const maxX = Math.max(starts[0] + spans[0], starts[1] + spans[1]);
     const minY = Math.min(frame.players[0].yOffset, frame.players[1].yOffset);
-    const maxY = Math.max(frame.players[0].yOffset + rows, frame.players[1].yOffset + rows);
+    const maxY = Math.max(frame.players[0].yOffset + heights[0], frame.players[1].yOffset + heights[1]);
     const geometry = timelineThumbnailGeometry(canvas.width, canvas.height, Math.max(1, maxX - minX), Math.max(1, maxY - minY), state.verticalStretch, 4, 1);
     frame.players.forEach((player, index) => {
       drawThumbPlayer(ctx, player,
         geometry.x + (starts[index] - minX) * geometry.cellW,
         geometry.y + (player.yOffset - minY) * geometry.cellH,
-        geometry.cellW * scales[index], geometry.cellH, rows, columns);
+        geometry.cellW, geometry.cellH, heights[index], widths[index]);
     });
   } else {
     const player = frame.players[state.activePlayer];
-    const geometry = timelineThumbnailGeometry(canvas.width, canvas.height, columns, rows, state.verticalStretch, 4, NUSIZ[player.nusiz].scale);
+    const rows = playerHeight(frame, state.activePlayer);
+    const columns = playerWidth(frame, state.activePlayer);
+    const span = renderedSpriteSpan(columns, player.nusiz);
+    const geometry = timelineThumbnailGeometry(canvas.width, canvas.height, span, rows, state.verticalStretch, 4, 1);
     drawThumbPlayer(ctx, player, geometry.x, geometry.y, geometry.cellW, geometry.cellH, rows, columns);
   }
 }
 
-function drawThumbPlayer(ctx, player, ox, oy, px, py, rows = state.height, columns = state.width) {
-  for (let y = 0; y < rows; y++) {
-    ctx.fillStyle = colorHex(["STANDARD", "MULTISPRITE"].includes(state.kernel) ? player.solidColor : player.colors[y]);
-    for (let x = 0; x < columns; x++) if (player.pixels[y]?.[x]) {
-      const left = Math.round(ox + x * px);
-      const right = Math.round(ox + (x + 1) * px);
-      const top = Math.round(oy + y * py);
-      const bottom = Math.round(oy + (y + 1) * py);
-      ctx.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
+function drawThumbPlayer(ctx, player, ox, oy, unitW, py, rows = state.height, columns = state.width) {
+  const mode = nusizMode(player.nusiz);
+  mode.copyOrigins.forEach(copyOrigin => {
+    for (let y = 0; y < rows; y++) {
+      ctx.fillStyle = colorHex(["STANDARD", "MULTISPRITE"].includes(state.kernel) ? player.solidColor : player.colors[y]);
+      for (let x = 0; x < columns; x++) if (player.pixels[y]?.[x]) {
+        const left = Math.round(ox + (copyOrigin + x * mode.scale) * unitW);
+        const right = Math.round(ox + (copyOrigin + (x + 1) * mode.scale) * unitW);
+        const top = Math.round(oy + y * py);
+        const bottom = Math.round(oy + (y + 1) * py);
+        ctx.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
+      }
     }
-  }
+  });
 }
 
 function renderAssets() {
@@ -1703,24 +1838,26 @@ function renderStamps() {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const player = currentPlayer();
+    const span = renderedSpriteSpan(stamp.w, player.nusiz);
     const geometry = timelineThumbnailGeometry(
       canvas.width,
       canvas.height,
-      stamp.w,
+      span,
       stamp.h,
       state.verticalStretch,
       4,
-      NUSIZ[player.nusiz].scale
+      1
     );
     ctx.fillStyle = colorHex(state.currentColor);
-    stamp.pixels.forEach((row, y) => row.forEach((value, x) => {
+    const mode = nusizMode(player.nusiz);
+    mode.copyOrigins.forEach(copyOrigin => stamp.pixels.forEach((row, y) => row.forEach((value, x) => {
       if (!value) return;
-      const left = Math.round(geometry.x + x * geometry.cellW);
-      const right = Math.round(geometry.x + (x + 1) * geometry.cellW);
+      const left = Math.round(geometry.x + (copyOrigin + x * mode.scale) * geometry.cellW);
+      const right = Math.round(geometry.x + (copyOrigin + (x + 1) * mode.scale) * geometry.cellW);
       const top = Math.round(geometry.y + y * geometry.cellH);
       const bottom = Math.round(geometry.y + (y + 1) * geometry.cellH);
       ctx.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
-    }));
+    })));
     const remove = document.createElement("button");
     remove.className = "asset-remove";
     remove.textContent = "\u00d7";
@@ -2308,7 +2445,7 @@ function syncControls() {
   el.twoSpriteMode.checked = state.twoSpriteMode;
   populateAssignmentSelect(el.playerAssignment0, 0);
   populateAssignmentSelect(el.playerAssignment1, 1);
-  el.spriteNusizLabel.firstChild.textContent = "NUSIZ ";
+  el.spriteNusizLabel.firstChild.textContent = "NUSIZ Mode ";
   el.spriteNusiz.value = currentPlayer().nusiz;
   el.spriteSolidColorRow.classList.toggle("hidden", !usesSolidColor());
   el.spriteSolidColor.value = currentPlayer().solidColor;
@@ -2938,10 +3075,12 @@ function setHeight() {
   const height = Math.max(1, Math.min(255, Number(el.spriteHeight.value) || state.height));
   pushHistory();
   forEachSelectedFrame(frame => {
+    const player = frame.players[state.activePlayer];
+    player.height = height;
+    resizePlayer(player, height);
     frame.height = height;
-    frame.players.forEach(player => resizePlayer(player, height));
   });
-  state.height = currentFrame().height;
+  state.height = playerHeight(currentFrame(), state.activePlayer);
   selection = null;
   renderAll();
 }
@@ -2949,8 +3088,8 @@ function setHeight() {
 function setWidth() {
   const width = Math.max(1, Math.min(8, Number(el.spriteWidth.value) || state.width));
   pushHistory();
-  forEachSelectedFrame(frame => { frame.width = width; });
-  state.width = currentFrame().width;
+  forEachSelectedFrame(frame => { frame.players[state.activePlayer].width = width; frame.width = width; });
+  state.width = playerWidth(currentFrame(), state.activePlayer);
   selection = null;
   syncControls();
   renderAll();
@@ -2958,15 +3097,19 @@ function setWidth() {
 
 function applySizeToAll() {
   const source = currentPlayer();
-  const height = currentFrame().height, width = currentFrame().width || 8;
-  const willCrop = state.frames.some(frame => (frame.height > height && frame.players.some(player => player.pixels.slice(height).some(row => row.some(Boolean)))) || (frame.width || 8) > width && frame.players.some(player => player.pixels.slice(0, height).some(row => row.slice(width).some(Boolean))));
+  const height = playerHeight(currentFrame(), state.activePlayer), width = playerWidth(currentFrame(), state.activePlayer);
+  const willCrop = state.frames.some(frame => {
+    const player = frame.players[state.activePlayer];
+    return (playerHeight(frame, state.activePlayer) > height && player.pixels.slice(height).some(row => row.some(Boolean))) || (playerWidth(frame, state.activePlayer) > width && player.pixels.slice(0, height).some(row => row.slice(width).some(Boolean)));
+  });
   if (willCrop && !confirm("Applying this size will crop nonempty pixels. Continue?")) return;
   pushHistory();
   state.frames.forEach(frame => {
-    frame.height = height;
-    frame.width = width;
-    frame.players.forEach(player => resizePlayer(player, height));
-    frame.players[state.activePlayer].nusiz = source.nusiz;
+    const player = frame.players[state.activePlayer];
+    player.height = height;
+    player.width = width;
+    resizePlayer(player, height);
+    player.nusiz = source.nusiz;
   });
   renderAll();
 }
@@ -3216,6 +3359,7 @@ function importBBText(text) {
     resizePlayer(player, height);
     player.pixels = Array.from({ length: height }, () => Array(8).fill(0));
     player.colors = Array(height).fill(state.currentColor);
+    player.nusiz = NUSIZ[p.nusiz] ? p.nusiz : "normal";
     p.rows.forEach((row, y) => player.pixels[y] = row);
     (p.colors || []).forEach((code, y) => {
       if (y < height) player.colors[y] = normalizeCode(code, state.currentColor);
@@ -3372,20 +3516,23 @@ function renderPngFrame(frame) {
   const cellH = scale;
   const slots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
   const players = slots.map(slot => frame.players[slot]);
-  const minX = Math.min(...players.map(player => player.xOffset));
-  const maxX = Math.max(...players.map(player => player.xOffset + (frame.width || 8)));
+  const widths = slots.map(slot => playerWidth(frame, slot));
+  const heights = slots.map(slot => playerHeight(frame, slot));
+  const spans = players.map((player, index) => renderedSpriteSpan(widths[index], player.nusiz));
+  const starts = players.map((player, index) => (index ? spans[0] : 0) + player.xOffset);
+  const minX = Math.min(...starts);
+  const maxX = Math.max(...players.map((player, index) => starts[index] + spans[index]));
   const minY = Math.min(...players.map(player => player.yOffset));
-  const maxY = Math.max(...players.map(player => player.yOffset + frame.height));
+  const maxY = Math.max(...players.map((player, index) => player.yOffset + heights[index]));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, (maxX - minX) * cellW + gap * 2);
   canvas.height = Math.max(1, (maxY - minY) * cellH + gap * 2);
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = colorHex(state.background);
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const rows = frame.height || frame.players[0].pixels.length;
-  slots.forEach(slot => {
+  slots.forEach((slot, index) => {
     const player = frame.players[slot];
-    drawSheetPlayer(ctx, player, gap + (player.xOffset - minX) * cellW, gap + (player.yOffset - minY) * cellH, cellW, cellH, rows);
+    drawSheetPlayer(ctx, player, gap + (starts[index] - minX) * cellW, gap + (player.yOffset - minY) * cellH, cellW, cellH, heights[index], widths[index]);
   });
   return canvas;
 }
@@ -3440,11 +3587,16 @@ async function confirmExportPng() {
   catch (error) { alert(`Could not export PNG frames: ${error.message}`); }
 }
 
-function drawSheetPlayer(ctx, player, ox, oy, cellW, cellH, rows = player.pixels.length) {
-  for (let y = 0; y < rows; y++) {
-    ctx.fillStyle = colorHex(usesSolidColor() ? player.solidColor : player.colors[y]);
-    for (let x = 0; x < Math.min(8, player.pixels[y].length); x++) if (player.pixels[y][x]) ctx.fillRect(ox + x * cellW, oy + y * cellH, cellW, cellH);
-  }
+function drawSheetPlayer(ctx, player, ox, oy, cellW, cellH, rows = player.pixels.length, columns = state.width) {
+  const mode = nusizMode(player.nusiz);
+  mode.copyOrigins.forEach(copyOrigin => {
+    for (let y = 0; y < rows; y++) {
+      ctx.fillStyle = colorHex(usesSolidColor() ? player.solidColor : player.colors[y]);
+      for (let x = 0; x < Math.min(columns, player.pixels[y].length); x++) if (player.pixels[y][x]) {
+        ctx.fillRect(ox + (copyOrigin + x * mode.scale) * cellW, oy + y * cellH, cellW * mode.scale, cellH);
+      }
+    }
+  });
 }
 
 function blobBase64(blob) {
@@ -3788,11 +3940,14 @@ function bindEvents() {
   el.applyRepeatAll.addEventListener("click", applyRepeatToAll);
   bindValue(el.playerAssignment0, v => setPlayerAssignment(0, Number(v)), true);
   bindValue(el.playerAssignment1, v => setPlayerAssignment(1, Number(v)), true);
-  bindValue(el.spriteNusiz, v => {
+  el.spriteNusiz.addEventListener("change", () => {
+    const v = el.spriteNusiz.value;
     if (!NUSIZ[v]) return;
+    pushHistory();
     forEachSelectedFrame(frame => { frame.players[state.activePlayer].nusiz = v; });
     rotationSession = null;
-  }, true);
+    renderAll();
+  });
   bindValue(el.spriteSolidColor, v => {
     const color = normalizeCode(v, currentPlayer().solidColor);
     forEachSelectedFrame(frame => { frame.players[state.activePlayer].solidColor = color; });
@@ -3812,6 +3967,22 @@ function bindEvents() {
   bindValue(el.onionOpacity, v => state.onionOpacity = Number(v), true);
   bindValue(el.onionFrames, v => state.onionFrames = Math.max(1, Math.min(10, Number(v) || 1)), true);
   bindCheck(el.twoSpriteMode, v => {
+    if (v && !state.twoSpriteMode) {
+      pushHistory();
+      state.frames.forEach(frame => {
+        const source = frame.players[0];
+        const target = frame.players[1];
+        target.width = playerWidth(frame, 0);
+        target.height = playerHeight(frame, 0);
+        target.nusiz = source.nusiz;
+        target.xOffset = 0;
+        target.yOffset = source.yOffset;
+        target.reference = null;
+        target.pixels = Array.from({ length: target.height }, () => Array(8).fill(0));
+        target.colors = Array.from({ length: target.height }, () => state.currentColor);
+        target.solidColor = state.currentColor;
+      });
+    }
     state.twoSpriteMode = v;
     if (!v) {
       state.activePlayer = 0;
@@ -4147,7 +4318,7 @@ function cacheElements() {
     "playerAssignment0", "playerAssignment0Row", "playerAssignment0Label", "playerAssignment1", "playerAssignment1Row", "spriteNusizLabel", "spriteNusiz", "spriteSolidColorRow", "spriteSolidColor", "spriteOffsetX", "spriteOffsetY", "applySizeAll", "applyOffsetsAll", "swapPlayers", "copyP0P1", "copyColorsP0P1", "mirrorP0P1", "fillShapes", "mirrorDraw", "brushWidth", "brushHeight", "undo", "redo",
     "nudgePixels", "nudgeColors", "scaleStep", "stretchHDown", "stretchHUp", "stretchVDown", "stretchVUp", "scaleUniformDown", "scaleUniformUp", "flipH", "flipV", "flipColor", "rotateL", "rotateR", "rotateAngle", "grow", "shrink", "clearFrame",
     "frameLabel", "pixelReadout", "canvasReadout", "showGrid", "showColorColumns", "onion", "onionOpacity", "onionFrames", "zoom", "playAnim", "loopPlayback", "timelineSummary", "timelineHeading", "framesActions", "editorZone",
-    "spriteStage", "compositionBackdrop", "compositionColorColumns", "playerCanvasGroup0", "playerCanvasGroup1", "spriteCanvas", "spriteCanvas1", "previewCanvas", "previewCaption", "rowColors0", "rowColors1", "p0ColorsColumn", "p1ColorsColumn", "p0ColorsTitle", "p1ColorsTitle", "selectionBar", "selectionInfo", "copySelection",
+    "canvasStageScroll", "spriteStage", "compositionBackdrop", "compositionColorColumns", "playerCanvasGroup0", "playerCanvasGroup1", "spriteCanvas", "spriteCanvas1", "previewCanvas", "previewCaption", "rowColors0", "rowColors1", "p0ColorsColumn", "p1ColorsColumn", "p0ColorsTitle", "p1ColorsTitle", "selectionBar", "selectionInfo", "copySelection",
     "cutSelection", "pasteSelection", "stampFromSelection", "cropSelection", "clearSelection", "insertFrame", "duplicateFrame",
     "removeFrame", "moveFrameLeft", "moveFrameRight", "reverseFrames", "framesList", "currentColorSwatch", "currentColor",
     "palettePanel", "palette", "displayRegion", "paletteEyedropper", "colorBlocks", "stamps", "newColorBlock", "newStamp", "colorBlockEditor", "colorBlockEditorTitle", "colorBlockEditorHeight", "colorBlockEditorLines", "colorBlockHueOffset", "colorBlockHueOffsetValue", "colorBlockLightnessOffset", "colorBlockLightnessOffsetValue", "saveColorBlockEdit", "saveColorBlockCopy", "stampEditor", "stampEditorTitle", "stampEditorWidth", "stampEditorHeight", "stampEditorZoom", "stampEditorReadout", "stampEditorCanvasContainer", "stampEditorCanvas", "stampEditorPreviewCanvas", "saveStampEdit", "saveStampCopy",

@@ -1,4 +1,5 @@
 import { normalizeAtariCode, YAJA_BB_COLLECTION_FORMAT_VERSION, YAJA_BB_FORMAT_VERSION, YAJA_COORDINATE_SYSTEM } from "./codegen.js";
+import { nusizModeKeyFromCode } from "./display-geometry.js";
 
 function parseJsonMarker(line, prefix) {
   if (!line.startsWith(prefix)) return null;
@@ -63,9 +64,18 @@ function firstCoherentPlayerSet(text) {
     const constantMatch = source.match(new RegExp(`\\bconst\\s+[A-Za-z_][A-Za-z0-9_]*Frame\\d+P${escapedNumber}Color\\s*=\\s*(\\$[0-9A-Fa-f]{2})`, "i"));
     const registerMatch = source.match(new RegExp(`\\b_?COLUP${escapedNumber}\\s*=\\s*(\\$[0-9A-Fa-f]{2})`, "i"));
     const solidColor = constantMatch?.[1] || registerMatch?.[1];
+    const nusizPatterns = playerNumber === 1
+      ? [`_NUSIZ1`, `NUSIZ1`]
+      : [`NUSIZ${escapedNumber}`];
+    let nusiz = "normal";
+    for (const symbol of nusizPatterns) {
+      const nusizMatch = source.match(new RegExp(`\\b${symbol}\\s*=\\s*(\\$[0-9A-Fa-f]{1,2}|\\d+)`, "i"));
+      if (nusizMatch) { nusiz = nusizModeKeyFromCode(nusizMatch[1]); break; }
+    }
     players.push({
       ...block,
-      solidColor: solidColor ? normalizeAtariCode(solidColor) : null
+      solidColor: solidColor ? normalizeAtariCode(solidColor) : null,
+      nusiz
     });
     if (players.length === 2) break;
   }
@@ -95,10 +105,12 @@ function parseGeneratedFrames(lines, meta) {
     fm.players.forEach((pm, blockIndex) => {
       const block = blocks[blockIndex];
       if (block.index !== pm.player) throw new Error(`Frame ${index} expected P${pm.player}, but its sprite block is P${block.index}.`);
-      if (block.rows.length !== fm.height) throw new Error(`Frame ${index}, P${pm.player} contains ${block.rows.length} rows; metadata requires ${fm.height}.`);
+      const playerHeight = Math.max(1, Number(pm.height) || fm.height);
+      const playerWidth = Math.max(1, Math.min(8, Number(pm.width) || fm.width));
+      if (block.rows.length !== playerHeight) throw new Error(`Frame ${index}, P${pm.player} contains ${block.rows.length} rows; metadata requires ${playerHeight}.`);
       const scanlineKernel = meta.kernel === "DPC+" || meta.kernel === "PXE";
-      if (scanlineKernel && block.colors.length !== fm.height) throw new Error(`Frame ${index}, P${pm.player} color data contains ${block.colors.length} rows; metadata requires ${fm.height}.`);
-      slots[pm.slot] = { pixels: block.rows, colors: scanlineKernel ? block.colors : Array(fm.height).fill(normalizeAtariCode(pm.solidColor)), solidColor: normalizeAtariCode(pm.solidColor), nusiz: pm.nusiz, xOffset: pm.xOffset, yOffset: pm.yOffset, reference: null };
+      if (scanlineKernel && block.colors.length !== playerHeight) throw new Error(`Frame ${index}, P${pm.player} color data contains ${block.colors.length} rows; metadata requires ${playerHeight}.`);
+      slots[pm.slot] = { pixels: block.rows, colors: scanlineKernel ? block.colors : Array(playerHeight).fill(normalizeAtariCode(pm.solidColor)), solidColor: normalizeAtariCode(pm.solidColor), nusiz: pm.nusiz, width: playerWidth, height: playerHeight, xOffset: pm.xOffset, yOffset: pm.yOffset, reference: null };
     });
     const blank = () => ({ pixels: Array.from({ length: fm.height }, () => Array(8).fill(0)), colors: Array(fm.height).fill("$0E"), solidColor: "$0E", nusiz: "normal", xOffset: 0, yOffset: 0, reference: null });
     frames[index] = { name: `Frame ${index}`, width: fm.width, height: fm.height, duration: fm.duration, players: slots.map(slot => slot || blank()) };
@@ -156,8 +168,8 @@ function parseGeneratedCollection(lines) {
     players: [],
     project: {
       app: "YAJA 2600 Animator",
-      schemaVersion: 10,
-      version: "1.1.0",
+      schemaVersion: 13,
+      version: "1.3.4",
       projectName: collection.projectName,
       kernel: collection.kernel,
       region: collection.region,
@@ -179,7 +191,7 @@ function parseGenerated(text) {
   if (meta.formatVersion !== YAJA_BB_FORMAT_VERSION) throw new Error(`YAJA bB format ${meta.formatVersion} is not supported; this version reads format ${YAJA_BB_FORMAT_VERSION}.`);
   validateCoordinateSystem(meta);
   const frames = parseGeneratedFrames(lines, meta);
-  return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 9, version: "1.0.5", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
+  return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 13, version: "1.3.4", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
 }
 
 export function parseBatariBasicSpriteData(text) {

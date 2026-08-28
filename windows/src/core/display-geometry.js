@@ -1,24 +1,56 @@
 export const ATARI_PIXEL_ASPECT = 1.7;
 
 export const NUSIZ_MODES = Object.freeze({
-  normal: Object.freeze({ label: "Normal", scale: 1, code: "$00" }),
-  double: Object.freeze({ label: "Double", scale: 2, code: "$05" }),
-  quad: Object.freeze({ label: "Quad", scale: 4, code: "$07" })
+  normal: Object.freeze({ label: "Normal", scale: 1, code: "$00", copyOrigins: Object.freeze([0]), group: "size" }),
+  doubleClose: Object.freeze({ label: "Double Close", scale: 1, code: "$01", copyOrigins: Object.freeze([0, 16]), group: "copies" }),
+  doubleMedium: Object.freeze({ label: "Double Medium", scale: 1, code: "$02", copyOrigins: Object.freeze([0, 32]), group: "copies" }),
+  tripleClose: Object.freeze({ label: "Triple Close", scale: 1, code: "$03", copyOrigins: Object.freeze([0, 16, 32]), group: "copies" }),
+  doubleWide: Object.freeze({ label: "Double Wide", scale: 1, code: "$04", copyOrigins: Object.freeze([0, 64]), group: "copies" }),
+  double: Object.freeze({ label: "Double Width", scale: 2, code: "$05", copyOrigins: Object.freeze([0]), group: "size" }),
+  tripleMedium: Object.freeze({ label: "Triple Medium", scale: 1, code: "$06", copyOrigins: Object.freeze([0, 32, 64]), group: "copies" }),
+  quad: Object.freeze({ label: "Quad Width", scale: 4, code: "$07", copyOrigins: Object.freeze([0]), group: "size" })
 });
 
 export function nusizMode(value) {
   return NUSIZ_MODES[value] || NUSIZ_MODES.normal;
 }
 
+export function nusizModeKeyFromCode(value) {
+  const numeric = typeof value === "number"
+    ? value
+    : /^\$[0-9a-f]+$/i.test(String(value || ""))
+      ? Number.parseInt(String(value).slice(1), 16)
+      : Number.parseInt(value, 10);
+  const code = `$${((Number.isFinite(numeric) ? numeric : 0) & 7).toString(16).padStart(2, "0").toUpperCase()}`;
+  return Object.keys(NUSIZ_MODES).find(key => NUSIZ_MODES[key].code === code) || "normal";
+}
+
 export function renderedSpriteWidth(width, nusiz) {
   const columns = Math.max(1, Math.min(8, Number.parseInt(width, 10) || 8));
-  return columns * nusizMode(nusiz).scale;
+  const mode = nusizMode(nusiz);
+  return mode.copyOrigins[mode.copyOrigins.length - 1] + columns * mode.scale;
+}
+
+export const renderedSpriteSpan = renderedSpriteWidth;
+
+export function nusizSourceColumn(displayX, width, nusiz) {
+  const columns = Math.max(1, Math.min(8, Number.parseInt(width, 10) || 8));
+  const mode = nusizMode(nusiz);
+  const x = Number(displayX);
+  for (let copyIndex = mode.copyOrigins.length - 1; copyIndex >= 0; copyIndex--) {
+    const origin = mode.copyOrigins[copyIndex];
+    const local = x - origin;
+    if (local >= 0 && local < columns * mode.scale) {
+      return { column: Math.min(columns - 1, Math.floor(local / mode.scale)), copyIndex, origin };
+    }
+  }
+  return null;
 }
 
 // Match the editor: center the adjacent, unshifted NUSIZ composition first,
 // then apply each frame's explicit X offset from that stable baseline.
 export function centeredCompositionGeometry(width, players) {
-  const renderedWidths = players.map(player => renderedSpriteWidth(width, player.nusiz));
+  const renderedWidths = players.map(player => renderedSpriteWidth(player.width || width, player.nusiz));
   const totalWidth = Math.max(1, renderedWidths.reduce((sum, value) => sum + value, 0));
   let baseline = 0;
   const centeredX = players.map((player, index) => {
