@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v1.3.4
+        default: v1.5.0
 
 permissions:
   contents: write
@@ -28,4 +28,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "${{ inputs.tag }}" release-assets/* --draft --title "YAJA 2600 Animator ${{ inputs.tag }}" --notes "Publishable web and desktop release candidate."
+        run: gh release create "${{ inputs.tag }}" release-assets/* --draft --title "YAJA 2600 Animator ${{ inputs.tag }}" --notes-file CHANGELOG.md

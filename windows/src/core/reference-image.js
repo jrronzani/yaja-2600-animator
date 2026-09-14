@@ -66,11 +66,13 @@ export function estimateUniformBorderColor(data, width, height, tolerance = 32, 
   return matching / samples.length >= minimumShare ? background : null;
 }
 
-export function analyzeReferenceCell(data, sampleWidth, cellX, cellY, sampleScale, threshold, background = null, alphaThreshold = 8) {
+export function analyzeReferenceCell(data, sampleWidth, cellX, cellY, sampleScale, threshold, background = null, alphaThreshold = 8, options = {}) {
   const sample = sampleDimensions(sampleScale);
   let qualifyingWeight = 0, qualifyingLuminance = 0;
   let areaLuminance = 0;
-  let r = 0, g = 0, b = 0;
+  const colorSamples = [];
+  const ignoreBlackBackground = !!options.ignoreBlackBackground;
+  const blackThreshold = Math.max(0, Math.min(255, Number(options.blackThreshold ?? 24)));
   const sampleCount = sample.x * sample.y;
   for (let sy = 0; sy < sample.y; sy++) {
     for (let sx = 0; sx < sample.x; sx++) {
@@ -80,34 +82,48 @@ export function analyzeReferenceCell(data, sampleWidth, cellX, cellY, sampleScal
       const alpha = data[i + 3];
       if (alpha < alphaThreshold) continue;
       const luminance = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      if (ignoreBlackBackground && Math.max(data[i], data[i + 1], data[i + 2]) <= blackThreshold) continue;
       areaLuminance += luminance * (alpha / 255);
+      const separation = background
+        ? colorDistance(data[i], data[i + 1], data[i + 2], background)
+        : luminance;
       const qualifies = background
-        ? colorDistance(data[i], data[i + 1], data[i + 2], background) >= threshold
+        ? separation >= threshold
         : luminance >= threshold;
       if (!qualifies) continue;
       const weight = alpha / 255;
       qualifyingWeight += weight;
       qualifyingLuminance += luminance * weight;
-      r += data[i] * weight; g += data[i + 1] * weight; b += data[i + 2] * weight;
+      colorSamples.push({ r: data[i], g: data[i + 1], b: data[i + 2], weight, separation });
     }
   }
+  const strongestSeparation = colorSamples.reduce((maximum, sample) => Math.max(maximum, sample.separation), 0);
+  const colorFloor = strongestSeparation * 0.72;
+  let r = 0, g = 0, b = 0, colorWeight = 0;
+  colorSamples.forEach(sample => {
+    if (sample.separation < colorFloor) return;
+    r += sample.r * sample.weight;
+    g += sample.g * sample.weight;
+    b += sample.b * sample.weight;
+    colorWeight += sample.weight;
+  });
   return qualifyingWeight ? {
     coverage: qualifyingWeight / sampleCount,
     foregroundCoverage: qualifyingWeight / sampleCount,
     averageLuminance: areaLuminance / sampleCount,
     luminance: qualifyingLuminance / qualifyingWeight,
-    r: r / qualifyingWeight,
-    g: g / qualifyingWeight,
-    b: b / qualifyingWeight,
-    weight: qualifyingWeight
+    r: r / colorWeight,
+    g: g / colorWeight,
+    b: b / colorWeight,
+    weight: colorWeight
   } : { coverage: 0, foregroundCoverage: 0, averageLuminance: areaLuminance / sampleCount, luminance: 0, r: 0, g: 0, b: 0, weight: 0 };
 }
 
-export function referenceCellGrid(data, columns, rows, sampleScale, threshold, background = null) {
+export function referenceCellGrid(data, columns, rows, sampleScale, threshold, background = null, options = {}) {
   const sample = sampleDimensions(sampleScale);
   const sampleWidth = columns * sample.x;
   return Array.from({ length: rows }, (_, y) => Array.from({ length: columns }, (_, x) =>
-    analyzeReferenceCell(data, sampleWidth, x, y, sample, threshold, background)
+    analyzeReferenceCell(data, sampleWidth, x, y, sample, threshold, background, 8, options)
   ));
 }
 

@@ -4,7 +4,9 @@ YAJA 2600 Animator is a pixel-accurate Atari 2600 player-sprite animation editor
 
 ## Starting a project
 
-Choose the kernel and display region, then set each frame's Width, Height, NUSIZ, X/Y offsets, and Frame Repeat. Two Sprite Mode adds Sprite B and a second assignment. The canvas, color columns, and timeline update for the active frame.
+Choose the kernel and display region, then set each frame's Width, Height, NUSIZ, X/Y offsets, and Frame Repeat. Two Sprite Mode adds Sprite B and a second assignment. Auto Sprite Select appears directly under Two Sprite Mode when that mode is enabled. When checked, the visible sprite under a canvas tool becomes active; when unchecked, every canvas tool remains locked to the manually selected Sprite A or B, including all NUSIZ copies. The labels beneath the two canvases also switch the active sprite, while their eye controls temporarily hide a sprite without changing project data.
+
+Kernel is the leftmost canvas-toolbar section with a full-width dropdown. The canvas controls follow with BG, Grid, Colors, and Zoom. BG opens the official Atari color palette in NTSC or PAL. Grid appearance opens from the small control beside Grid, where its color and Opacity can be adjusted.
 
 ## Drawing and editing
 
@@ -14,7 +16,7 @@ Selection uses exact pixel masks. Drag selected pixels to move them, use arrow k
 
 ## Timeline
 
-PLAY previews the current animation; Loop controls wrapping. Add, duplicate, reorder, reverse, and delete act on selected frames. Shift selects a range, Ctrl/Command adds individual frames, and blank-area dragging creates a marquee selection. Frame Repeat is stored per frame; Apply to All copies it to the animation.
+PLAY previews the current animation; Loop controls wrapping. Add, duplicate, reorder, reverse, and delete act on selected frames. Shift selects a range, Ctrl/Command adds individual frames, and blank-area dragging creates a marquee selection. Frame Repeat is stored per frame; Apply to All copies it to the animation. Frames are displayed from Frame 1, and the timeline shows the complete animation duration including repeats.
 
 ## Animation library
 
@@ -24,13 +26,17 @@ The editable animation control above the timeline switches between animations st
 
 DPC+ and PXE frames can use scanline color streams. Standard and Multisprite use solid player colors. Color Blocks and Stamps are editor assets stored in JSON projects; they are intentionally not embedded in bB files.
 
+## Editor appearance preferences
+
+Grid visibility, grid color and Opacity, and Auto Sprite Selection are editor preferences saved in browser storage. They do not change animation content and are intentionally excluded from project JSON and bB exports. Grid appearance is stored per theme, so a legible choice for a light theme does not replace the choice for a dark theme. New preference states start with Grid visible and Auto Sprite Select off; older saved choices are retained.
+
 ## Image references
 
-Import one image for the current frame or a naturally sorted sequence. References are stored per frame and sprite slot. Fit mode, opacity, scale, fine X/Y placement, brightness, contrast, threshold, dithering, Auto-Paint, and Auto-Color help translate artwork to Atari pixels and colors.
+Import one image for the current frame or a naturally sorted sequence. References are stored per frame and sprite slot. Fit mode, opacity, scale, fine X/Y placement, brightness, contrast, threshold, dithering, Auto-Paint, and Auto-Color help translate artwork to Atari pixels and colors. Auto-Paint and Auto-Color ignore transparent pixels and can ignore a solid black background, preventing common reference-image backgrounds from darkening the result.
 
 ## Saving and exporting
 
-- **Save** writes a JSON project containing animation data plus editor-only stamps, color blocks, and reference images.
+- **Save** opens the normal Save As chooser and writes a JSON project containing animation data plus editor-only stamps, color blocks, and reference images. Desktop File-menu Save continues to update the current project path, while Save As chooses a new path.
 - **Export bB** offers Data Only modules or a Compilable Demo for the current animation or every animation. The all-animation demo starts with the first animation and switches with joystick Up/Down.
 - **Import bB** restores generated YAJA animation data and supports partial import from ordinary `player#:` blocks.
 - **Export PNG** writes one PNG for a single frame or a ZIP of individual PNGs for multiple selected/all frames.

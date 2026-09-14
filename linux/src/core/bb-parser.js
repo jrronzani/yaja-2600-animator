@@ -96,20 +96,20 @@ function parseGeneratedFrames(lines, meta) {
     if (!marker) throw new Error(`Malformed YAJA frame marker on line ${i + 1}.`);
     const index = Number(marker[1]);
     let fm;
-    try { fm = JSON.parse(marker[2]); } catch (error) { throw new Error(`Frame ${index} metadata is invalid JSON: ${error.message}`); }
+    try { fm = JSON.parse(marker[2]); } catch (error) { throw new Error(`Frame ${index + 1} metadata is invalid JSON: ${error.message}`); }
     const end = lines.findIndex((line, n) => n > i && line === `;@YAJA FRAME_END ${index}`);
-    if (end < 0) throw new Error(`Frame ${index} is missing its YAJA frame-end marker.`);
+    if (end < 0) throw new Error(`Frame ${index + 1} is missing its YAJA frame-end marker.`);
     const blocks = parseBlocks(lines.slice(i + 1, end).join("\n"));
-    if (blocks.length !== fm.players.length) throw new Error(`Frame ${index} metadata describes ${fm.players.length} sprite(s), but ${blocks.length} sprite block(s) were found.`);
+    if (blocks.length !== fm.players.length) throw new Error(`Frame ${index + 1} metadata describes ${fm.players.length} sprite(s), but ${blocks.length} sprite block(s) were found.`);
     const slots = [null, null];
     fm.players.forEach((pm, blockIndex) => {
       const block = blocks[blockIndex];
-      if (block.index !== pm.player) throw new Error(`Frame ${index} expected P${pm.player}, but its sprite block is P${block.index}.`);
+      if (block.index !== pm.player) throw new Error(`Frame ${index + 1} expected P${pm.player}, but its sprite block is P${block.index}.`);
       const playerHeight = Math.max(1, Number(pm.height) || fm.height);
       const playerWidth = Math.max(1, Math.min(8, Number(pm.width) || fm.width));
-      if (block.rows.length !== playerHeight) throw new Error(`Frame ${index}, P${pm.player} contains ${block.rows.length} rows; metadata requires ${playerHeight}.`);
+      if (block.rows.length !== playerHeight) throw new Error(`Frame ${index + 1}, P${pm.player} contains ${block.rows.length} rows; metadata requires ${playerHeight}.`);
       const scanlineKernel = meta.kernel === "DPC+" || meta.kernel === "PXE";
-      if (scanlineKernel && block.colors.length !== playerHeight) throw new Error(`Frame ${index}, P${pm.player} color data contains ${block.colors.length} rows; metadata requires ${playerHeight}.`);
+      if (scanlineKernel && block.colors.length !== playerHeight) throw new Error(`Frame ${index + 1}, P${pm.player} color data contains ${block.colors.length} rows; metadata requires ${playerHeight}.`);
       slots[pm.slot] = { pixels: block.rows, colors: scanlineKernel ? block.colors : Array(playerHeight).fill(normalizeAtariCode(pm.solidColor)), solidColor: normalizeAtariCode(pm.solidColor), nusiz: pm.nusiz, width: playerWidth, height: playerHeight, xOffset: pm.xOffset, yOffset: pm.yOffset, reference: null };
     });
     const blank = () => ({ pixels: Array.from({ length: fm.height }, () => Array(8).fill(0)), colors: Array(fm.height).fill("$0E"), solidColor: "$0E", nusiz: "normal", xOffset: 0, yOffset: 0, reference: null });
@@ -168,8 +168,8 @@ function parseGeneratedCollection(lines) {
     players: [],
     project: {
       app: "YAJA 2600 Animator",
-      schemaVersion: 13,
-      version: "1.3.4",
+      schemaVersion: 14,
+      version: "1.5.0",
       projectName: collection.projectName,
       kernel: collection.kernel,
       region: collection.region,
@@ -191,7 +191,7 @@ function parseGenerated(text) {
   if (meta.formatVersion !== YAJA_BB_FORMAT_VERSION) throw new Error(`YAJA bB format ${meta.formatVersion} is not supported; this version reads format ${YAJA_BB_FORMAT_VERSION}.`);
   validateCoordinateSystem(meta);
   const frames = parseGeneratedFrames(lines, meta);
-  return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 13, version: "1.3.4", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
+  return { generated: true, players: [], project: { app: "YAJA 2600 Animator", schemaVersion: 14, version: "1.5.0", projectName: meta.projectName, animationName: meta.animationName, kernel: meta.kernel, region: meta.region, background: meta.background, playerAssignments: meta.assignments, twoSpriteMode: meta.twoSpriteMode, compositionModel: meta.compositionModel || "adjacent", activePlayer: meta.activeSlots?.[0] ?? 0, frames } };
 }
 
 export function parseBatariBasicSpriteData(text) {

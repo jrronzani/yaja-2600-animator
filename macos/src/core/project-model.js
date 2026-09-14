@@ -1,6 +1,7 @@
 import { ensureAnimationCollection, loadAnimationWorkspace } from "./animation-collection.js";
+import { renderedSpriteSpan } from "./display-geometry.js";
 
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 const NUSIZ_VALUES = new Set(["normal", "doubleClose", "doubleMedium", "tripleClose", "doubleWide", "double", "tripleMedium", "quad"]);
 
@@ -40,6 +41,7 @@ function normalizeReference(reference) {
     yOffset: Math.max(-200, Math.min(200, Number(reference.yOffset) || 0)),
     threshold: Math.max(0, Math.min(255, Number(reference.threshold ?? 64))),
     dither: !!reference.dither,
+    ignoreBlackBackground: reference.ignoreBlackBackground !== false,
     brightness: Math.max(0, Math.min(400, Number(reference.brightness) || 100)),
     contrast: Math.max(0, Math.min(400, Number(reference.contrast) || 100))
   };
@@ -69,13 +71,17 @@ export function migrateProject(input) {
   if (!hasLegacyFrames && !hasAnimations) throw new Error("Project must contain at least one animation with at least one frame.");
 
   project.schemaVersion = CURRENT_SCHEMA_VERSION;
-  project.version = "1.3.4";
+  project.version = "1.5.0";
   project.app = "YAJA 2600 Animator";
   project.projectName = String(project.projectName || "Untitled Project");
   project.theme = SUPPORTED_THEMES.has(project.theme) ? project.theme : "atari-console";
   project.animationName = String(project.animationName || project.projectName || "Untitled Animation");
   project.kernel = ["STANDARD", "MULTISPRITE", "DPC+", "PXE"].includes(project.kernel) ? project.kernel : "PXE";
-  project.compositionModel = project.compositionModel === "adjacent" ? "adjacent" : (sourceVersion >= 6 ? "adjacent" : "legacy-absolute");
+  project.compositionModel = project.compositionModel === "tia-right-copies"
+    ? "tia-right-copies"
+    : project.compositionModel === "adjacent"
+      ? "adjacent"
+      : (sourceVersion >= 6 ? "adjacent" : "legacy-absolute");
   project.playerAssignments = normalizePlayerAssignments(project.playerAssignments, project.kernel);
   project.region = project.region === "PAL" ? "PAL" : "NTSC";
   project.paletteDataVersion = Number(project.paletteDataVersion) || 0;
@@ -144,6 +150,14 @@ export function migrateProject(input) {
       frame.players[1].xOffset -= span;
     }));
     project.compositionModel = "adjacent";
+  }
+  if (project.compositionModel === "adjacent") {
+    project.animations.forEach(animation => animation.frames.forEach(frame => {
+      const playerA = frame.players[0];
+      const baseWidth = playerA.width || frame.width || 8;
+      frame.players[1].xOffset += renderedSpriteSpan(baseWidth, playerA.nusiz) - baseWidth;
+    }));
+    project.compositionModel = "tia-right-copies";
   }
   loadAnimationWorkspace(project, project.activeAnimationId);
   delete project.nusiz;

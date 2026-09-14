@@ -5,10 +5,11 @@ import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRas
 import { parseBatariBasicSpriteData } from "./core/bb-parser.js";
 import { applyTheme, getPreferredTheme, normalizeThemeId } from "./themes.js";
 import { buildStoredZip } from "./core/zip.js";
-import { canvasCellSize, NUSIZ_MODES as NUSIZ, nusizMode, nusizSourceColumn, rasterCellBoundary, rasterCellRect, rasterSurfaceGeometry, renderedSpriteSpan, timelineThumbnailGeometry } from "./core/display-geometry.js";
+import { canvasCellSize, centeredCompositionGeometry, centeredCompositionMargins, NUSIZ_MODES as NUSIZ, nusizMode, nusizSourceColumn, rasterCellBoundary, rasterCellBoundaryFromOrigin, rasterCellRect, smoothRasterCellGeometry, renderedSpriteSpan, timelineThumbnailGeometry } from "./core/display-geometry.js";
 import { averageReferenceGridRow, estimateUniformBorderColor, fittedReferenceRect, nearestPaletteColor, referenceCellGrid, referenceCellIsForeground } from "./core/reference-image.js";
 import { animationRecordFromWorkspace, duplicateAnimationRecord, ensureAnimationCollection, loadAnimationWorkspace, nextAnimationId, syncActiveAnimation, uniqueAnimationName } from "./core/animation-collection.js";
 import { ATARI_NTSC, ATARI_PAL, convertColorCode, displayCodesForRegion, migrateLegacyPalCode, paletteForRegion } from "./core/atari-palettes.js";
+import { gridLineColor, loadEditorPreferences, normalizeGridColor, saveEditorPreferences } from "./core/editor-preferences.js";
 
 const CODES = Object.keys(ATARI_NTSC);
 const FONT_3X5 = {
@@ -36,7 +37,11 @@ const FONT_3X5 = {
 
 const el = {};
 let state;
+const editorPreferences = loadEditorPreferences();
+let spriteVisibility = [true, true];
 let desktopCurrentProjectPath = null;
+let saveInProgress = false;
+let lastDesktopMenuState = "";
 const PROJECT_PICKER_ID = "yaja-animator-project-files";
 const SHARED_PICKER_HANDLE_KEY = "__yajaAnimatorLastProjectPickerHandle";
 let currentProjectFileHandle = null;
@@ -65,6 +70,7 @@ let colorSelectionBefore = null;
 let colorSelectionMode = "replace";
 let isPaintingColorBlock = false;
 let isPaintingRowColors = false;
+let rowColorStroke = null;
 let activeStampIndex = null;
 let activeColorBlockIndex = null;
 let colorBlockHoverRow = null;
@@ -170,7 +176,7 @@ function defaultState() {
   const project = {
     app: "YAJA 2600 Animator",
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    version: "1.3.4",
+    version: "1.5.0",
     theme: getPreferredTheme(),
     projectName: "Untitled Project",
     animationName: "Untitled Animation",
@@ -182,7 +188,7 @@ function defaultState() {
     twoSpriteMode: false,
     activePlayer: 0,
     playerAssignments: [0, 1],
-    compositionModel: "adjacent",
+    compositionModel: "tia-right-copies",
     verticalStretch: 1,
     showGrid: true,
     showColorColumns: true,
@@ -359,7 +365,7 @@ function restore(snap) {
 
 function normalizeProject() {
   state.schemaVersion = CURRENT_SCHEMA_VERSION;
-  state.version = "1.3.4";
+  state.version = "1.5.0";
   ensureAnimationCollection(state);
   state.theme = applyTheme(normalizeThemeId(state.theme));
   state.animationName = String(state.animationName || state.projectName || "Untitled Animation");
@@ -369,7 +375,7 @@ function normalizeProject() {
   state.height = Math.max(1, Math.min(255, parseInt(state.height) || 16));
   state.width = Math.max(1, Math.min(8, parseInt(state.width) || 8));
   state.playerAssignments = normalizePlayerAssignments(state.playerAssignments, state.kernel);
-  state.compositionModel = "adjacent";
+  state.compositionModel = "tia-right-copies";
   state.verticalStretch = ["STANDARD", "MULTISPRITE"].includes(state.kernel) ? 2 : 1;
   state.currentFrame = Math.max(0, Math.min(state.currentFrame || 0, state.frames.length - 1));
   state.activePlayer = state.activePlayer === 1 ? 1 : 0;
@@ -429,6 +435,32 @@ function resizePlayer(player, height) {
   player.height = height;
 }
 
+function resizePlayerBottomAnchored(player, height) {
+  const oldHeight = Math.max(1, Number(player.height) || player.pixels?.length || 1);
+  const nextHeight = Math.max(1, Math.min(255, Number(height) || oldHeight));
+  const delta = nextHeight - oldHeight;
+  if (delta > 0) {
+    player.pixels = [
+      ...Array.from({ length: delta }, () => Array(8).fill(0)),
+      ...player.pixels
+    ];
+    player.colors = [
+      ...Array(delta).fill(state.currentColor || "$48"),
+      ...player.colors
+    ];
+  } else if (delta < 0) {
+    const remove = -delta;
+    player.pixels = player.pixels.slice(remove);
+    player.colors = player.colors.slice(remove);
+  }
+  player.yOffset = (Number(player.yOffset) || 0) - delta;
+  resizePlayer(player, nextHeight);
+}
+
+function resetSpriteVisibility() {
+  spriteVisibility = [true, true];
+}
+
 function normalizeReference(ref) {
   return {
     dataUrl: String(ref.dataUrl || ""), name: String(ref.name || ref.imageName || "Reference"),
@@ -438,6 +470,7 @@ function normalizeReference(ref) {
     xOffset: Math.max(-100, Math.min(100, Number(ref.xOffset ?? ref.x) || 0)),
     yOffset: Math.max(-200, Math.min(200, Number(ref.yOffset ?? ref.y) || 0)),
     threshold: Math.max(0, Math.min(255, Number(ref.threshold ?? 64))), dither: !!ref.dither,
+    ignoreBlackBackground: ref.ignoreBlackBackground !== false,
     brightness: Math.max(0, Math.min(200, Number(ref.brightness) || 100)),
     contrast: Math.max(0, Math.min(200, Number(ref.contrast) || 100))
   };
@@ -451,27 +484,29 @@ function aspectForKernel() {
 function layout(playerIndex = state.activePlayer, frame = currentFrame()) {
   const requested = canvasCellSize(state.zoom, state.verticalStretch, state.kernel === "STANDARD" ? 2 : 1);
   const p0 = 0, p1 = 0, cols = playerWidth(frame, playerIndex), rows = playerHeight(frame, playerIndex);
-  const surface = rasterSurfaceGeometry(requested.cellW, requested.cellH, cols, rows, window.devicePixelRatio || 1);
+  const cell = smoothRasterCellGeometry(requested.cellW, requested.cellH, window.devicePixelRatio || 1);
+  const width = rasterCellBoundary(cell.cellW, cols, 0, cell.pixelRatio);
+  const height = rasterCellBoundary(cell.cellH, rows, 0, cell.pixelRatio);
   return {
-    cellW: surface.cellW,
-    cellH: surface.cellH,
+    cellW: cell.cellW,
+    cellH: cell.cellH,
     p0,
     p1,
     cols,
     rows,
-    w: surface.width,
-    h: surface.height,
-    dpr: surface.pixelRatio,
-    deviceW: surface.deviceWidth,
-    deviceH: surface.deviceHeight
+    w: width,
+    h: height,
+    dpr: cell.pixelRatio,
+    deviceW: cell.deviceCellWidth * cols,
+    deviceH: cell.deviceCellHeight * rows
   };
 }
 
 function setCanvasSize(canvas, cssW, cssH, dpr = window.devicePixelRatio || 1) {
-  canvas.style.width = `${cssW}px`;
-  canvas.style.height = `${cssH}px`;
   canvas.width = Math.max(1, Math.round(cssW * dpr));
   canvas.height = Math.max(1, Math.round(cssH * dpr));
+  canvas.style.width = `${canvas.width / dpr}px`;
+  canvas.style.height = `${canvas.height / dpr}px`;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
@@ -479,7 +514,13 @@ function setCanvasSize(canvas, cssW, cssH, dpr = window.devicePixelRatio || 1) {
 }
 
 function fillRasterCell(ctx, l, x, y, offsetX = 0, offsetY = 0) {
-  const rect = rasterCellRect(l.cellW, l.cellH, x, y, offsetX, offsetY, l.dpr);
+  const originX = Number(l.rasterOriginX) || 0;
+  const originY = Number(l.rasterOriginY) || 0;
+  const left = rasterCellBoundaryFromOrigin(l.cellW, x + offsetX, originX, l.dpr);
+  const right = rasterCellBoundaryFromOrigin(l.cellW, x + offsetX + 1, originX, l.dpr);
+  const top = rasterCellBoundaryFromOrigin(l.cellH, y + offsetY, originY, l.dpr);
+  const bottom = rasterCellBoundaryFromOrigin(l.cellH, y + offsetY + 1, originY, l.dpr);
+  const rect = { x: left, y: top, w: Math.max(1 / l.dpr, right - left), h: Math.max(1 / l.dpr, bottom - top) };
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
   return rect;
 }
@@ -508,6 +549,34 @@ function colorBlockColor(block, index) {
   return transformAtariColor(block?.colors?.[index] || "$00", block?.hueOffset, block?.lightnessOffset);
 }
 
+function playerLayerPriority(slot) {
+  const assignment = Number(state.playerAssignments?.[slot]) || 0;
+  return assignment === 0 ? 1000 : assignment;
+}
+
+function resolveSpriteLabelLayout(items, gap = 4) {
+  const tops = Object.fromEntries(items.map(item => [item.slot, item.top]));
+  if (items.length < 2) return { stacked: false, tops };
+  const [a, b] = items;
+  const horizontalTouch = a.left <= b.left + b.width + gap && b.left <= a.left + a.width + gap;
+  const verticalTouch = a.top <= b.top + b.height + gap && b.top <= a.top + a.height + gap;
+  if (!horizontalTouch || !verticalTouch) return { stacked: false, tops };
+  const stackTop = Math.max(...items.map(item => item.canvasBottom)) + 5;
+  [...items]
+    .sort((leftItem, rightItem) => rightItem.priority - leftItem.priority || leftItem.slot - rightItem.slot)
+    .forEach((item, index) => { tops[item.slot] = stackTop + index * (item.height + gap); });
+  return { stacked: true, tops };
+}
+
+function syncCanvasReadoutDock() {
+  if (!el.canvasStageScroll || !el.canvasBand) return;
+  const viewport = el.canvasStageScroll.getBoundingClientRect();
+  const style = getComputedStyle(el.canvasStageScroll);
+  const borders = (Number.parseFloat(style.borderTopWidth) || 0) + (Number.parseFloat(style.borderBottomWidth) || 0);
+  const horizontalScrollbarHeight = Math.max(0, viewport.height - el.canvasStageScroll.clientHeight - borders);
+  el.canvasBand.style.setProperty("--canvas-horizontal-scrollbar-height", `${horizontalScrollbarHeight}px`);
+}
+
 function renderEditor() {
   const base = layout();
   const solidKernel = ["STANDARD", "MULTISPRITE"].includes(state.kernel);
@@ -515,36 +584,92 @@ function renderEditor() {
   const frame = currentFrame();
   const visibleSlots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
   const spans = [0, 1].map(slot => renderedSpriteSpan(playerWidth(frame, slot), frame.players[slot].nusiz));
-  const startsX = [frame.players[0].xOffset, spans[0] + frame.players[1].xOffset];
-  if (!state.twoSpriteMode && state.activePlayer === 1) startsX[1] = frame.players[1].xOffset;
-  const left = Math.min(...visibleSlots.map(slot => startsX[slot]));
-  const right = Math.max(...visibleSlots.map(slot => startsX[slot] + spans[slot]));
+  const horizontalGeometry = centeredCompositionGeometry(state.width, visibleSlots.map(slot => ({
+    ...frame.players[slot],
+    width: playerWidth(frame, slot)
+  })));
+  const startsX = [0, 0];
+  visibleSlots.forEach((slot, index) => { startsX[slot] = horizontalGeometry.starts[index]; });
+  const left = horizontalGeometry.minX;
+  const right = horizontalGeometry.maxX;
+  const spritesTouch = state.twoSpriteMode && startsX[1] === startsX[0] + spans[0];
   const top = Math.min(...visibleSlots.map(slot => frame.players[slot].yOffset));
   const bottom = Math.max(...visibleSlots.map(slot => frame.players[slot].yOffset + playerHeight(frame, slot)));
   const titlePad = 22;
-  const columnGap = solidKernel || !state.showColorColumns ? 0 : 10;
-  const columnsWidth = solidKernel || !state.showColorColumns ? 0 : (state.twoSpriteMode ? 51 : 24);
-  const stageWidth = Math.max(1, (right - left) * base.cellW + columnGap + columnsWidth);
-  const stageHeight = Math.max(1, (bottom - top) * base.cellH + titlePad);
+  const columnGap = !state.showColorColumns ? 0 : 10;
+  const columnsWidth = !state.showColorColumns ? 0 : (state.twoSpriteMode ? 51 : 24);
+  const compositionWidth = Math.max(1, rasterCellBoundary(base.cellW, right - left, 0, base.dpr));
+  const compositionHeight = Math.max(1, rasterCellBoundary(base.cellH, bottom - top, 0, base.dpr));
+  const labelHeight = 27;
+  const labelMetrics = state.twoSpriteMode ? [0, 1].map(slot => {
+    const player = frame.players[slot];
+    const canvasLeft = rasterCellBoundary(base.cellW, startsX[slot] - left, 0, base.dpr);
+    const canvasTop = titlePad + rasterCellBoundary(base.cellH, player.yOffset - top, 0, base.dpr);
+    const canvasWidth = rasterCellBoundary(base.cellW, spans[slot], 0, base.dpr);
+    const canvasBottom = canvasTop + rasterCellBoundary(base.cellH, playerHeight(frame, slot), 0, base.dpr);
+    const label = el[`spriteCanvasLabel${slot}`];
+    const labelWidth = Math.max(136, label?.offsetWidth || label?.getBoundingClientRect?.().width || 0);
+    return {
+      slot,
+      left: canvasLeft + (canvasWidth - labelWidth) / 2,
+      top: canvasBottom + 5,
+      width: labelWidth,
+      height: labelHeight,
+      canvasBottom,
+      priority: playerLayerPriority(slot)
+    };
+  }) : [];
+  const labelLayout = resolveSpriteLabelLayout(labelMetrics);
+  const labelBottom = labelMetrics.length
+    ? Math.max(...labelMetrics.map(item => labelLayout.tops[item.slot] + item.height))
+    : 0;
+  const minimumLeft = Math.min(0, ...labelMetrics.map(item => item.left));
+  const maximumRight = Math.max(compositionWidth + columnGap + columnsWidth, ...labelMetrics.map(item => item.left + item.width));
+  const compositionOriginX = -minimumLeft;
+  const compositionOriginY = titlePad;
+  const readoutHeight = Math.max(25, el.canvasReadout?.offsetHeight || el.canvasReadout?.getBoundingClientRect?.().height || 0);
+  const contentBottom = Math.max(compositionOriginY + compositionHeight, labelBottom);
+  const stageWidth = Math.max(1, maximumRight - minimumLeft);
+  const stageHeight = Math.max(1, contentBottom + readoutHeight + 12);
   Object.assign(el.spriteStage.style, { width: `${stageWidth}px`, height: `${stageHeight}px` });
-  el.compositionBackdrop.classList.add("hidden");
+  el.spriteStage.classList.toggle("stacked-sprite-labels", labelLayout.stacked);
+  el.compositionBackdrop.classList.remove("hidden");
+  Object.assign(el.compositionBackdrop.style, {
+    left: `${compositionOriginX}px`,
+    top: `${compositionOriginY}px`,
+    width: `${compositionWidth}px`,
+    height: `${compositionHeight}px`,
+    background: colorHex(state.background)
+  });
+  const manualSpriteLock = state.twoSpriteMode && !editorPreferences.autoSpriteSelection;
+  el.lockedSpriteFeedback.classList.toggle("hidden", !manualSpriteLock);
   Object.assign(el.compositionColorColumns.style, {
     position: "absolute",
-    left: `${(right - left) * base.cellW + columnGap}px`,
-    top: `${titlePad}px`,
+    left: `${compositionOriginX + compositionWidth + columnGap}px`,
+    top: `${compositionOriginY}px`,
     marginLeft: "0"
   });
   if (el.canvasStageScroll) {
-    const centerX = Math.max(0, (el.canvasStageScroll.clientWidth - stageWidth) / 2);
-    const centerY = Math.max(0, (el.canvasStageScroll.clientHeight - stageHeight) / 2);
-    el.spriteStage.style.marginLeft = `${centerX}px`;
-    el.spriteStage.style.marginTop = `${centerY}px`;
+    const viewport = el.canvasStageScroll.getBoundingClientRect();
+    const scrollStyle = getComputedStyle(el.canvasStageScroll);
+    const margins = centeredCompositionMargins({
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+      compositionWidth,
+      compositionHeight,
+      paddingLeft: Number.parseFloat(scrollStyle.paddingLeft) || 0,
+      paddingTop: Number.parseFloat(scrollStyle.paddingTop) || 0,
+      compositionOriginX,
+      compositionOriginY
+    });
+    el.spriteStage.style.marginLeft = `${margins.left}px`;
+    el.spriteStage.style.marginTop = `${margins.top}px`;
   }
   [0, 1].forEach(playerIndex => {
     const group = el[`playerCanvasGroup${playerIndex}`];
     const visible = state.twoSpriteMode || playerIndex === state.activePlayer;
     group.classList.toggle("hidden", !visible);
-    group.classList.toggle("active-slot", playerIndex === state.activePlayer);
+    group.classList.toggle("sprite-hidden", !spriteVisibility[playerIndex]);
     // Both visible sprites are direct editing surfaces. Pointer-down selects
     // the target slot before applying the active tool.
     group.style.pointerEvents = "auto";
@@ -565,45 +690,58 @@ function renderEditor() {
       spanUnits: span,
       mode,
       normalCellW: playerBase.cellW,
+      rasterOriginX: (startsX[playerIndex] - left) / scale,
+      rasterOriginY: player.yOffset - top,
       copyOrigins: mode.copyOrigins.map(origin => origin / scale),
       cellW: playerBase.cellW * scale,
-      w: span * playerBase.cellW,
+      w: rasterCellBoundaryFromOrigin(playerBase.cellW, span, startsX[playerIndex] - left, playerBase.dpr),
       rows: height,
-      h: height * playerBase.cellH
+      h: rasterCellBoundaryFromOrigin(playerBase.cellH, height, player.yOffset - top, playerBase.dpr),
+      // The two sprite canvases touch at one seam. Skip the right canvas's
+      // outer left edge so that seam is rendered once instead of twice.
+      skipOuterLeft: spritesTouch && playerIndex === 1
     };
     const canvas = playerIndex ? el.spriteCanvas1 : el.spriteCanvas;
     const ctx = setCanvasSize(canvas, l.w, l.h, l.dpr);
-    ctx.fillStyle = colorHex(state.background);
-    if (mode.copyOrigins.length > 1) {
-      // Hardware copies share one bitmap but occupy separate visible regions.
-      // Paint the project background beneath each real copy only, leaving the
-      // spacing between copies transparent in both one- and two-sprite modes.
-      forEachDisplayedCopy(l, origin => {
-        ctx.fillRect(origin * l.cellW, 0, l.cols * l.cellW, l.h);
-      });
-    } else {
-      ctx.fillRect(0, 0, l.w, l.h);
-    }
     if (playerIndex === state.activePlayer) drawReference(ctx, l, playerIndex);
     if (state.onion && state.frames.length > 1) drawOnion(ctx, l, playerIndex);
-    drawPlayer(ctx, l, playerIndex, 1);
+    if (spriteVisibility[playerIndex]) drawPlayer(ctx, l, playerIndex, 1);
     if (state.showGrid) drawGrid(ctx, l);
     // Grid lines must sit beneath selection and brush feedback. Drawing the
     // feedback last keeps its complete border visible on shared cell edges.
-    if (playerIndex === state.activePlayer) drawSelection(ctx, l);
-    if (pointerInsideCanvas && lastCell.player === playerIndex) {
+    if (!manualSpriteLock && playerIndex === state.activePlayer) drawSelection(ctx, l);
+    if (!manualSpriteLock && pointerInsideCanvas && lastCell.player === playerIndex) {
       drawStampPlacementPreview(ctx, l);
       drawBrushGhost(ctx, l);
     }
     Object.assign(group.style, {
       position: "absolute",
-      left: `${(startsX[playerIndex] - left) * base.cellW}px`,
-      top: `${titlePad + (player.yOffset - top) * base.cellH}px`,
+      left: `${compositionOriginX + rasterCellBoundary(base.cellW, startsX[playerIndex] - left, 0, base.dpr)}px`,
+      top: `${compositionOriginY + rasterCellBoundary(base.cellH, player.yOffset - top, 0, base.dpr)}px`,
       transform: "none"
     });
-    el[`p${playerIndex}ColorsColumn`].style.transform = `translateY(${(player.yOffset - top) * base.cellH}px)`;
-    group.style.zIndex = state.playerAssignments[playerIndex] === 0 ? "3" : (playerIndex === 0 ? "2" : "1");
+    const canvasLabel = el[`spriteCanvasLabel${playerIndex}`];
+    if (state.twoSpriteMode && canvasLabel) {
+      const groupTop = compositionOriginY + rasterCellBoundary(base.cellH, player.yOffset - top, 0, base.dpr);
+      canvasLabel.style.top = `${labelLayout.tops[playerIndex] - groupTop}px`;
+    } else if (canvasLabel) {
+      canvasLabel.style.top = "";
+    }
+    if (manualSpriteLock && playerIndex === state.activePlayer) {
+      const overlay = el.lockedSpriteFeedback;
+      const overlayContext = setCanvasSize(overlay, l.w, l.h, l.dpr);
+      overlay.style.left = group.style.left;
+      overlay.style.top = group.style.top;
+      drawSelection(overlayContext, l);
+      if (pointerInsideCanvas && lastCell.player === playerIndex) {
+        drawStampPlacementPreview(overlayContext, l);
+        drawBrushGhost(overlayContext, l);
+      }
+    }
+    el[`p${playerIndex}ColorsColumn`].style.transform = `translateY(${rasterCellBoundary(base.cellH, player.yOffset - top, 0, base.dpr)}px)`;
+    group.style.zIndex = String(10 + playerLayerPriority(playerIndex));
   });
+  syncCanvasReadoutDock();
 }
 
 function drawBrushGhost(ctx, l) {
@@ -751,37 +889,31 @@ function drawGrid(ctx, l) {
   const deviceLineWidth = Math.max(1, Math.round(requestedLineWidth * l.dpr));
   ctx.lineWidth = deviceLineWidth / l.dpr;
   const halfLine = deviceLineWidth / (2 * l.dpr);
+  const rasterOriginX = Number(l.rasterOriginX) || 0;
+  const rasterOriginY = Number(l.rasterOriginY) || 0;
   forEachDisplayedCopy(l, origin => {
-    const left = origin * l.cellW;
-    const right = (origin + l.cols) * l.cellW;
+    const left = rasterCellBoundaryFromOrigin(l.cellW, origin, rasterOriginX, l.dpr);
+    const right = rasterCellBoundaryFromOrigin(l.cellW, origin + l.cols, rasterOriginX, l.dpr);
     for (let x = 1; x < l.cols; x++) {
-      const boundary = rasterCellBoundary(l.cellW, origin + x, 0, l.dpr);
+      const boundary = rasterCellBoundaryFromOrigin(l.cellW, origin + x, rasterOriginX, l.dpr);
       ctx.beginPath();
       ctx.moveTo(boundary + halfLine, 0);
       ctx.lineTo(boundary + halfLine, l.h);
       ctx.stroke();
     }
     for (let y = 1; y < l.rows; y++) {
-      const boundary = rasterCellBoundary(l.cellH, y, 0, l.dpr);
+      const boundary = rasterCellBoundaryFromOrigin(l.cellH, y, rasterOriginY, l.dpr);
       ctx.beginPath();
       ctx.moveTo(left, boundary + halfLine);
       ctx.lineTo(right, boundary + halfLine);
       ctx.stroke();
     }
-    ctx.strokeRect(left + halfLine, halfLine, Math.max(0, right - left - deviceLineWidth / l.dpr), Math.max(0, l.h - deviceLineWidth / l.dpr));
-  });
-  ctx.restore();
-}
-
-function drawPlayerBounds(ctx, l) {
-  if (!state.twoSpriteMode) return;
-  ctx.save();
-  [0, 1].forEach(playerIndex => {
-    if (!state.twoSpriteMode && playerIndex !== state.activePlayer) return;
-    const origin = playerOrigin(l, playerIndex);
-    ctx.strokeStyle = playerIndex === state.activePlayer ? "#ffffff" : "#86e7ff";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(origin * l.cellW + 1, 1, 8 * l.cellW - 2, state.height * l.cellH - 2);
+    ctx.strokeRect(
+      left + halfLine,
+      halfLine,
+      Math.max(0, right - left - (halfLine * 2)),
+      Math.max(0, l.h - (halfLine * 2))
+    );
   });
   ctx.restore();
 }
@@ -801,8 +933,14 @@ function drawSelection(ctx, l) {
     }
     ctx.beginPath();
     maskBoundarySegments(mask).forEach(([x1, y1, x2, y2]) => {
-      ctx.moveTo((origin + selection.x + x1) * l.cellW, (selection.y + y1) * l.cellH);
-      ctx.lineTo((origin + selection.x + x2) * l.cellW, (selection.y + y2) * l.cellH);
+      ctx.moveTo(
+        rasterCellBoundaryFromOrigin(l.cellW, origin + selection.x + x1, l.rasterOriginX || 0, l.dpr),
+        rasterCellBoundaryFromOrigin(l.cellH, selection.y + y1, l.rasterOriginY || 0, l.dpr)
+      );
+      ctx.lineTo(
+        rasterCellBoundaryFromOrigin(l.cellW, origin + selection.x + x2, l.rasterOriginX || 0, l.dpr),
+        rasterCellBoundaryFromOrigin(l.cellH, selection.y + y2, l.rasterOriginY || 0, l.dpr)
+      );
     });
     ctx.stroke();
   });
@@ -812,18 +950,17 @@ function drawSelection(ctx, l) {
 function renderPreview() {
   const aspect = aspectForKernel();
   const p0 = currentFrame().players[0], p1 = currentFrame().players[1];
-  const p0Mode = nusizMode(p0.nusiz);
-  const p1Mode = nusizMode(p1.nusiz);
-  const p0Span = renderedSpriteSpan(playerWidth(currentFrame(), 0), p0.nusiz);
-  const p1Span = renderedSpriteSpan(playerWidth(currentFrame(), 1), p1.nusiz);
   const pixelW = 17;
   const pixelH = (state.kernel === "STANDARD" ? 20 : 10) * state.verticalStretch;
-  const p0Start = p0.xOffset;
-  const p1Start = p0Span + p1.xOffset;
-  const minPlayerX = state.twoSpriteMode ? Math.min(p0Start, p1Start) : p0Start;
+  const previewGeometry = centeredCompositionGeometry(state.width, state.twoSpriteMode
+    ? [{ ...p0, width: playerWidth(currentFrame(), 0) }, { ...p1, width: playerWidth(currentFrame(), 1) }]
+    : [{ ...p0, width: playerWidth(currentFrame(), 0) }]);
+  const p0Start = previewGeometry.starts[0];
+  const p1Start = state.twoSpriteMode ? previewGeometry.starts[1] : p0Start;
+  const minPlayerX = previewGeometry.minX;
   const p0PreviewX = p0Start - minPlayerX;
   const p1PreviewX = p1Start - minPlayerX;
-  const widthPixels = state.twoSpriteMode ? Math.max(p0PreviewX + p0Span, p1PreviewX + p1Span) : p0Span;
+  const widthPixels = previewGeometry.totalWidth;
   const cssW = Math.max(180, widthPixels * pixelW + 36);
   const minY = Math.min(p0.yOffset, state.twoSpriteMode ? p1.yOffset : p0.yOffset);
   const maxY = Math.max(p0.yOffset + playerHeight(currentFrame(), 0), state.twoSpriteMode ? p1.yOffset + playerHeight(currentFrame(), 1) : p0.yOffset + playerHeight(currentFrame(), 0));
@@ -858,10 +995,11 @@ function cellFromPointer(event, clampToEdges = false) {
     ? event.currentTarget
     : event.target.closest?.("canvas[data-player]") || (clampToEdges ? dragStart?.canvas : null);
   if (!canvas) return null;
+  const playerIndex = Number(canvas.dataset.player);
+  if (state.twoSpriteMode && !spriteVisibility[playerIndex]) return null;
   const rect = canvas.getBoundingClientRect();
   const localX = event.clientX - rect.left;
   const localY = event.clientY - rect.top;
-  const playerIndex = Number(canvas.dataset.player);
   const l = layout(playerIndex);
   const player = currentFrame().players[playerIndex];
   const width = playerWidth(currentFrame(), playerIndex);
@@ -876,7 +1014,7 @@ function cellFromPointer(event, clampToEdges = false) {
   if (!hit && clampToEdges) {
     const preferredCopy = Math.max(0, Math.min(mode.copyOrigins.length - 1, dragStart?.copyIndex || 0));
     const origin = mode.copyOrigins[preferredCopy];
-    displayX = Math.max(origin, Math.min(origin + width * mode.scale - Number.EPSILON, displayX));
+    displayX = Math.max(origin, Math.min(origin + width * mode.scale - 1e-7, displayX));
     hit = nusizSourceColumn(displayX, width, player.nusiz);
   }
   let row = Math.floor(localY / cellHeight);
@@ -887,18 +1025,28 @@ function cellFromPointer(event, clampToEdges = false) {
 }
 
 function compositionCellFromPointer(event, clampToEdges = false) {
+  if (state.twoSpriteMode && !editorPreferences.autoSpriteSelection) {
+    const canvas = state.activePlayer ? el.spriteCanvas1 : el.spriteCanvas;
+    return cellFromPointer({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      currentTarget: canvas,
+      target: canvas
+    }, clampToEdges);
+  }
   const direct = cellFromPointer(event, clampToEdges);
-  if (direct || !state.twoSpriteMode || clampToEdges) return direct;
-  const canvases = document.elementsFromPoint(event.clientX, event.clientY)
-    .filter(node => node instanceof HTMLCanvasElement && node.dataset.player !== undefined);
-  for (const canvas of canvases) {
-    const cell = cellFromPointer({
+  if (!state.twoSpriteMode || clampToEdges) return direct;
+  const directCanvas = event?.currentTarget?.dataset?.player !== undefined ? event.currentTarget : null;
+  const canvases = [directCanvas, ...document.elementsFromPoint(event.clientX, event.clientY)]
+    .filter((node, index, all) => node instanceof HTMLCanvasElement && node.dataset.player !== undefined && all.indexOf(node) === index);
+  const candidates = canvases.map(canvas => cellFromPointer({
       clientX: event.clientX, clientY: event.clientY,
       currentTarget: canvas, target: canvas
-    });
-    if (cell) return cell;
-  }
-  return null;
+    }))
+    .filter(Boolean)
+    .sort((a, b) => playerLayerPriority(b.player) - playerLayerPriority(a.player));
+  const live = candidates.find(cell => currentFrame().players[cell.player].pixels[cell.row]?.[cell.col]);
+  return live || candidates[0] || null;
 }
 
 function updateCanvasSelectionCursor(event) {
@@ -923,7 +1071,20 @@ function setActivePlayer(playerIndex, render = true) {
   syncFrameSize();
   if (usesSolidColor()) state.currentColor = currentPlayer().solidColor;
   syncControls();
+  syncReadouts();
   if (render) renderAll();
+}
+
+function toggleSpriteVisibility(playerIndex) {
+  const slot = playerIndex ? 1 : 0;
+  spriteVisibility[slot] = !spriteVisibility[slot];
+  if (!spriteVisibility[slot] && state.activePlayer === slot && spriteVisibility[1 - slot]) {
+    setActivePlayer(1 - slot, false);
+  }
+  pointerInsideCanvas = false;
+  endPointer();
+  syncControls();
+  renderAll();
 }
 
 function beginPointer(event) {
@@ -1003,11 +1164,19 @@ function beginPointer(event) {
 
 function movePointer(event) {
   const clampSelectionDrag = isPointerDown && (state.tool === "select" || movingSelection);
-  const cell = clampSelectionDrag ? cellFromPointer(event, true) : compositionCellFromPointer(event);
+  const cell = clampSelectionDrag
+    ? cellFromPointer({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        currentTarget: dragStart.canvas,
+        target: dragStart.canvas
+      }, true)
+    : compositionCellFromPointer(event);
   if (!cell) {
     if (!isPointerDown) pointerInsideCanvas = false;
     return;
   }
+  if (isPointerDown && dragStart && cell.player !== dragStart.player) return;
   pointerInsideCanvas = true;
   const previousCell = lastCell;
   lastCell = cell;
@@ -1068,6 +1237,7 @@ function endPointer() {
   colorSelectionAnchor = null;
   isPaintingColorBlock = false;
   isPaintingRowColors = false;
+  rowColorStroke = null;
   rightEraseStroke = false;
   selectionBeforeDrag = null;
   referenceDrag = null;
@@ -1246,7 +1416,7 @@ function floodFillColorRows(y, playerIndex = state.activePlayer, erase = false) 
 
 function renderRowColors() {
   el.editorZone.classList.toggle("show-grid", state.showGrid);
-  const showColumns = state.showColorColumns && !["STANDARD", "MULTISPRITE"].includes(state.kernel);
+  const showColumns = state.showColorColumns;
   el.compositionColorColumns.classList.toggle("hidden", !showColumns);
   [0, 1].forEach(playerIndex => {
     const column = el[`p${playerIndex}ColorsColumn`];
@@ -1308,6 +1478,7 @@ function renderPlayerRowColors(playerIndex, container) {
       } else {
         pushHistory();
         isPaintingRowColors = true;
+        rowColorStroke = { player: playerIndex, lastRow: y };
         paintRowColor(y, playerIndex, row);
       }
     });
@@ -1322,7 +1493,10 @@ function renderPlayerRowColors(playerIndex, container) {
       } else if (isPaintingColorBlock && e.buttons && activeColorBlockIndex !== null) {
         applyColorBlock(activeColorBlockIndex, y, false, playerIndex);
       } else if (activeColorBlockIndex !== null && !e.buttons) renderRowColors();
-      else if (isPaintingRowColors && e.buttons && activeColorBlockIndex === null) paintRowColor(y, playerIndex, row);
+      else if (isPaintingRowColors && e.buttons && activeColorBlockIndex === null && rowColorStroke?.player === playerIndex) {
+        paintRowColorRange(rowColorStroke.lastRow, y, playerIndex);
+        rowColorStroke.lastRow = y;
+      }
     });
     row.addEventListener("pointerleave", () => {
       if (activeColorBlockIndex !== null) { colorBlockHoverRow = null; renderRowColors(); }
@@ -1356,19 +1530,29 @@ function renderColorSelectionOverlay(container, playerIndex, cellH) {
 }
 
 function paintRowColor(y, playerIndex = state.activePlayer, rowElement = null) {
-  const color = normalizeCode(state.currentColor, "$48");
-  currentFrame().players[playerIndex].colors[y] = color;
+  paintRowColorRange(y, y, playerIndex);
+}
 
-  // Rows are rebuilt by several independent UI updates (palette, frames, assets).
-  // Never repaint a retained row reference: it can belong to a previous render and
-  // briefly show stale scanline data when the pointer subsequently crosses the palette.
-  const liveRow = el[`rowColors${playerIndex}`]?.querySelector(`.color-row[data-row="${y}"]`);
-  if (liveRow) {
+function scanlineStrokeRows(fromRow, toRow, height) {
+  return rasterLineCells(0, fromRow, 0, toRow)
+    .map(([, y]) => y)
+    .filter(y => y >= 0 && y < height);
+}
+
+function paintRowColorRange(fromRow, toRow, playerIndex = state.activePlayer) {
+  const color = normalizeCode(state.currentColor, "$48");
+  const player = currentFrame().players[playerIndex];
+  const height = playerHeight(currentFrame(), playerIndex);
+  scanlineStrokeRows(fromRow, toRow, height).forEach(y => {
+    player.colors[y] = color;
+
+    // Rows are rebuilt by several independent UI updates (palette, frames, assets).
+    // Resolve every live row again instead of retaining a stale pointer target.
+    const liveRow = el[`rowColors${playerIndex}`]?.querySelector(`.color-row[data-row="${y}"]`);
+    if (!liveRow) return;
     liveRow.lastElementChild.style.background = colorHex(color);
     liveRow.title = `Row ${y}: ${color}`;
-  } else {
-    renderRowColors();
-  }
+  });
   renderEditor();
   if (el.previewCanvas) renderPreview();
   renderFrames();
@@ -1390,18 +1574,18 @@ function reconcileRenderedRowColors() {
   });
 }
 
-function renderPalette() {
-  el.palette.innerHTML = "";
+function renderAtariPaletteGrid(container, selectedCode, selectColor, ariaPrefix) {
+  container.innerHTML = "";
   const palette = paletteForRegion(state.region);
   const corner = document.createElement("div");
   corner.className = "palette-axis-label";
   corner.textContent = "$";
-  el.palette.appendChild(corner);
+  container.appendChild(corner);
   ["0", "2", "4", "6", "8", "A", "C", "E"].forEach(lum => {
     const label = document.createElement("div");
     label.className = "palette-axis-label";
     label.textContent = lum;
-    el.palette.appendChild(label);
+    container.appendChild(label);
   });
   const hues = [...new Set(displayCodesForRegion(state.region).map(code => code[1]))];
   for (const hueCode of hues) {
@@ -1409,16 +1593,25 @@ function renderPalette() {
     const rowLabel = document.createElement("div");
     rowLabel.className = "palette-axis-label";
     rowLabel.textContent = hue.toString(16).toUpperCase();
-    el.palette.appendChild(rowLabel);
+    container.appendChild(rowLabel);
     for (let lum = 0; lum <= 0xE; lum += 2) {
       const code = `$${hue.toString(16).toUpperCase()}${lum.toString(16).toUpperCase()}`;
       if (!palette[code]) continue;
-    const btn = document.createElement("button");
-      btn.className = `persistent-swatch${code === state.currentColor ? " active selected" : ""}`;
-    btn.style.setProperty("--swatch-color", palette[code]);
-    btn.style.background = palette[code];
-    btn.title = code;
-    btn.addEventListener("click", () => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `persistent-swatch${code === selectedCode ? " active selected" : ""}`;
+      btn.style.setProperty("--swatch-color", palette[code]);
+      btn.style.background = palette[code];
+      btn.title = code;
+      btn.setAttribute("aria-label", `${ariaPrefix} ${code}`);
+      btn.addEventListener("click", () => selectColor(code));
+      container.appendChild(btn);
+    }
+  }
+}
+
+function renderPalette() {
+  renderAtariPaletteGrid(el.palette, state.currentColor, code => {
       // A palette click must always close a completed scanline stroke before any
       // palette/project rerender replaces the color-column DOM.
       if (isPaintingRowColors) {
@@ -1430,10 +1623,26 @@ function renderPalette() {
       paletteEyedropperArmed = false;
       syncControls();
       renderAll();
-    });
-    el.palette.appendChild(btn);
-    }
-  }
+  }, "Paint color");
+}
+
+function positionBgPalette() {
+  if (el.bgColorPopover.hidden) return;
+  const anchor = el.bgColorPicker.getBoundingClientRect();
+  const popover = el.bgColorPopover;
+  popover.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - popover.offsetWidth - 8))}px`;
+  popover.style.top = `${Math.max(8, Math.min(anchor.bottom + 5, window.innerHeight - popover.offsetHeight - 8))}px`;
+}
+
+function renderBgPalette() {
+  if (!el.bgPalette) return;
+  renderAtariPaletteGrid(el.bgPalette, state.background, code => {
+    state.background = code;
+    el.bgColorPopover.hidden = true;
+    syncControls();
+    renderAll();
+  }, "Background color");
+  positionBgPalette();
 }
 
 function resetAnimationWorkspaceTransientState() {
@@ -1589,7 +1798,7 @@ function renderFrames() {
     drawFrameThumb(canvas, frame);
     const label = document.createElement("div");
     label.className = "frame-thumb-label";
-    label.innerHTML = `<span>${index}</span><span title="Frame repeat: ${frame.duration}" aria-label="Frame repeat: ${frame.duration}">x${frame.duration}</span>`;
+    label.innerHTML = `<span>${index + 1}</span><span title="Frame repeat: ${frame.duration}" aria-label="Frame repeat: ${frame.duration}">x${frame.duration}</span>`;
     item.append(canvas, label);
     item.addEventListener("click", event => {
       if (suppressFrameClick) return;
@@ -1742,13 +1951,15 @@ function drawFrameThumb(canvas, frame) {
     const widths = frame.players.map((_, slot) => playerWidth(frame, slot));
     const heights = frame.players.map((_, slot) => playerHeight(frame, slot));
     const spans = frame.players.map((player, slot) => renderedSpriteSpan(widths[slot], player.nusiz));
-    const starts = [frame.players[0].xOffset, spans[0] + frame.players[1].xOffset];
-    const minX = Math.min(...starts);
-    const maxX = Math.max(starts[0] + spans[0], starts[1] + spans[1]);
+    const horizontalGeometry = centeredCompositionGeometry(state.width, frame.players.map((player, slot) => ({ ...player, width: widths[slot] })));
+    const starts = horizontalGeometry.starts;
+    const minX = horizontalGeometry.minX;
+    const maxX = horizontalGeometry.maxX;
     const minY = Math.min(frame.players[0].yOffset, frame.players[1].yOffset);
     const maxY = Math.max(frame.players[0].yOffset + heights[0], frame.players[1].yOffset + heights[1]);
     const geometry = timelineThumbnailGeometry(canvas.width, canvas.height, Math.max(1, maxX - minX), Math.max(1, maxY - minY), state.verticalStretch, 4, 1);
-    frame.players.forEach((player, index) => {
+    [0, 1].sort((a, b) => playerLayerPriority(a) - playerLayerPriority(b) || a - b).forEach(index => {
+      const player = frame.players[index];
       drawThumbPlayer(ctx, player,
         geometry.x + (starts[index] - minX) * geometry.cellW,
         geometry.y + (player.yOffset - minY) * geometry.cellH,
@@ -2154,11 +2365,16 @@ function renderStampEditorCanvas() {
     }
   }));
   if (state.showGrid) {
-    const gridStyle = getComputedStyle(document.documentElement);
-    ctx.strokeStyle = gridStyle.getPropertyValue("--canvas-grid-line").trim() || "rgba(255,255,255,.15)";
-    ctx.lineWidth = Number.parseFloat(gridStyle.getPropertyValue("--canvas-grid-line-width")) || 1;
-    for (let x = 0; x <= w; x++) { ctx.beginPath(); ctx.moveTo(Math.round(x * stampEditorCellWidth) + .5, 0); ctx.lineTo(Math.round(x * stampEditorCellWidth) + .5, cssHeight); ctx.stroke(); }
-    for (let y = 0; y <= h; y++) { ctx.beginPath(); ctx.moveTo(0, Math.round(y * stampEditorCellHeight) + .5); ctx.lineTo(cssWidth, Math.round(y * stampEditorCellHeight) + .5); ctx.stroke(); }
+    drawGrid(ctx, {
+      cellW: stampEditorCellWidth,
+      cellH: stampEditorCellHeight,
+      cols: w,
+      rows: h,
+      w: cssWidth,
+      h: cssHeight,
+      dpr: window.devicePixelRatio || 1,
+      copyOrigins: [0]
+    });
   }
   pctx.clearRect(0, 0, cssWidth, cssHeight);
   if (stampEditorSelection) {
@@ -2399,7 +2615,41 @@ function saveStampEdit(asCopy = false) {
   renderAll();
 }
 
+function currentGridAppearance() {
+  const style = getComputedStyle(document.body);
+  return editorPreferences.grids[state.theme] || {
+    color: normalizeGridColor(style.getPropertyValue("--canvas-grid-default-color")) || "#FFFFFF",
+    intensity: Number.parseFloat(style.getPropertyValue("--canvas-grid-default-intensity")) || 15
+  };
+}
+
+function positionGridSettings() {
+  el.gridSettingsPopover.hidden = !el.gridSettingsDisclosure.open;
+  if (!el.gridSettingsDisclosure.open) return;
+  const anchor = el.gridSettingsDisclosure.getBoundingClientRect();
+  const popover = el.gridSettingsPopover;
+  popover.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - popover.offsetWidth - 8))}px`;
+  popover.style.top = `${Math.max(8, Math.min(anchor.bottom + 5, window.innerHeight - popover.offsetHeight - 8))}px`;
+}
+
+function syncEditorPreferences() {
+  const grid = currentGridAppearance();
+  document.documentElement.style.setProperty("--canvas-grid-line", gridLineColor(grid));
+  document.body.classList.toggle("editor-grid-hidden", !state.showGrid);
+  el.gridColorPicker.value = grid.color;
+  el.gridIntensity.value = grid.intensity;
+  el.gridIntensityValue.value = `${grid.intensity}%`;
+  positionGridSettings();
+}
+
+function updateGridPreference(change) {
+  editorPreferences.grids[state.theme] = { ...currentGridAppearance(), ...change };
+  saveEditorPreferences(editorPreferences);
+  renderAll();
+}
+
 function renderAll() {
+  syncEditorPreferences();
   syncFrameSize();
   renderCanvasSurfaces();
   renderProjectPanels();
@@ -2414,17 +2664,26 @@ function renderCanvasSurfaces() {
 
 function renderProjectPanels() {
   renderPalette();
+  renderBgPalette();
   renderFrames();
   renderAssets();
 }
 
+function setStatus(message) {
+  if (el.statusMessage) el.statusMessage.textContent = String(message || "");
+}
+
 function syncReadouts() {
   updateSelectionBar();
-  el.frameLabel.textContent = `Frame ${state.currentFrame}`;
-  el.pixelReadout.textContent = `${state.twoSpriteMode ? "2 x " : ""}${state.width} x ${state.height}`;
+  const frame = currentFrame();
+  const selectedWidth = playerWidth(frame, state.activePlayer);
+  const selectedHeight = playerHeight(frame, state.activePlayer);
+  el.frameLabel.textContent = `Frame ${state.currentFrame + 1}`;
+  el.pixelReadout.textContent = `${selectedWidth} x ${selectedHeight}`;
   el.editorZone.classList.toggle("two-sprite-layout", state.twoSpriteMode);
   el.currentColorSwatch.style.background = colorHex(state.currentColor);
-  el.timelineSummary.textContent = `${state.frames.length} frame${state.frames.length === 1 ? "" : "s"} · ${currentFrame().duration}/60s`;
+  const totalSeconds = state.frames.reduce((sum, item) => sum + Math.max(1, Math.min(60, Number(item.duration) || 3)), 0) / 60;
+  el.timelineSummary.textContent = `${state.frames.length} frame${state.frames.length === 1 ? "" : "s"} · ${totalSeconds.toFixed(2)}s`;
   el.statusKernel.textContent = state.kernel;
   el.statusFrame.textContent = `Frame ${state.currentFrame + 1} of ${state.frames.length}`;
   el.statusMessage.textContent = playbackRunning ? "Playing" : `${state.tool[0].toUpperCase() + state.tool.slice(1)} ready`;
@@ -2441,8 +2700,12 @@ function syncControls() {
   el.kernelMode.value = state.kernel;
   el.timelineFrameRepeat.value = currentFrame().duration;
   el.bgColor.value = state.background;
+  el.bgColorPicker.style.setProperty("--swatch-color", colorHex(state.background));
   el.currentColor.value = state.currentColor;
   el.twoSpriteMode.checked = state.twoSpriteMode;
+  el.autoSpriteSelection.checked = editorPreferences.autoSpriteSelection;
+  el.autoSpriteSelectionRow.classList.toggle("hidden", !state.twoSpriteMode);
+  el.autoSpriteSelection.disabled = !state.twoSpriteMode;
   populateAssignmentSelect(el.playerAssignment0, 0);
   populateAssignmentSelect(el.playerAssignment1, 1);
   el.spriteNusizLabel.firstChild.textContent = "NUSIZ Mode ";
@@ -2468,6 +2731,7 @@ function syncControls() {
   el.displayRegion.value = state.region;
   el.zoom.value = zoomToSlider(state.zoom);
   el.bgColor.value = state.background;
+  el.bgColorPicker.style.setProperty("--swatch-color", colorHex(state.background));
   const ref = currentReference();
   el.refControls.classList.toggle("visible", !!ref);
   if (ref) {
@@ -2478,6 +2742,7 @@ function syncControls() {
     el.refY.max = String(Math.max(16, Math.ceil(ref.yOffset)));
     el.refX.value = ref.xOffset; el.refY.value = ref.yOffset;
     el.threshold.value = ref.threshold; el.refFitMode.value = ref.fitMode; el.refDither.checked = ref.dither;
+    el.refIgnoreBlack.checked = ref.ignoreBlackBackground;
     el.refBrightness.value = ref.brightness; el.refContrast.value = ref.contrast;
     el.toggleReference.textContent = ref.visible ? "Hide" : "Show";
   }
@@ -2489,6 +2754,20 @@ function syncControls() {
   el.selectSpriteB.classList.toggle("active", state.activePlayer === 1);
   el.selectSpriteA.setAttribute("aria-pressed", String(state.activePlayer === 0));
   el.selectSpriteB.setAttribute("aria-pressed", String(state.activePlayer === 1));
+  [0, 1].forEach(slot => {
+    const name = `Sprite ${slot ? "B" : "A"}`;
+    const visible = spriteVisibility[slot];
+    el[`spriteCanvasLabel${slot}`].classList.toggle("hidden", !state.twoSpriteMode);
+    el[`spriteCanvasLabel${slot}`].classList.toggle("sprite-hidden", !visible);
+    el[`spriteCanvasLabel${slot}`].classList.toggle("active-sprite", state.activePlayer === slot);
+    el[`spriteCanvasAssignment${slot}`].textContent = `P${state.playerAssignments[slot]}`;
+    el[`spriteCanvasSelector${slot}`].setAttribute("aria-pressed", String(state.activePlayer === slot));
+    const button = el[`toggleSpriteVisibility${slot}`];
+    button.title = `${visible ? "Hide" : "Show"} ${name}`;
+    button.setAttribute("aria-label", button.title);
+    button.setAttribute("aria-pressed", String(!visible));
+    button.querySelector("use")?.setAttribute("href", visible ? "#icon-eye" : "#icon-eye-off");
+  });
   el.offsetControls.classList.add("x-visible");
   el.spriteOffsetXRow.classList.remove("hidden");
   el.referenceImportSingle.classList.toggle("hidden", state.twoSpriteMode);
@@ -2498,6 +2777,7 @@ function syncControls() {
   el.p0ColorsTitle.textContent = `P${state.playerAssignments[0]}`;
   el.p1ColorsTitle.textContent = `P${state.playerAssignments[1]}`;
   [el.spriteCanvas, el.spriteCanvas1].forEach((canvas, slot) => canvas.setAttribute("aria-label", `P${state.playerAssignments[slot]} ${state.width}-pixel-wide Atari sprite editing canvas`));
+  syncDesktopMenuState();
 }
 
 function syncNudgeButtons() {
@@ -3076,12 +3356,16 @@ function setHeight() {
   pushHistory();
   forEachSelectedFrame(frame => {
     const player = frame.players[state.activePlayer];
-    player.height = height;
-    resizePlayer(player, height);
+    if (state.twoSpriteMode) resizePlayerBottomAnchored(player, height);
+    else {
+      player.height = height;
+      resizePlayer(player, height);
+    }
     frame.height = height;
   });
   state.height = playerHeight(currentFrame(), state.activePlayer);
   selection = null;
+  syncControls();
   renderAll();
 }
 
@@ -3100,15 +3384,23 @@ function applySizeToAll() {
   const height = playerHeight(currentFrame(), state.activePlayer), width = playerWidth(currentFrame(), state.activePlayer);
   const willCrop = state.frames.some(frame => {
     const player = frame.players[state.activePlayer];
-    return (playerHeight(frame, state.activePlayer) > height && player.pixels.slice(height).some(row => row.some(Boolean))) || (playerWidth(frame, state.activePlayer) > width && player.pixels.slice(0, height).some(row => row.slice(width).some(Boolean)));
+    const oldHeight = playerHeight(frame, state.activePlayer);
+    const retainedStart = state.twoSpriteMode ? Math.max(0, oldHeight - height) : 0;
+    const croppedRows = state.twoSpriteMode ? player.pixels.slice(0, retainedStart) : player.pixels.slice(height);
+    const retainedRows = player.pixels.slice(retainedStart, state.twoSpriteMode ? oldHeight : height);
+    return (oldHeight > height && croppedRows.some(row => row.some(Boolean)))
+      || (playerWidth(frame, state.activePlayer) > width && retainedRows.some(row => row.slice(width).some(Boolean)));
   });
   if (willCrop && !confirm("Applying this size will crop nonempty pixels. Continue?")) return;
   pushHistory();
   state.frames.forEach(frame => {
     const player = frame.players[state.activePlayer];
-    player.height = height;
     player.width = width;
-    resizePlayer(player, height);
+    if (state.twoSpriteMode) resizePlayerBottomAnchored(player, height);
+    else {
+      player.height = height;
+      resizePlayer(player, height);
+    }
     player.nusiz = source.nusiz;
   });
   renderAll();
@@ -3331,6 +3623,7 @@ function importBBText(text) {
     try { candidate = migrateProject(parsed.project); } catch (error) { return showImportError(`Could not import generated YAJA bB: ${error.message}`); }
     pushHistory();
     state = { ...defaultState(), ...candidate, currentFrame: 0, activePlayer: candidate.activePlayer === 1 ? 1 : 0 };
+    resetSpriteVisibility();
     normalizeProject();
     resetAnimationWorkspaceTransientState();
     syncControls();
@@ -3369,6 +3662,7 @@ function importBBText(text) {
       if (!(p.colors || []).length) player.colors = Array(height).fill(player.solidColor);
     }
   });
+  resetSpriteVisibility();
   syncControls();
   renderAll();
   return true;
@@ -3405,33 +3699,48 @@ function normalizeJsonSaveName(rawName, fallbackProjectName) {
 }
 
 async function saveProject(forceSaveAs = false) {
-  const filename = normalizeJsonSaveName(`${state.projectName || "Untitled Project"}.json`, state.projectName).filename;
-  if (window.YaJaDesktop?.isDesktop) {
-    const content = serializedProject();
-    const bridge = window.YaJaDesktop;
-    const options = {
-      title: forceSaveAs ? "Save Animator Project As" : "Save Animator Project",
-      suggestedName: filename,
-      filters: [{ name: "YAJA Animator Projects", extensions: ["json"] }],
-      content
-    };
-    const result = forceSaveAs || !desktopCurrentProjectPath
-      ? await bridge.saveProjectAs(options)
-      : await bridge.saveProject({ ...options, filePath: desktopCurrentProjectPath });
-    if (!result?.canceled) desktopCurrentProjectPath = result.filePath || desktopCurrentProjectPath;
-    return;
+  if (saveInProgress) return;
+  saveInProgress = true;
+  if (el.saveProject) {
+    el.saveProject.disabled = true;
+    el.saveProject.setAttribute("aria-busy", "true");
   }
-
-  if ("showSaveFilePicker" in window) {
-    try {
-      const handle = await window.showSaveFilePicker(addProjectPickerStart({
-        id: PROJECT_PICKER_ID,
+  const filename = normalizeJsonSaveName(`${state.projectName || "Untitled Project"}.json`, state.projectName).filename;
+  try {
+    if (window.YaJaDesktop?.isDesktop) {
+      const content = serializedProject();
+      const bridge = window.YaJaDesktop;
+      const options = {
+        title: forceSaveAs ? "Save Animator Project As" : "Save Animator Project",
         suggestedName: filename,
-        types: [{
-          description: "YAJA Animator Project",
-          accept: { "application/json": [".json"] }
-        }]
-      }));
+        filters: [{ name: "YAJA Animator Projects", extensions: ["json"] }],
+        content
+      };
+      const result = forceSaveAs || !desktopCurrentProjectPath
+        ? await bridge.saveProjectAs(options)
+        : await bridge.saveProject({ ...options, filePath: desktopCurrentProjectPath });
+      if (!result?.canceled) {
+        desktopCurrentProjectPath = result.filePath || desktopCurrentProjectPath;
+        if (result.fileName) {
+          state.projectName = projectNameFromFilename(result.fileName, state.projectName);
+          el.projectName.value = state.projectName;
+        }
+        setStatus(`Saved ${result.fileName || filename}`);
+      }
+      return;
+    }
+
+    if ("showSaveFilePicker" in window) {
+      const handle = !forceSaveAs && currentProjectFileHandle
+        ? currentProjectFileHandle
+        : await window.showSaveFilePicker(addProjectPickerStart({
+          id: PROJECT_PICKER_ID,
+          suggestedName: filename,
+          types: [{
+            description: "YAJA Animator Project",
+            accept: { "application/json": [".json"] }
+          }]
+        }));
       const chosenName = projectNameFromFilename(handle.name, state.projectName);
       state.projectName = chosenName;
       el.projectName.value = chosenName;
@@ -3441,19 +3750,28 @@ async function saveProject(forceSaveAs = false) {
       await writable.close();
       setStatus(`Saved ${handle.name}`);
       return;
-    } catch (error) {
-      if (error?.name === "AbortError") return;
-      console.warn("Save picker failed, falling back to a direct project download.", error);
+    }
+
+    await downloadBlob(new Blob([serializedProject()], { type: "application/json" }), filename);
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      console.error("Could not save project.", error);
+      alert(`Could not save project: ${error.message}`);
+    }
+  } finally {
+    saveInProgress = false;
+    if (el.saveProject) {
+      el.saveProject.disabled = false;
+      el.saveProject.removeAttribute("aria-busy");
     }
   }
-
-  await downloadBlob(new Blob([serializedProject()], { type: "application/json" }), filename);
 }
 
 function loadProjectContent(content) {
   try {
     const candidate = migrateProject(JSON.parse(content));
     state = candidate;
+    resetSpriteVisibility();
     referenceImages.clear();
     rotationSession = null;
     normalizeProject();
@@ -3510,29 +3828,29 @@ async function openProject() {
 }
 
 function renderPngFrame(frame) {
-  const scale = 6;
-  const gap = 8;
-  const cellW = 2 * scale;
-  const cellH = scale;
+  const cellW = 17;
+  const cellH = 10;
   const slots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
   const players = slots.map(slot => frame.players[slot]);
   const widths = slots.map(slot => playerWidth(frame, slot));
   const heights = slots.map(slot => playerHeight(frame, slot));
-  const spans = players.map((player, index) => renderedSpriteSpan(widths[index], player.nusiz));
-  const starts = players.map((player, index) => (index ? spans[0] : 0) + player.xOffset);
-  const minX = Math.min(...starts);
-  const maxX = Math.max(...players.map((player, index) => starts[index] + spans[index]));
+  const horizontalGeometry = centeredCompositionGeometry(state.width, players.map((player, index) => ({ ...player, width: widths[index] })));
+  const starts = horizontalGeometry.starts;
+  const minX = horizontalGeometry.minX;
+  const maxX = horizontalGeometry.maxX;
   const minY = Math.min(...players.map(player => player.yOffset));
   const maxY = Math.max(...players.map((player, index) => player.yOffset + heights[index]));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, (maxX - minX) * cellW + gap * 2);
-  canvas.height = Math.max(1, (maxY - minY) * cellH + gap * 2);
+  canvas.width = Math.max(1, (maxX - minX) * cellW);
+  canvas.height = Math.max(1, (maxY - minY) * cellH);
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = colorHex(state.background);
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  slots.forEach((slot, index) => {
+  slots.map((slot, index) => ({ slot, index }))
+    .sort((a, b) => playerLayerPriority(a.slot) - playerLayerPriority(b.slot) || a.slot - b.slot)
+    .forEach(({ slot, index }) => {
     const player = frame.players[slot];
-    drawSheetPlayer(ctx, player, gap + (starts[index] - minX) * cellW, gap + (player.yOffset - minY) * cellH, cellW, cellH, heights[index], widths[index]);
+    drawSheetPlayer(ctx, player, (starts[index] - minX) * cellW, (player.yOffset - minY) * cellH, cellW, cellH, heights[index], widths[index]);
   });
   return canvas;
 }
@@ -3661,11 +3979,26 @@ function setupDesktopMenuBridge() {
       case "move-frame-left": click("moveFrameLeft"); break;
       case "move-frame-right": click("moveFrameRight"); break;
       case "reverse-frames": click("reverseFrames"); break;
+      case "two-sprite-toggle": click("twoSpriteMode"); break;
       case "grid-toggle": click("showGrid"); break;
       case "colors-toggle": click("showColorColumns"); break;
       case "onion-toggle": click("onion"); break;
     }
   });
+}
+
+function syncDesktopMenuState() {
+  if (!window.YaJaDesktop?.isDesktop || typeof window.YaJaDesktop.updateMenuState !== "function") return;
+  const menuState = {
+    twoSpriteMode: state.twoSpriteMode,
+    showGrid: state.showGrid,
+    showColorColumns: state.showColorColumns,
+    onion: state.onion
+  };
+  const signature = JSON.stringify(menuState);
+  if (signature === lastDesktopMenuState) return;
+  lastDesktopMenuState = signature;
+  window.YaJaDesktop.updateMenuState(menuState);
 }
 
 function safeName(name) {
@@ -3720,7 +4053,7 @@ function extractShape() {
   const ref = currentReference();
   const threshold = ref.threshold;
   const player = currentPlayer();
-  const cells = referenceCellGrid(sample.data, 8, state.height, sample.sampleScale, threshold, sample.background);
+  const cells = referenceCellGrid(sample.data, 8, state.height, sample.sampleScale, threshold, sample.background, { ignoreBlackBackground: ref.ignoreBlackBackground });
   const luminance = cells.map(row => row.map(cell => sample.background ? cell.foregroundCoverage * 255 : cell.averageLuminance));
   const paintThreshold = sample.background ? 128 : threshold;
   if (ref.dither) for (let y = 0; y < state.height; y++) for (let x = 0; x < 8; x++) { const old = luminance[y][x], next = old >= paintThreshold ? 255 : 0, error = old - next; luminance[y][x] = next; [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]].forEach(([dx,dy,f]) => { if (luminance[y+dy]?.[x+dx] !== undefined) luminance[y+dy][x+dx] += error*f; }); }
@@ -3754,6 +4087,7 @@ function resetReferenceDefaults() {
     yOffset: 0,
     threshold: 64,
     dither: false,
+    ignoreBlackBackground: true,
     brightness: 100,
     contrast: 100
   });
@@ -3812,8 +4146,9 @@ function autoColor() {
   if (!sample) return;
   pushHistory();
   const player = currentPlayer();
-  const threshold = currentReference().threshold;
-  const cells = referenceCellGrid(sample.data, 8, state.height, sample.sampleScale, threshold, sample.background);
+  const reference = currentReference();
+  const threshold = reference.threshold;
+  const cells = referenceCellGrid(sample.data, 8, state.height, sample.sampleScale, threshold, sample.background, { ignoreBlackBackground: reference.ignoreBlackBackground });
   for (let y = 0; y < state.height; y++) {
     const average = averageReferenceGridRow(cells[y]);
     if (average) player.colors[y] = nearestAtariColor(average.r, average.g, average.b);
@@ -3930,7 +4265,14 @@ function bindEvents() {
     el.toggleAnimationMenu.setAttribute("aria-expanded", "false");
   });
   bindValue(el.currentColor, v => { state.currentColor = normalizeCode(v, state.currentColor); if (usesSolidColor()) currentPlayer().solidColor = state.currentColor; }, true);
-  bindValue(el.bgColor, v => state.background = normalizeCode(v, state.background), true);
+  bindValue(el.bgColor, v => {
+    state.background = normalizeCode(v, state.background);
+    el.bgColorPicker.style.setProperty("--swatch-color", colorHex(state.background));
+  }, true);
+  el.bgColorPicker.addEventListener("click", () => {
+    el.bgColorPopover.hidden = !el.bgColorPopover.hidden;
+    positionBgPalette();
+  });
   bindValue(el.kernelMode, v => { state.kernel = v; state.verticalStretch = ["STANDARD", "MULTISPRITE"].includes(v) ? 2 : 1; state.playerAssignments = normalizePlayerAssignments(state.playerAssignments, v); syncControls(); }, true);
   bindValue(el.timelineFrameRepeat, v => {
     const repeat = Math.max(1, Math.min(60, Number(v) || 3));
@@ -3995,6 +4337,36 @@ function bindEvents() {
   }, true);
   el.selectSpriteA.addEventListener("click", () => setActivePlayer(0));
   el.selectSpriteB.addEventListener("click", () => setActivePlayer(1));
+  el.spriteCanvasSelector0.addEventListener("click", () => setActivePlayer(0));
+  el.spriteCanvasSelector1.addEventListener("click", () => setActivePlayer(1));
+  el.toggleSpriteVisibility0.addEventListener("click", event => { event.stopPropagation(); toggleSpriteVisibility(0); });
+  el.toggleSpriteVisibility1.addEventListener("click", event => { event.stopPropagation(); toggleSpriteVisibility(1); });
+  el.autoSpriteSelection.addEventListener("change", () => {
+    endPointer();
+    pointerInsideCanvas = false;
+    editorPreferences.autoSpriteSelection = el.autoSpriteSelection.checked;
+    saveEditorPreferences(editorPreferences);
+    renderAll();
+  });
+  el.gridSettingsDisclosure.addEventListener("toggle", positionGridSettings);
+  document.addEventListener("pointerdown", event => {
+    if (el.gridSettingsDisclosure.open && !el.gridSettingsDisclosure.contains(event.target) && !el.gridSettingsPopover.contains(event.target)) {
+      el.gridSettingsDisclosure.open = false;
+    }
+  });
+  el.gridColorPicker.addEventListener("input", () => updateGridPreference({ color: el.gridColorPicker.value.toUpperCase() }));
+  el.bgColorPopover.addEventListener("pointerdown", event => event.stopPropagation());
+  window.addEventListener("resize", positionBgPalette);
+  document.addEventListener("pointerdown", event => {
+    if (el.bgColorPopover.hidden || el.bgColorPopover.contains(event.target) || event.target.closest?.("#bgColorPicker")) return;
+    el.bgColorPopover.hidden = true;
+  });
+  el.gridIntensity.addEventListener("input", () => updateGridPreference({ intensity: Number(el.gridIntensity.value) }));
+  el.resetGridSettings.addEventListener("click", () => {
+    delete editorPreferences.grids[state.theme];
+    saveEditorPreferences(editorPreferences);
+    renderAll();
+  });
   bindCheck(el.showGrid, v => state.showGrid = v, true);
   bindCheck(el.showColorColumns, v => state.showColorColumns = v, true);
   bindCheck(el.onion, v => {
@@ -4019,6 +4391,7 @@ function bindEvents() {
   bindValue(el.threshold, v => { if (currentReference()) currentReference().threshold = Number(v); });
   bindValue(el.refFitMode, v => { if (currentReference()) currentReference().fitMode = v; }, true);
   bindCheck(el.refDither, v => { if (currentReference()) currentReference().dither = v; });
+  bindCheck(el.refIgnoreBlack, v => { if (currentReference()) currentReference().ignoreBlackBackground = v; });
   bindValue(el.refBrightness, v => { if (currentReference()) currentReference().brightness = Number(v); }, true);
   bindValue(el.refContrast, v => { if (currentReference()) currentReference().contrast = Number(v); }, true);
   el.spriteHeight.addEventListener("change", setHeight);
@@ -4133,9 +4506,8 @@ function bindEvents() {
   [el.exportPngSelected, el.exportPngAll].forEach(control => control.addEventListener("change", updateExportPngSummary));
   el.confirmExportPng.addEventListener("click", confirmExportPng);
   el.saveProject.addEventListener("click", async event => {
-    const desktopToolbarSave = !!window.YaJaDesktop?.isDesktop;
-    await saveProject(desktopToolbarSave);
-    if (desktopToolbarSave && event.detail > 0) el.saveProject.blur();
+    await saveProject(true);
+    if (window.YaJaDesktop?.isDesktop && event.detail > 0) el.saveProject.blur();
   });
   el.loadProject.addEventListener("click", openProject);
   el.projectFile.addEventListener("change", e => {
@@ -4147,6 +4519,7 @@ function bindEvents() {
   el.newProject.addEventListener("click", () => {
     if (!confirm("Start a new project?")) return;
     state = defaultState();
+    resetSpriteVisibility();
     desktopCurrentProjectPath = null;
     bindCurrentProjectFileHandle(null);
     history = [];
@@ -4252,6 +4625,12 @@ function handleKeys(e) {
   const commandKey = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   const redoKey = commandKey && ((e.shiftKey && (key === "z" || key === "r")) || key === "y");
+  if (e.key === "Escape" && el.gridSettingsDisclosure.open) {
+    e.preventDefault();
+    el.gridSettingsDisclosure.open = false;
+    el.gridSettingsDisclosure.querySelector("summary")?.focus();
+    return;
+  }
   if (commandKey && key === "z" && el.stampEditor?.open) { e.preventDefault(); e.shiftKey ? redoStampEditor() : undoStampEditor(); return; }
   if (redoKey && el.stampEditor?.open) { e.preventDefault(); redoStampEditor(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y" && el.stampEditor?.open) { e.preventDefault(); redoStampEditor(); return; }
@@ -4314,15 +4693,15 @@ function handleKeys(e) {
 function cacheElements() {
   [
     "selectTheme", "projectName", "animationName", "toggleAnimationMenu", "animationMenu", "newAnimation", "duplicateAnimation", "deleteAnimation", "newProject", "saveProject", "loadProject", "projectFile", "exportCode", "importCode", "exportSheet", "fullscreenButton",
-    "toolGrid", "spriteWidth", "spriteHeight", "kernelMode", "bgColor", "twoSpriteMode", "twoSpriteControls", "activeSpriteTabs", "selectSpriteA", "selectSpriteB", "offsetControls", "spriteOffsetXRow", "spriteOffsetYRow", "timelineFrameRepeat", "applyRepeatAll",
+    "toolGrid", "spriteWidth", "spriteHeight", "kernelMode", "bgColor", "twoSpriteMode", "twoSpriteControls", "activeSpriteTabs", "selectSpriteA", "selectSpriteB", "autoSpriteSelection", "autoSpriteSelectionRow", "offsetControls", "spriteOffsetXRow", "spriteOffsetYRow", "timelineFrameRepeat", "applyRepeatAll",
     "playerAssignment0", "playerAssignment0Row", "playerAssignment0Label", "playerAssignment1", "playerAssignment1Row", "spriteNusizLabel", "spriteNusiz", "spriteSolidColorRow", "spriteSolidColor", "spriteOffsetX", "spriteOffsetY", "applySizeAll", "applyOffsetsAll", "swapPlayers", "copyP0P1", "copyColorsP0P1", "mirrorP0P1", "fillShapes", "mirrorDraw", "brushWidth", "brushHeight", "undo", "redo",
     "nudgePixels", "nudgeColors", "scaleStep", "stretchHDown", "stretchHUp", "stretchVDown", "stretchVUp", "scaleUniformDown", "scaleUniformUp", "flipH", "flipV", "flipColor", "rotateL", "rotateR", "rotateAngle", "grow", "shrink", "clearFrame",
-    "frameLabel", "pixelReadout", "canvasReadout", "showGrid", "showColorColumns", "onion", "onionOpacity", "onionFrames", "zoom", "playAnim", "loopPlayback", "timelineSummary", "timelineHeading", "framesActions", "editorZone",
-    "canvasStageScroll", "spriteStage", "compositionBackdrop", "compositionColorColumns", "playerCanvasGroup0", "playerCanvasGroup1", "spriteCanvas", "spriteCanvas1", "previewCanvas", "previewCaption", "rowColors0", "rowColors1", "p0ColorsColumn", "p1ColorsColumn", "p0ColorsTitle", "p1ColorsTitle", "selectionBar", "selectionInfo", "copySelection",
+    "frameLabel", "pixelReadout", "canvasReadout", "showGrid", "gridSettingsDisclosure", "gridSettingsPopover", "gridColorPicker", "gridIntensity", "gridIntensityValue", "resetGridSettings", "bgColorPicker", "bgColorPopover", "bgPalette", "showColorColumns", "onion", "onionOpacity", "onionFrames", "zoom", "playAnim", "loopPlayback", "timelineSummary", "timelineHeading", "framesActions", "editorZone",
+    "canvasBand", "canvasStageScroll", "spriteStage", "lockedSpriteFeedback", "compositionBackdrop", "compositionColorColumns", "playerCanvasGroup0", "playerCanvasGroup1", "spriteCanvas", "spriteCanvas1", "spriteCanvasLabel0", "spriteCanvasLabel1", "spriteCanvasSelector0", "spriteCanvasSelector1", "spriteCanvasAssignment0", "spriteCanvasAssignment1", "toggleSpriteVisibility0", "toggleSpriteVisibility1", "previewCanvas", "previewCaption", "rowColors0", "rowColors1", "p0ColorsColumn", "p1ColorsColumn", "p0ColorsTitle", "p1ColorsTitle", "selectionBar", "selectionInfo", "copySelection",
     "cutSelection", "pasteSelection", "stampFromSelection", "cropSelection", "clearSelection", "insertFrame", "duplicateFrame",
     "removeFrame", "moveFrameLeft", "moveFrameRight", "reverseFrames", "framesList", "currentColorSwatch", "currentColor",
     "palettePanel", "palette", "displayRegion", "paletteEyedropper", "colorBlocks", "stamps", "newColorBlock", "newStamp", "colorBlockEditor", "colorBlockEditorTitle", "colorBlockEditorHeight", "colorBlockEditorLines", "colorBlockHueOffset", "colorBlockHueOffsetValue", "colorBlockLightnessOffset", "colorBlockLightnessOffsetValue", "saveColorBlockEdit", "saveColorBlockCopy", "stampEditor", "stampEditorTitle", "stampEditorWidth", "stampEditorHeight", "stampEditorZoom", "stampEditorReadout", "stampEditorCanvasContainer", "stampEditorCanvas", "stampEditorPreviewCanvas", "saveStampEdit", "saveStampCopy",
-    "refFile", "loadReference", "loadReferenceA", "loadReferenceB", "referenceImportSingle", "referenceImportDual", "refControls", "refOpacity", "refScale", "refX", "refY", "threshold", "refDither", "refFitMode", "refBrightness", "refContrast", "referenceTransform", "resetReferenceDefaults", "applyReferenceTransformAll", "toggleReference", "extractShape",
+    "refFile", "loadReference", "loadReferenceA", "loadReferenceB", "referenceImportSingle", "referenceImportDual", "refControls", "refOpacity", "refScale", "refX", "refY", "threshold", "refDither", "refIgnoreBlack", "refFitMode", "refBrightness", "refContrast", "referenceTransform", "resetReferenceDefaults", "applyReferenceTransformAll", "toggleReference", "extractShape",
     "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "bbExportMode", "bbExportScope", "bbExportOptions", "bbExportPositioning", "bbRamSummary", "exportBbTables", "exportBbModule", "exportBbDemo", "exportBbCurrent", "exportBbAll", "codeText", "copyCode", "downloadBas",
     "importFromText", "codeDiagnostics", "bbProjectDataOption", "bbCommentsOption", "exportWithProjectData", "exportWithComments", "exportPositionSprite", "exportPositionAnchor", "textDialog", "textToolText", "textToolY", "textToolX", "textDirection", "placeText",
     "statusKernel", "statusFrame", "statusMessage"

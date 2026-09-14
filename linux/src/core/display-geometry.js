@@ -47,18 +47,23 @@ export function nusizSourceColumn(displayX, width, nusiz) {
   return null;
 }
 
-// Match the editor: center the adjacent, unshifted NUSIZ composition first,
-// then apply each frame's explicit X offset from that stable baseline.
+// Anchor each player's primary sprite in an adjacent baseline. NUSIZ copies
+// and width expansion extend to the right without moving later primaries.
 export function centeredCompositionGeometry(width, players) {
-  const renderedWidths = players.map(player => renderedSpriteWidth(player.width || width, player.nusiz));
-  const totalWidth = Math.max(1, renderedWidths.reduce((sum, value) => sum + value, 0));
+  const baseWidths = players.map(player => Math.max(1, Math.min(8, Number.parseInt(player.width, 10) || width || 8)));
+  const renderedWidths = players.map((player, index) => renderedSpriteWidth(baseWidths[index], player.nusiz));
   let baseline = 0;
-  const centeredX = players.map((player, index) => {
-    const value = Math.floor(-totalWidth / 2) + baseline + Math.trunc(Number(player.xOffset) || 0);
-    baseline += renderedWidths[index];
+  const starts = players.map((player, index) => {
+    const value = baseline + Math.trunc(Number(player.xOffset) || 0);
+    baseline += baseWidths[index];
     return value;
   });
-  return { totalWidth, renderedWidths, centeredX };
+  const minX = Math.min(...starts);
+  const maxX = Math.max(...starts.map((start, index) => start + renderedWidths[index]));
+  const totalWidth = Math.max(1, maxX - minX);
+  const centerOffset = Math.floor(-totalWidth / 2) - minX;
+  const centeredX = starts.map(start => start + centerOffset);
+  return { totalWidth, baseWidths, renderedWidths, starts, minX, maxX, centeredX };
 }
 
 export function canvasCellSize(zoom, verticalStretch = 1, minimumHeight = 1) {
@@ -118,11 +123,55 @@ export function rasterSurfaceGeometry(cellW, cellH, columns, rows, pixelRatio = 
   };
 }
 
+// Snap the cell itself so independently sized sprite canvases share the same
+// backing-store coordinate lattice when their Atari positions overlap.
+export function sharedRasterCellGeometry(cellW, cellH, pixelRatio = 1) {
+  const ratio = Math.max(1, Number(pixelRatio) || 1);
+  const deviceCellWidth = Math.max(1, Math.round((Number(cellW) || 1) * ratio));
+  const deviceCellHeight = Math.max(1, Math.round((Number(cellH) || 1) * ratio));
+  return {
+    pixelRatio: ratio,
+    deviceCellWidth,
+    deviceCellHeight,
+    cellW: deviceCellWidth / ratio,
+    cellH: deviceCellHeight / ratio
+  };
+}
+
+// Preserve continuous CSS dimensions while giving tiny cells enough backing
+// pixels for crisp shared boundaries.
+export function smoothRasterCellGeometry(cellW, cellH, pixelRatio = 1) {
+  const width = Math.max(1, Number(cellW) || 1);
+  const height = Math.max(1, Number(cellH) || 1);
+  const displayRatio = Math.max(1, Number(pixelRatio) || 1);
+  const precisionRatio = Math.max(displayRatio, Math.min(4, 8 / Math.min(width, height)));
+  return {
+    pixelRatio: precisionRatio,
+    displayPixelRatio: displayRatio,
+    deviceCellWidth: width * precisionRatio,
+    deviceCellHeight: height * precisionRatio,
+    cellW: width,
+    cellH: height
+  };
+}
+
+export function centeredCompositionMargins({ viewportWidth, viewportHeight, compositionWidth, compositionHeight, paddingLeft = 0, paddingTop = 0, compositionOriginX = 0, compositionOriginY = 0 }) {
+  return {
+    left: Math.max(0, (viewportWidth - compositionWidth) / 2 - paddingLeft - compositionOriginX),
+    top: Math.max(0, (viewportHeight - compositionHeight) / 2 - paddingTop - compositionOriginY)
+  };
+}
+
 // Round in backing-store pixels, then convert back to CSS coordinates. All
 // cell fills, grid lines, and feedback outlines consequently share one edge.
 export function rasterCellBoundary(cellSize, index, offset = 0, pixelRatio = 1) {
   const ratio = Math.max(1, Number(pixelRatio) || 1);
   return Math.round((offset + index * cellSize) * ratio) / ratio;
+}
+
+export function rasterCellBoundaryFromOrigin(cellSize, index, origin = 0, pixelRatio = 1) {
+  return rasterCellBoundary(cellSize, origin + index, 0, pixelRatio)
+    - rasterCellBoundary(cellSize, origin, 0, pixelRatio);
 }
 
 export function rasterCellRect(cellW, cellH, x, y, offsetX = 0, offsetY = 0, pixelRatio = 1) {

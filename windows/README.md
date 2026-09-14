@@ -1,6 +1,62 @@
-# YAJA 2600 Animator v1.3.4
+# YAJA 2600 Animator v1.5.0
 
-## v1.3.4 working notes
+The v1.5.0 milestone includes the major improvements made since the last published v1.3.4 release. See [CHANGELOG.md](CHANGELOG.md) for release-ready notes.
+
+## v1.5.0 working notes
+
+- The frame and selected-sprite size readout is docked to the bottom of the canvas viewport above its horizontal scrollbar.
+- The size readout now shows only the selected sprite dimensions; the redundant two-sprite `2 x` prefix is removed.
+- Sprite A/B canvas labels select the matching edit slot from their text area while their eye buttons remain visibility-only controls.
+- Inactive sprite labels use the same darker surface as the frame/size readout.
+- NUSIZ copies and width expansion extend right from stable primary-sprite anchors without pushing the other primary sprite.
+- Schema 14 migrates older adjacent compositions once to preserve their existing appearance under the corrected anchor model.
+
+- Selected Sprite A/B canvas labels now use the active theme highlight.
+- Timeline thumbnails follow the same assigned-player layer priority as the editing canvas.
+- Paint-palette selection is an inset outline around the actual Atari color.
+- Save reuses the current browser handle or desktop path and rejects overlapping save requests.
+- Canvas centering and zoom use the sprite composition alone; labels, color columns, readouts, and scrollbar changes no longer shift it.
+- Timeline frames display from 1 and report the complete animation duration in seconds.
+
+- Added a default-on **Ignore Black Background** reference option shared by Auto-Paint and Auto-Color.
+- Auto-Color now rejects opaque near-black background pixels and low-strength antialias blends before averaging a scanline color.
+- Transparent PNG pixels remain excluded from both shape and color extraction.
+- PNG frames now use tight 17×10 Atari-aspect cells, allowing an exported single sprite to map back onto the same reference grid without padding or aspect drift.
+
+- Interpolates fast scanline-color drags so every crossed row receives the selected Atari color.
+- Audits every desktop menu command and file bridge, and adds state-synchronized checkbox items for Two Sprite Mode, Grid, Color Columns, and Onion Skin.
+- Restores the visible Atari background layer in one- and two-sprite editing modes.
+- Uses one device-aligned cell size for both sprite canvases so offset overlaps share exact grid coordinates.
+- Keeps saved Auto Sprite Select choices while a fresh preference state starts unchecked.
+- Stacks sprite labels when their natural positions touch, with the top-rendered player's label first.
+- Restores the Grid perimeter at the same color, opacity, and line thickness as the internal cell edges.
+- Keeps active-sprite outlines, canvas borders, focus rings, and canvas shadows removed.
+- Replaces the Stamp tool artwork with a simple filled stamp silhouette.
+- Removes canvas focus and active-slot edge treatments from every canvas layer.
+- Renders BG once beneath transparent sprite canvases so upper blank cells cannot cover lower sprite pixels.
+- Uses assigned player order for overlaps: P0 is always highest, then higher player numbers.
+- Auto Sprite Select defaults off and passes through hidden or empty upper sprite cells to live pixels below.
+
+- Refreshes the frame dimension readout whenever button selection or Auto Sprite Select changes the active sprite.
+
+- Removed workspace dots and all CSS canvas outlines while retaining optional grid-edge lines.
+- Renamed Grid Intensity to Opacity and tightened the Sprite Settings layout.
+- Added temporary per-sprite visibility controls to dynamic labels beneath both canvases.
+- Two-sprite height changes now preserve the bottom edge and the position of retained artwork.
+
+- Removed the distracting active-sprite canvas rings in Two Sprite Mode; the Sprite A/B buttons now carry selection state.
+- Replaced the Stamp tool's duplicate-pages glyph with a dedicated rubber-stamp icon.
+
+- Background color selection now uses the same labeled Atari palette grid and inset selection ring as paint-color selection in NTSC and PAL.
+- Two-sprite active-canvas feedback is drawn in a dedicated top overlay so it always marks the actual active sprite, including overlapping sprites.
+- The open Grid Appearance control uses the same theme accent outline as other selected controls.
+
+- Auto Sprite Selection is integrated with the Sprite A/B selector and can be disabled for manual canvas-tool locking.
+- Grid color and intensity open from the small disclosure beside Grid; Dots independently controls the workspace pattern.
+- Kernel is the leftmost canvas-toolbar section; the canvas controls follow with the Atari BG palette, Grid, Dots, Colors, and Zoom.
+- Grid appearance uses a compact color/intensity popup with a consistent RESET button; BG uses the official Atari palette popup.
+- Undo and Redo are labeled actions, and color columns remain visible whenever Colors is enabled.
+- Kernel dropdown text now follows the established compact `.7rem` control sizing.
 
 - Removed project-background fill from the spaces between hardware copies in Single Sprite Mode.
 - Background painting now follows NUSIZ copy geometry consistently in both one- and two-sprite compositions.

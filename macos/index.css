@@ -805,9 +805,7 @@ body.theme-atari {
 .canvas-band {
   min-height: 0;
   padding: 28px 18px;
-  background:
-    radial-gradient(circle at 1px 1px, #383838 1px, transparent 1.2px) 0 0 / 16px 16px,
-    #141414;
+  background: #141414;
 }
 
 .canvas-wrap {
@@ -1146,8 +1144,7 @@ button.primary,
   gap: 5px;
   padding: 60px;
   background-color: var(--bg-dark);
-  background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: none;
   overflow: auto;
   align-items: flex-start;
 }
@@ -1405,7 +1402,7 @@ body.theme-atari { min-width: 0; overflow: hidden; }
 .panel { border-radius: 0; border-top: 0; border-bottom: 0; background: #292929; }
 .editor-zone { min-width: 0; border-inline: 1px solid #454545; background: #101010; }
 .editor-toolbar { min-height: 62px; padding: 9px 12px; border-bottom: 1px solid #414141; background: #252525; }
-.canvas-band { min-height: 0; padding: 28px 18px; background: radial-gradient(circle at 1px 1px, #383838 1px, transparent 1.2px) 0 0 / 16px 16px, #141414; }
+.canvas-band { min-height: 0; padding: 28px 18px; background: #141414; }
 .canvas-wrap { border: 1px solid #777; box-shadow: 0 0 0 3px #080808, 0 18px 42px rgba(0,0,0,.42); background: var(--canvas-black); }
 .preview-shell { width: 218px; border-color: #555; background: #181818; }
 .frames-strip { display: grid; grid-template-rows: auto auto minmax(82px, 1fr); gap: 8px; min-height: 154px; padding: 10px 12px 12px; border-top: 1px solid #505050; background: #242424; }
@@ -2216,7 +2213,7 @@ body { color: var(--theme-text); background: var(--theme-app-bg); }
 .editor-toolbar { background: var(--theme-toolbar-bg); border-color: var(--theme-border); }
 .canvas-band {
   background-color: var(--theme-canvas-workspace-bg);
-  background-image: radial-gradient(circle at 1px 1px, #383838 1px, transparent 1.2px);
+  background-image: none;
 }
 .frames-strip { background: var(--theme-timeline-bg); border-color: var(--theme-border); }
 .status-bar { background: var(--theme-status-bg); border-color: var(--theme-border); color: var(--theme-text-muted); }
@@ -2351,7 +2348,6 @@ canvas[tabindex]:focus-visible {
   z-index: 5;
 }
 .composition-color-columns:empty { display: none; }
-.solid-color-kernel .composition-color-columns { display: none; }
 
 .display-region-row {
   display: grid;
@@ -2605,7 +2601,8 @@ canvas {
   min-width: 0;
 }
 
-.reference-dither {
+.reference-dither,
+.reference-ignore-black {
   min-height: 30px;
   align-items: center;
 }
@@ -2832,7 +2829,7 @@ body {
 
 .canvas-band {
   background-color: var(--theme-canvas-workspace-bg);
-  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--theme-text) 18%, transparent) 1px, transparent 1.2px);
+  background-image: none;
 }
 
 button.active,
@@ -2878,8 +2875,9 @@ input[type="range"] { accent-color: var(--theme-primary); }
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  outline: 1px solid var(--theme-border);
-  outline-offset: -1px;
+  outline: none;
+  border: 0;
+  box-shadow: none;
 }
 
 .player-canvas-group { z-index: 1; }
@@ -3066,10 +3064,10 @@ button:where(:not(.persistent-swatch):not(#currentColorSwatch)) svg {
   --canvas-grid-line-width: 1px;
 }
 
-#palette .persistent-swatch.active,
-#palette .persistent-swatch.selected,
-#palette .persistent-swatch.active:hover,
-#palette .persistent-swatch.selected:hover {
+.persistent-palette-grid .persistent-swatch.active,
+.persistent-palette-grid .persistent-swatch.selected,
+.persistent-palette-grid .persistent-swatch.active:hover,
+.persistent-palette-grid .persistent-swatch.selected:hover {
   position: relative;
   z-index: 12;
   background: var(--swatch-color) !important;
@@ -4178,7 +4176,7 @@ dialog.color-block-editor-popover[open] {
 }
 
 /* YAJA 2600 Animator v0.069 - theme-readable palette labels and frame/readout parity. */
-#palette .palette-axis-label {
+.persistent-palette-grid .palette-axis-label {
   color: #c8c8c8 !important;
   background: #111111 !important;
 }
@@ -4424,20 +4422,377 @@ dialog.color-block-editor-popover[open] {
 .sprite-stage .player-canvas-group.hidden { display: none !important; }
 .sprite-stage .canvas-wrap { padding: 0 !important; background: transparent !important; }
 .sprite-stage .player-canvas-group canvas { display: block; background: transparent !important; }
-.composition-backdrop { display: none !important; }
+.composition-backdrop { display: block; }
 .composition-color-columns { margin: 0 !important; z-index: 5; }
 
-/* v1.3.2: each NUSIZ copy retains its own grid edge. Do not draw an active
-   outline around the transparent canvas spanning the complete copy group. */
-.player-canvas-group.nusiz-copies canvas,
-.editor-zone.two-sprite-layout .player-canvas-group.active-slot canvas {
+/* The optional drawn grid is the only canvas edge treatment. */
+.player-canvas-group canvas {
   outline: none !important;
   box-shadow: none !important;
+  border: 0 !important;
 }
+
+.sprite-canvas-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 5px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: max-content;
+  min-width: 136px;
+  height: 27px;
+  margin: 0;
+  padding: 0 3px 0 0;
+  border: 1px solid var(--theme-border);
+  background: color-mix(in srgb, var(--theme-panel-bg) 94%, transparent);
+  color: var(--theme-text-secondary);
+  font: 11px/1 "JetBrains Mono", monospace;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.sprite-canvas-label.hidden { display: none !important; }
+.sprite-canvas-label:not(.active-sprite) { background: rgba(20, 20, 20, .92); }
+.theme-classic-light .sprite-canvas-label:not(.active-sprite),
+.theme-classic-light .canvas-readout { background: var(--theme-panel-bg) !important; }
+.sprite-canvas-selector {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 8px;
+  min-width: 0;
+  height: 25px;
+  min-height: 25px;
+  margin: 0;
+  padding: 0 8px 0 10px;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--theme-text-secondary);
+  font: inherit;
+  letter-spacing: inherit;
+  white-space: nowrap;
+}
+.sprite-canvas-selector:hover,
+.sprite-canvas-selector:focus-visible { color: var(--theme-text); }
+.sprite-canvas-selector:focus-visible { outline: 1px solid var(--theme-primary); outline-offset: -2px; }
+.sprite-canvas-label .sprite-canvas-name { color: var(--theme-text-secondary); }
+.sprite-canvas-label.active-sprite .sprite-canvas-name { color: var(--theme-primary); }
+.sprite-canvas-label .sprite-canvas-separator { color: var(--theme-text-muted); }
+.sprite-canvas-label.sprite-hidden { opacity: .72; }
+
+.sprite-visibility-button {
+  display: grid;
+  place-items: center;
+  width: 23px;
+  min-width: 23px;
+  height: 21px;
+  min-height: 21px;
+  margin-left: auto;
+  padding: 0;
+  border-radius: 3px;
+  background: var(--theme-control-bg);
+  color: var(--theme-text-secondary);
+}
+
+.sprite-visibility-button svg { width: 14px; height: 14px; fill: currentColor; }
+.sprite-visibility-button[aria-pressed="true"] { color: var(--theme-text-muted); }
 
 .onion-control-group .onion-count {
   margin-left: 10px !important;
   margin-right: 10px !important;
+}
+
+/* v1.3.8 editor visibility and sprite targeting */
+:root {
+  --canvas-grid-default-color: #ffffff;
+  --canvas-grid-default-intensity: 15;
+}
+
+.active-sprite-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.active-sprite-heading > span {
+  flex: 0 0 auto;
+  color: var(--theme-text-secondary);
+  font-size: .7rem;
+  letter-spacing: .08rem;
+  text-transform: uppercase;
+}
+
+.auto-sprite-selection {
+  min-width: 0;
+  margin: 5px 0 0 !important;
+  white-space: nowrap;
+}
+
+.auto-sprite-selection input { flex: 0 0 auto; }
+
+.grid-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.grid-control > .check-row { margin-right: 0; }
+
+.grid-settings-disclosure {
+  position: static;
+  height: 32px;
+}
+
+.grid-settings-disclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  margin-left: 2px;
+  padding: 0;
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+  background: var(--theme-control-bg);
+  color: var(--theme-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.grid-settings-disclosure > summary::-webkit-details-marker { display: none; }
+.grid-settings-disclosure > summary svg { width: 16px; height: 16px; display: block; }
+.grid-settings-disclosure > summary:hover,
+.grid-settings-disclosure > summary:focus-visible,
+.grid-settings-disclosure[open] > summary {
+  border-color: var(--theme-primary);
+  background: var(--theme-control-hover-bg);
+  color: var(--theme-primary);
+  box-shadow: inset 0 0 0 1px var(--theme-primary);
+}
+
+.grid-settings-popover {
+  position: fixed;
+  z-index: 100;
+  width: 238px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+  background: var(--theme-panel-bg);
+  color: var(--theme-text);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 32%);
+  font: .66rem/1.35 "Orbitron", system-ui, sans-serif;
+  letter-spacing: .04rem;
+}
+
+.grid-settings-popover > strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--theme-text-secondary);
+  font-size: .65rem;
+  letter-spacing: .06rem;
+  text-transform: uppercase;
+}
+
+.grid-color-row {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 30px !important;
+  margin: 0 !important;
+  color: var(--theme-text-secondary);
+}
+
+.grid-color-row input[type="color"] {
+  width: 34px;
+  min-width: 34px;
+  height: 28px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.grid-intensity-row {
+  display: flex !important;
+  justify-content: space-between;
+  min-height: 22px !important;
+  margin-top: 8px !important;
+}
+
+.grid-settings-popover > input[type="range"] {
+  display: block;
+  width: 100%;
+  height: 24px;
+  margin: 0 0 6px;
+}
+
+.grid-settings-popover > button {
+  width: 100%;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+  background: var(--theme-control-bg);
+  color: var(--theme-text);
+  font: 400 .65rem "Orbitron", system-ui, sans-serif;
+  letter-spacing: .08rem;
+}
+
+.grid-settings-popover > button:hover {
+  border-color: var(--theme-primary);
+  background: var(--theme-control-hover-bg);
+  color: var(--theme-primary);
+}
+
+.kernel-control-group,
+.view-control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.toolbar-section-label {
+  color: var(--theme-text-secondary);
+  font-size: .58rem;
+  letter-spacing: .1rem;
+  text-transform: uppercase;
+}
+
+.kernel-control-group select {
+  width: 142px;
+  min-width: 142px;
+  height: 30px;
+  font-size: .7rem;
+}
+
+.bg-control { gap: 5px !important; }
+
+.bg-swatch-button {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 3px;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-control-bg);
+}
+
+.bg-swatch-button > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgb(255 255 255 / 40%);
+  border-radius: 2px;
+  background: var(--swatch-color, #000);
+}
+
+.bg-swatch-button:hover { border-color: var(--theme-primary); }
+
+.bg-control input.code-input {
+  width: 52px;
+  min-width: 52px;
+  height: 30px;
+  padding-inline: 5px;
+  font-size: .65rem;
+}
+
+.bg-color-popover {
+  position: fixed;
+  z-index: 101;
+  width: 234px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+  background: var(--theme-panel-bg);
+  color: var(--theme-text);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 32%);
+  font: .66rem/1.35 "Orbitron", system-ui, sans-serif;
+  letter-spacing: .04rem;
+}
+
+.bg-color-popover > strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--theme-text-secondary);
+  font-size: .65rem;
+  letter-spacing: .06rem;
+  text-transform: uppercase;
+}
+
+.bg-palette {
+  width: 100%;
+  margin: 0;
+}
+
+.history-actions .history-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  min-width: 76px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: .65rem;
+}
+
+.history-actions .history-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.canvas-stage-scroll { scrollbar-gutter: stable; }
+.canvas-band { scrollbar-gutter: auto; }
+
+/* Color columns are an editor view aid and remain available for every kernel. */
+.solid-color-kernel .composition-color-columns { display: flex; }
+
+@media (max-width: 1420px) {
+  .kernel-control-group select { width: 136px; min-width: 136px; }
+}
+
+body.editor-grid-hidden .color-block-editor-line { border-bottom-color: transparent; }
+
+.locked-sprite-feedback {
+  position: absolute;
+  z-index: 2000;
+  pointer-events: none;
+  background: transparent !important;
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.sprite-stage .player-canvas-group,
+.sprite-stage .canvas-wrap,
+.sprite-stage canvas,
+.sprite-stage .composition-backdrop {
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+@media (max-width: 1420px) {
+  .editor-toolbar input[type="range"] { width: 92px; }
+  .kernel-control-group select { width: 136px; min-width: 136px; }
+  .bg-control input.code-input { width: 48px; min-width: 48px; }
+  .editor-toolbar { gap: 5px; }
+  .editor-toolbar .canvas-toolbar-divider { margin-inline: 1px; }
+}
+
+@media (max-width: 1120px) {
+  .editor-toolbar { overflow-x: auto; overflow-y: hidden; }
 }
 
 @media (max-width: 1680px) {
@@ -4866,12 +5221,12 @@ dialog.color-block-editor-popover[open] {
 /* YAJA 2600 Animator v1.1.13 - Palette swatches are fixed grid cells.
    Hover and selection use inset treatments so they cannot expand into, clip,
    or visually merge with their neighboring palette row. */
-#palette.persistent-palette-grid {
+.persistent-palette-grid {
   isolation: isolate;
   overflow: hidden;
 }
 
-#palette .persistent-swatch {
+.persistent-palette-grid .persistent-swatch {
   box-sizing: border-box;
   min-width: 0;
   min-height: 22px;
@@ -4882,18 +5237,66 @@ dialog.color-block-editor-popover[open] {
   transition: box-shadow .1s ease, border-color .1s ease;
 }
 
-#palette .persistent-swatch:hover {
+.persistent-palette-grid .persistent-swatch:hover {
   z-index: auto;
   transform: none !important;
   border-color: transparent;
   box-shadow: inset 0 0 0 1px var(--theme-text) !important;
 }
 
+.persistent-palette-grid .persistent-swatch.active,
+.persistent-palette-grid .persistent-swatch.selected,
+.persistent-palette-grid .persistent-swatch.active:hover,
+.persistent-palette-grid .persistent-swatch.selected:hover {
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
+}
+
+/* v1.5.0: dock the readout to the viewport above its horizontal scrollbar. */
+.canvas-band > .canvas-readout.canvas-readout-dock,
+.theme-classic-light .canvas-band > .canvas-readout.canvas-readout-dock {
+  position: absolute !important;
+  left: 50% !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: calc(var(--canvas-horizontal-scrollbar-height, 0px) + 4px) !important;
+  margin: 0 !important;
+  transform: translateX(-50%) !important;
+  z-index: 2001;
+  pointer-events: none;
+}
+
+/* Match the sprite indicators' centered separator and even spacing. */
+.canvas-readout.canvas-readout-dock {
+  align-items: center;
+  gap: 8px;
+  font: 11px/1 "JetBrains Mono", monospace;
+}
+
+.canvas-readout.canvas-readout-dock > span {
+  min-width: 0;
+}
+
+.canvas-readout.canvas-readout-dock .canvas-readout-separator,
+.theme-classic-light .canvas-readout.canvas-readout-dock .canvas-readout-separator {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--theme-text-muted) !important;
+}
+
+.canvas-readout span + span::before {
+  content: none !important;
+  margin: 0 !important;
+}
+
+/* Paint selection is an outline around the Atari color, never a fill. */
 #palette .persistent-swatch.active,
 #palette .persistent-swatch.selected,
 #palette .persistent-swatch.active:hover,
 #palette .persistent-swatch.selected:hover {
-  z-index: 1;
+  background: var(--swatch-color) !important;
+  border-color: transparent !important;
   box-shadow: inset 0 0 0 2px var(--theme-primary) !important;
 }
 

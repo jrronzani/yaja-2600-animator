@@ -115,6 +115,20 @@ ipcMain.handle("desktop:save-file-as", async (_event, options = {}) => {
   return { canceled: false, filePath: result.filePath, fileName: path.basename(result.filePath) };
 });
 
+ipcMain.on("desktop-menu-state", (_event, state = {}) => {
+  const menu = Menu.getApplicationMenu();
+  const checks = {
+    "view-two-sprite": state.twoSpriteMode,
+    "view-grid": state.showGrid,
+    "view-colors": state.showColorColumns,
+    "view-onion": state.onion
+  };
+  Object.entries(checks).forEach(([id, checked]) => {
+    const item = menu?.getMenuItemById(id);
+    if (item) item.checked = !!checked;
+  });
+});
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -226,9 +240,11 @@ function createAppMenu() {
     {
       label: "View",
       submenu: [
-        { label: "Toggle Grid", click: () => sendMenuCommand("grid-toggle") },
-        { label: "Toggle Color Columns", click: () => sendMenuCommand("colors-toggle") },
-        { label: "Toggle Onion Skin", click: () => sendMenuCommand("onion-toggle") },
+        { id: "view-two-sprite", label: "Two Sprite Mode", type: "checkbox", click: () => sendMenuCommand("two-sprite-toggle") },
+        { type: "separator" },
+        { id: "view-grid", label: "Grid", type: "checkbox", checked: true, click: () => sendMenuCommand("grid-toggle") },
+        { id: "view-colors", label: "Color Columns", type: "checkbox", checked: true, click: () => sendMenuCommand("colors-toggle") },
+        { id: "view-onion", label: "Onion Skin", type: "checkbox", click: () => sendMenuCommand("onion-toggle") },
         { type: "separator" },
         { role: "reload" },
         {
@@ -258,7 +274,7 @@ function createAppMenu() {
             type: "info",
             title: "About YAJA 2600 Animator",
             message: "YAJA 2600 Animator",
-            detail: "Version 1.3.4\nAtari 2600 sprite animation editor by Nebulords."
+            detail: "Version 1.5.0\nAtari 2600 sprite animation editor by Nebulords."
           })
         }
       ]

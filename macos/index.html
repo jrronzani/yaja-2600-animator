@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YAJA 2600 Animator v1.3.4</title>
+  <title>YAJA 2600 Animator v1.5.0</title>
   <link rel="icon" type="image/png" sizes="512x512" href="assets/branding/yaja-2600-animator-logo.png">
-  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="index.css?v=1.5.0">
 </head>
 <body class="theme-atari">
   <svg class="icon-defs" aria-hidden="true">
@@ -49,6 +49,9 @@
       <symbol id="icon-duplicate" viewBox="0 0 24 24">
         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
       </symbol>
+      <symbol id="icon-stamp" viewBox="0 0 24 24">
+        <path d="M12 2a4 4 0 00-4 4c0 1.6.9 2.9 2 3.6V13H6a3 3 0 00-3 3v3h18v-3a3 3 0 00-3-3h-4V9.6c1.1-.7 2-2 2-3.6a4 4 0 00-4-4zM5 21h14v2H5z"/>
+      </symbol>
       <symbol id="icon-up" viewBox="0 0 24 24">
         <path d="M7 14l5-5 5 5z"/>
       </symbol>
@@ -57,6 +60,12 @@
       </symbol>
       <symbol id="icon-eyedropper" viewBox="0 0 24 24">
         <path d="M20.71 5.63l-2.34-2.34a1 1 0 00-1.41 0l-3.12 3.12-1.93-1.91-1.41 1.41 1.92 1.92L2 18.25V22h3.75l10.42-10.42 1.92 1.92 1.41-1.41-1.92-1.92 3.12-3.12a1 1 0 000-1.42zM5.12 20H4v-1.12l9.46-9.46 1.12 1.12L5.12 20z"/>
+      </symbol>
+      <symbol id="icon-eye" viewBox="0 0 24 24">
+        <path d="M12 5C6.5 5 2.1 8.4.5 12c1.6 3.6 6 7 11.5 7s9.9-3.4 11.5-7C21.9 8.4 17.5 5 12 5zm0 11a4 4 0 110-8 4 4 0 010 8zm0-2a2 2 0 100-4 2 2 0 000 4z"/>
+      </symbol>
+      <symbol id="icon-eye-off" viewBox="0 0 24 24">
+        <path d="M3.3 2L2 3.3l3.1 3.1C2.9 7.8 1.4 9.8.5 12c1.6 3.6 6 7 11.5 7 1.7 0 3.3-.3 4.7-.9l4 3.9 1.3-1.3L3.3 2zM12 16c-2.2 0-4-1.8-4-4 0-.7.2-1.4.12-2l1.6 1.6V12a2 2 0 002 2h.4l1.6 1.6c-.6.3-1.3.4-2.1.4zm0-11c5.5 0 9.9 3.4 11.5 7-.7 1.6-1.9 3.1-3.4 4.3l-2.3-2.3c.1-.6.2-1.3.2-2a6 6 0 00-6-6c-.7 0-1.4.1-2 .3L8.5 4.8c1.1-.5 2.3-.8 3.5-.8z"/>
       </symbol>
       <symbol id="icon-image" viewBox="0 0 24 24">
         <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
@@ -81,12 +90,17 @@
       <symbol id="icon-fullscreen" viewBox="0 0 24 24">
         <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
       </symbol>
+      <symbol id="icon-tune" viewBox="0 0 24 24">
+        <path d="M4 7h7m4 0h5M4 17h3m4 0h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="13" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="9" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      </symbol>
     </defs>
   </svg>
   <header class="app-header">
     <div class="brand">
       <div class="logo brand-title">YAJA 2600 Animator</div>
-      <div class="version">v1.3.4</div>
+      <div class="version">v1.5.0</div>
     </div>
     <div class="project-strip" aria-label="Project actions">
       <label class="project-name-control"><span>Project</span><input id="projectName" value="Untitled Project"></label>
@@ -102,7 +116,7 @@
         </select>
       </label>
       <button id="newProject" title="New project">New</button>
-      <button id="saveProject" title="Save project JSON">Save</button>
+      <button id="saveProject" title="Choose where to save project JSON">Save</button>
       <button id="loadProject" title="Load project JSON">Open</button>
       <input id="projectFile" type="file" accept="application/json,.json" hidden>
       <span class="project-divider" aria-hidden="true"></span>
@@ -134,7 +148,7 @@
           <button data-tool="triangle" class="tool tool-btn" title="Vertical triangle"><svg><use href="#icon-triangle-v"></use></svg></button>
           <button data-tool="triangle-side" class="tool tool-btn" title="Horizontal triangle"><svg><use href="#icon-triangle-h"></use></svg></button>
           <button data-tool="select" class="tool tool-btn" title="Select"><svg><use href="#icon-select"></use></svg></button>
-          <button data-tool="stamp" class="tool tool-btn" title="Stamp"><svg><use href="#icon-duplicate"></use></svg></button>
+          <button data-tool="stamp" class="tool tool-btn" title="Stamp"><svg><use href="#icon-stamp"></use></svg></button>
           <button data-tool="fill" class="tool tool-btn" title="Flood fill"><svg><use href="#icon-bucket"></use></svg></button>
           <button data-tool="color" class="tool tool-btn" title="Paint scanline color"><svg><use href="#icon-paint"></use></svg></button>
           <!-- Text and canvas eyedropper tools remain recoverable in app.js but are hidden here. -->
@@ -144,16 +158,19 @@
         <label class="dimension-control"><span>Brush Width</span><input id="brushWidth" type="number" min="1" max="8" value="1"></label>
         <label class="dimension-control"><span>Brush Height</span><input id="brushHeight" type="number" min="1" max="32" value="1"></label>
         <div class="compact-row history-actions">
-          <button id="undo" class="btn-icon" title="Undo" aria-label="Undo"><svg><use href="#icon-undo"></use></svg></button>
-          <button id="redo" class="btn-icon" title="Redo" aria-label="Redo"><svg><use href="#icon-redo"></use></svg></button>
+          <button id="undo" class="history-button" title="Undo" aria-label="Undo"><svg><use href="#icon-undo"></use></svg><span>Undo</span></button>
+          <button id="redo" class="history-button" title="Redo" aria-label="Redo"><svg><use href="#icon-redo"></use></svg><span>Redo</span></button>
         </div>
       </section>
 
       <section class="settings-section sprite-settings-section">
         <h2>Sprite Settings</h2>
         <label class="check-row"><input id="twoSpriteMode" type="checkbox"> Two Sprite Mode</label>
+        <label id="autoSpriteSelectionRow" class="check-row auto-sprite-selection hidden" title="Automatically activate the visible sprite under the canvas tool"><input id="autoSpriteSelection" type="checkbox"> Auto Sprite Select</label>
         <div id="activeSpriteTabs" class="active-sprite-tabs hidden" aria-label="Choose sprite to edit">
-          <span>Edit Sprite</span>
+          <div class="active-sprite-heading">
+            <span>Edit Sprite</span>
+          </div>
           <div class="segmented">
             <button id="selectSpriteA" type="button" class="active" aria-pressed="true">Sprite A</button>
             <button id="selectSpriteB" type="button" aria-pressed="false">Sprite B</button>
@@ -161,7 +178,6 @@
         </div>
         <label id="playerAssignment0Row" class="sprite-assignment-row"><span id="playerAssignment0Label">Sprite #</span><select id="playerAssignment0"></select></label>
         <label id="playerAssignment1Row" class="sprite-assignment-row hidden"><span id="playerAssignment1Label">Sprite B #</span><select id="playerAssignment1"></select></label>
-        <div class="two-col frame-dimensions"><label>Width <input id="spriteWidth" type="number" min="1" max="8" value="8"></label><label>Height <input id="spriteHeight" type="number" min="1" max="255" value="16"></label></div>
         <label id="spriteNusizLabel">NUSIZ Mode
           <select id="spriteNusiz">
             <optgroup label="Single Sprite Size">
@@ -178,8 +194,8 @@
             </optgroup>
           </select>
         </label>
+        <div class="two-col frame-dimensions"><label>Width <input id="spriteWidth" type="number" min="1" max="8" value="8"></label><label>Height <input id="spriteHeight" type="number" min="1" max="255" value="16"></label></div>
         <label id="spriteSolidColorRow" class="solid-color-row">Color <input id="spriteSolidColor" class="code-input" value="$48" maxlength="3"></label>
-        <div class="subcontrol-label frame-offset-label">Sprite Offsets</div>
         <div id="offsetControls" class="offset-controls"><label id="spriteOffsetXRow" class="hidden">X Offset <input id="spriteOffsetX" type="number" min="-160" max="160" value="0"></label><label id="spriteOffsetYRow">Y Offset <input id="spriteOffsetY" type="number" min="-255" max="255" value="0"></label></div>
         <div class="two-col bulk-actions"><button id="applySizeAll">Apply Size to All</button><button id="applyOffsetsAll" title="Copy the active sprite's current-frame X and Y offsets to every frame">Apply Offsets to All</button></div>
         <div id="twoSpriteControls" class="two-sprite-controls hidden">
@@ -190,20 +206,6 @@
             <button id="mirrorP0P1" class="span-two">Mirror</button>
           </div>
         </div>
-      </section>
-
-      <section class="settings-section project-settings-section">
-        <h2>Project Settings</h2>
-        <label>Kernel
-          <select id="kernelMode">
-            <option value="PXE">PXE</option>
-            <option value="DPC+">DPC+</option>
-            <option value="MULTISPRITE">Multisprite</option>
-            <option value="STANDARD">Standard</option>
-          </select>
-        </label>
-        <!-- Vertical stretch is kernel-defined: Standard is 2x; DPC+/PXE are 1x. -->
-        <label>BG <input id="bgColor" class="code-input" value="$00" maxlength="3"></label>
       </section>
 
       <section class="edit-section">
@@ -248,8 +250,27 @@
 
     <section class="editor-zone" id="editorZone">
       <div class="editor-toolbar" aria-label="Canvas view controls">
-        <div class="canvas-control-group view-control-group">
-          <label class="check-row"><input id="showGrid" type="checkbox" checked> Grid</label>
+        <div class="canvas-control-group kernel-control-group" aria-label="Kernel settings">
+          <span class="toolbar-section-label">Kernel</span>
+          <select id="kernelMode" aria-label="Kernel">
+            <option value="PXE">PXE</option>
+            <option value="DPC+">DPC+</option>
+            <option value="MULTISPRITE">Multisprite</option>
+            <option value="STANDARD">Standard</option>
+          </select>
+        </div>
+        <div class="canvas-toolbar-divider" aria-hidden="true"></div>
+        <div class="canvas-control-group view-control-group" aria-label="Canvas controls">
+          <label class="bg-control">BG
+            <button id="bgColorPicker" type="button" class="bg-swatch-button" aria-label="Background Atari color" title="Choose background Atari color"><span aria-hidden="true"></span></button>
+            <input id="bgColor" class="code-input" value="$00" maxlength="3" aria-label="Background Atari color number">
+          </label>
+          <div class="grid-control">
+            <label class="check-row"><input id="showGrid" type="checkbox" checked> Grid</label>
+            <details id="gridSettingsDisclosure" class="grid-settings-disclosure">
+              <summary title="Grid appearance" aria-label="Grid appearance"><svg aria-hidden="true"><use href="#icon-tune"></use></svg></summary>
+            </details>
+          </div>
           <label class="check-row"><input id="showColorColumns" type="checkbox" checked> Colors</label>
           <div class="canvas-toolbar-divider compact-divider" aria-hidden="true"></div>
           <label>Zoom <input id="zoom" type="range" min="0" max="100" value="50"></label>
@@ -262,12 +283,13 @@
         </div>
       </div>
 
-      <div class="canvas-band">
+      <div class="canvas-band" id="canvasBand">
         <div class="canvas-stage-scroll" id="canvasStageScroll">
         <div class="sprite-stage" id="spriteStage">
+          <canvas id="lockedSpriteFeedback" class="locked-sprite-feedback hidden" aria-hidden="true"></canvas>
           <div id="compositionBackdrop" class="composition-backdrop hidden" aria-hidden="true"></div>
-          <div id="playerCanvasGroup0" class="player-canvas-group"><div class="canvas-wrap"><canvas id="spriteCanvas" data-player="0" tabindex="0"></canvas></div></div>
-          <div id="playerCanvasGroup1" class="player-canvas-group hidden"><div class="canvas-wrap"><canvas id="spriteCanvas1" data-player="1" tabindex="0"></canvas></div></div>
+          <div id="playerCanvasGroup0" class="player-canvas-group"><div class="canvas-wrap"><canvas id="spriteCanvas" data-player="0"></canvas></div><div id="spriteCanvasLabel0" class="sprite-canvas-label hidden"><button id="spriteCanvasSelector0" type="button" class="sprite-canvas-selector" title="Edit Sprite A" aria-label="Edit Sprite A"><span class="sprite-canvas-name">Sprite A</span><span class="sprite-canvas-separator">·</span><span id="spriteCanvasAssignment0">P0</span></button><button id="toggleSpriteVisibility0" type="button" class="sprite-visibility-button" title="Hide Sprite A" aria-label="Hide Sprite A" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-eye"></use></svg></button></div></div>
+          <div id="playerCanvasGroup1" class="player-canvas-group hidden"><div class="canvas-wrap"><canvas id="spriteCanvas1" data-player="1"></canvas></div><div id="spriteCanvasLabel1" class="sprite-canvas-label hidden"><button id="spriteCanvasSelector1" type="button" class="sprite-canvas-selector" title="Edit Sprite B" aria-label="Edit Sprite B"><span class="sprite-canvas-name">Sprite B</span><span class="sprite-canvas-separator">·</span><span id="spriteCanvasAssignment1">P1</span></button><button id="toggleSpriteVisibility1" type="button" class="sprite-visibility-button" title="Hide Sprite B" aria-label="Hide Sprite B" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-eye"></use></svg></button></div></div>
           <div id="compositionColorColumns" class="composition-color-columns" aria-label="Sprite scanline colors">
             <div id="p0ColorsColumn" class="player-colors-panel canvas-colors"><div id="p0ColorsTitle" class="row-colors-title">P0</div><div id="rowColors0" class="row-colors"></div></div>
             <div id="p1ColorsColumn" class="player-colors-panel canvas-colors"><div id="p1ColorsTitle" class="row-colors-title">P1</div><div id="rowColors1" class="row-colors"></div></div>
@@ -289,7 +311,7 @@
           <button id="cropSelection" title="Crop to Selection: clear pixels outside the selection on the active sprite">Crop</button>
           <button id="clearSelection">Clear</button>
         </div>
-        <div id="canvasReadout" class="canvas-readout canvas-readout-dock"><span id="frameLabel">Frame 0</span><span id="pixelReadout">8 x 16</span></div>
+        <div id="canvasReadout" class="canvas-readout canvas-readout-dock"><span id="frameLabel">Frame 1</span><span class="canvas-readout-separator" aria-hidden="true">·</span><span id="pixelReadout">8 x 16</span></div>
       </div>
 
       <div class="frames-strip">
@@ -374,6 +396,7 @@
           </div>
           <div class="reference-secondary-actions"><button id="toggleReference" class="btn-secondary">Hide</button><button id="removeReference" class="btn-danger">Delete</button></div>
           <label class="reference-control">Threshold <input id="threshold" type="range" min="0" max="255" value="64"></label>
+          <label class="check-row reference-ignore-black" title="Treat opaque black and near-black pixels as image background during Auto-Paint and Auto-Color"><input id="refIgnoreBlack" type="checkbox" checked> Ignore Black Background</label>
           <label class="check-row reference-dither"><input id="refDither" type="checkbox"> Dithering</label>
           <label class="reference-control">Fit Mode <select id="refFitMode"><option value="fit">Fit (Letterbox)</option><option value="crop">Crop (Fill)</option><option value="stretch">Stretch</option><option value="manual">Manual</option></select></label>
           <button id="referenceTransform" class="btn-secondary reference-transform" title="Move and resize the reference image"><svg aria-hidden="true"><use href="#icon-transform"></use></svg> Move Image</button>
@@ -559,6 +582,19 @@ Keep every commented ;@YAJA line to restore frames, repeats, NUSIZ, offsets, ass
     </form>
   </dialog>
 
-  <script defer src="app.bundle.js"></script>
+  <div id="gridSettingsPopover" class="grid-settings-popover" role="region" aria-label="Grid appearance settings" hidden>
+    <strong>Grid appearance</strong>
+    <label class="grid-color-row">Color <input id="gridColorPicker" type="color" value="#ffffff"></label>
+    <label class="grid-intensity-row" for="gridIntensity"><span>Opacity</span><output id="gridIntensityValue" for="gridIntensity">15%</output></label>
+    <input id="gridIntensity" type="range" min="0" max="100" value="15" aria-label="Grid opacity">
+    <button id="resetGridSettings" type="button">RESET</button>
+  </div>
+
+  <div id="bgColorPopover" class="bg-color-popover" role="region" aria-label="Background Atari color palette" hidden>
+    <strong>Background color</strong>
+    <div id="bgPalette" class="palette persistent-palette-grid bg-palette"></div>
+  </div>
+
+<script defer src="app.bundle.js?v=1.5.0"></script>
 </body>
 </html>

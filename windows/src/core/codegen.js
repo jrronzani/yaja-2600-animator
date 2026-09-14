@@ -104,7 +104,7 @@ export function createAnimationIR(project, options = {}) {
     schemaVersion: 4, formatVersion: YAJA_BB_FORMAT_VERSION, kind: content, content, positioning,
     projectName: String(project.projectName || "Untitled Project"), animationName, namespace, variableBase: vars,
     animationId: namespace.slice(2), kernel, region: project.region === "PAL" ? "PAL" : "NTSC",
-    background: normalizeAtariCode(project.background, "$00"), compositionModel: "adjacent",
+    background: normalizeAtariCode(project.background, "$00"), compositionModel: project.compositionModel === "tia-right-copies" ? "tia-right-copies" : "adjacent",
     twoSpriteMode: !!project.twoSpriteMode, assignments, activeSlots, activePlayers: activeSlots.map(slot => assignments[slot]),
     displayRows, defaultOrigin: { x: 80, y: Math.floor(displayRows / 2) }, coordinateSystem: YAJA_COORDINATE_SYSTEM,
     needsPositioning, hasFrameCorrections,
@@ -126,8 +126,8 @@ export function validateAnimationIR(ir) {
     if (player < 0 || player > max) diagnostics.push({ severity: "error", code: "PLAYER_RANGE", message: `${ir.kernel} supports P0 through P${max}; P${player} cannot be exported.` });
   });
   ir.frames.forEach(frame => frame.players.forEach(player => {
-    if (player.pixels.length !== player.height) diagnostics.push({ severity: "error", code: "SPRITE_HEIGHT", message: `Frame ${frame.index}, P${player.player} data does not match its ${player.height}-row height.` });
-    if (!isSolidKernel(ir.kernel) && player.colors.length !== player.height) diagnostics.push({ severity: "error", code: "COLOR_HEIGHT", message: `Frame ${frame.index}, P${player.player} color rows do not match sprite height.` });
+    if (player.pixels.length !== player.height) diagnostics.push({ severity: "error", code: "SPRITE_HEIGHT", message: `Frame ${frame.index + 1}, P${player.player} data does not match its ${player.height}-row height.` });
+    if (!isSolidKernel(ir.kernel) && player.colors.length !== player.height) diagnostics.push({ severity: "error", code: "COLOR_HEIGHT", message: `Frame ${frame.index + 1}, P${player.player} color rows do not match sprite height.` });
   }));
   if (ir.twoSpriteMode && ir.activePlayers.every(player => player > 0)) diagnostics.push({ severity: "warning", code: "VIRTUAL_OVERLAP", message: "Two virtual P1+ sprites may flicker when their vertical ranges overlap; export will continue." });
   diagnostics.push({
@@ -351,7 +351,7 @@ function collectionMetadata(project, irs, content, namespace) {
     formatVersion: YAJA_BB_COLLECTION_FORMAT_VERSION, app: "YAJA 2600 Animator", kind: content,
     projectName: String(project.projectName || "Untitled Project"), symbol: namespace,
     kernel: irs[0].kernel, region: irs[0].region, background: irs[0].background,
-    compositionModel: "adjacent", activeAnimationId: project.activeAnimationId,
+    compositionModel: project.compositionModel === "tia-right-copies" ? "tia-right-copies" : "adjacent", activeAnimationId: project.activeAnimationId,
     animations: irs.map((ir, index) => ({ id: project.animations[index].id, name: ir.animationName, symbol: ir.namespace }))
   });
 }

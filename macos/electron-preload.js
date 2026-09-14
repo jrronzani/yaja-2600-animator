@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld("YaJaDesktop", {
     ipcRenderer.on("desktop-menu-command", listener);
     return () => ipcRenderer.removeListener("desktop-menu-command", listener);
   },
+  updateMenuState(state) {
+    ipcRenderer.send("desktop-menu-state", state || {});
+  },
   openProject(options) {
     return ipcRenderer.invoke("desktop:open-project-file", options || {});
   },
