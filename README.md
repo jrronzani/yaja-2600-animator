@@ -1,8 +1,36 @@
 # YAJA 2600 Animator v1.5.0
 
-The v1.5.0 milestone includes the major improvements made since the last published v1.3.4 release. See [CHANGELOG.md](CHANGELOG.md) for release-ready notes.
+The v1.5.0 release is the finalized milestone since v1.3.4. See [CHANGELOG.md](CHANGELOG.md) for the release notes.
 
 ## v1.5.0 working notes
+
+- Import Data now accepts common hand-written Assembly sprite tables as well as YAJA Assembly exports. It recognizes labelled sprite and color data written with `.byte`, `BYTE`, `.db`, `dc.b`, or `fcb`, using binary, hexadecimal, decimal, or `0x` byte values.
+- YAJA manifests remain the complete round-trip format. Ordinary tables bring in the sprite rows and color stream that they contain, leaving unavailable editor settings at safe defaults.
+- This stays focused on player-sprite data. Playfield table packing belongs in YAJA Painter, where PF0, PF1, PF2, mirroring, and playfield layers can be handled correctly.
+## v1.4.32 working notes
+
+- Arrow-key movement of a selected sprite now follows the Transform panel's Pixels and Colors choices.
+- Height changes add blank rows at the top and preserve the sprite's bottom anchor, so a character's feet stay in place.
+- Resizing the playback preview changes only its viewing window; art stays centered at the selected preview zoom.
+
+## v1.4.31 working notes
+
+- Import Data now restores YAJA Assembly exports, including complete multi-animation exports through a DASM-safe comment manifest. Earlier raw YAJA Assembly tables recover art and scanline colors with editor defaults for data that was never exported.
+- The Import Data examples now include YAJA Assembly format, and the playback preview hide control uses the same theme button surface as other compact controls.
+
+## v1.4.28 working notes
+
+- Playback preview framing now uses each sprite’s configured grid dimensions, including blank rows and columns. Drawing the first pixels into a frame no longer shifts the preview.
+
+## v1.4.27 working notes
+
+- Renames the bB toolbar and desktop menu entry points to **Import Data** and **Export Data**.
+- Export Data now offers a bB/Assembly format choice. Assembly exports DASM-compatible bottom-up art and named scanline-color tables for the current animation or the complete project; it deliberately contains no runtime kernel.
+- The original Import Data entry point began as the bB importer; it now also accepts YAJA Assembly and common labelled Assembly sprite tables.
+
+## v1.4.26 working notes
+
+- Adds a smaller draggable playback thumbnail that stays pinned to the canvas viewport while the editor canvas scrolls or zooms. It renders every sprite pixel, NUSIZ copy, offset, and layer in the editor composition.
 
 - The frame and selected-sprite size readout is docked to the bottom of the canvas viewport above its horizontal scrollbar.
 - The size readout now shows only the selected sprite dimensions; the redundant two-sprite `2 x` prefix is removed.

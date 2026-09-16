@@ -251,6 +251,40 @@ export function tightenSelectionToLivePixels(pixels, selection, frameWidth = pix
   return selectionFromMask(selected);
 }
 
+// Move only the scanline colors belonging to the live pixels in a selection.
+// Rows exposed behind the moving art inherit the nearest unselected row on the
+// opposite side, keeping the body color in place when (for example) a head bobs.
+export function moveSelectedScanlineColors(colors, pixels, selection, dy, fallback = "$00") {
+  const height = Math.max(colors?.length || 0, pixels?.length || 0);
+  const source = Array.from({ length: height }, (_, row) => colors?.[row] ?? fallback);
+  if (!selection || !dy || !height) return { colors: source, movedRows: Array(height).fill(false) };
+
+  const mask = selectionToMask(selection, pixels?.[0]?.length || 8, height);
+  const selectedRows = mask.map((row, y) => row.some((selected, x) => selected && !!pixels?.[y]?.[x]));
+  if (!selectedRows.some(Boolean)) return { colors: source, movedRows: Array(height).fill(false) };
+
+  const next = source.slice();
+  const movedRows = Array(height).fill(false);
+  selectedRows.forEach((selected, row) => {
+    const target = row + dy;
+    if (!selected || target < 0 || target >= height) return;
+    next[target] = source[row];
+    movedRows[target] = true;
+  });
+
+  // Fill each exposed source row from the first non-selected scanline behind
+  // the direction of travel. This intentionally overwrites only the gap left
+  // by the moving selection; destination colors above it remain replaced.
+  const fillStep = dy < 0 ? 1 : -1;
+  selectedRows.forEach((selected, row) => {
+    if (!selected || movedRows[row]) return;
+    let neighbor = row + fillStep;
+    while (neighbor >= 0 && neighbor < height && selectedRows[neighbor]) neighbor += fillStep;
+    next[row] = neighbor >= 0 && neighbor < height ? source[neighbor] : source[row];
+  });
+  return { colors: next, movedRows };
+}
+
 export function compositeSelectionGrid(pixels, selection, grid, targetX, targetY, frameWidth = pixels?.[0]?.length || 8, frameHeight = pixels?.length || 0) {
   const live = tightenSelectionToLivePixels(pixels, selection, frameWidth, frameHeight);
   if (!live) return { pixels: pixels.map(row => row.slice()), selection: null, changed: false };

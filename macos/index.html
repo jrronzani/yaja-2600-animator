@@ -67,6 +67,9 @@
       <symbol id="icon-eye-off" viewBox="0 0 24 24">
         <path d="M3.3 2L2 3.3l3.1 3.1C2.9 7.8 1.4 9.8.5 12c1.6 3.6 6 7 11.5 7 1.7 0 3.3-.3 4.7-.9l4 3.9 1.3-1.3L3.3 2zM12 16c-2.2 0-4-1.8-4-4 0-.7.2-1.4.12-2l1.6 1.6V12a2 2 0 002 2h.4l1.6 1.6c-.6.3-1.3.4-2.1.4zm0-11c5.5 0 9.9 3.4 11.5 7-.7 1.6-1.9 3.1-3.4 4.3l-2.3-2.3c.1-.6.2-1.3.2-2a6 6 0 00-6-6c-.7 0-1.4.1-2 .3L8.5 4.8c1.1-.5 2.3-.8 3.5-.8z"/>
       </symbol>
+      <symbol id="icon-magnify" viewBox="0 0 24 24">
+        <path d="M10.5 3a7.5 7.5 0 105.04 13.05L21 21.5 22.5 20l-5.45-5.45A7.5 7.5 0 0010.5 3zm0 2a5.5 5.5 0 110 11 5.5 5.5 0 010-11z"/>
+      </symbol>
       <symbol id="icon-image" viewBox="0 0 24 24">
         <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
       </symbol>
@@ -121,8 +124,8 @@
       <input id="projectFile" type="file" accept="application/json,.json" hidden>
       <span class="project-divider" aria-hidden="true"></span>
       <span class="export-actions">
-        <button id="exportCode" class="btn-primary primary" title="Validate and export bB code">Export bB</button>
-        <button id="importCode" title="Import a YAJA bB scene or ordinary bB sprite data">Import bB</button>
+        <button id="exportCode" class="btn-primary primary" title="Validate and export bB or Assembly data">Export Data</button>
+        <button id="importCode" title="Import YAJA bB or Assembly data">Import Data</button>
         <button id="exportSheet" title="Export animation frames as PNG">Export PNG</button>
       </span>
       <span class="fullscreen-action">
@@ -296,6 +299,16 @@
           </div>
         </div>
         </div>
+        <div id="playbackThumbnail" class="playback-thumbnail" role="region" aria-label="Playback preview. Drag to position it within the canvas viewport.">
+          <div class="playback-thumbnail-surface">
+            <canvas id="playbackThumbnailCanvas" role="img" aria-label="Animation playback preview"></canvas>
+          </div>
+          <div class="playback-thumbnail-controls">
+            <button id="togglePlaybackThumbnailVisibility" type="button" class="playback-thumbnail-visibility" title="Hide playback preview" aria-label="Hide playback preview" aria-pressed="true"><svg aria-hidden="true"><use href="#icon-eye"></use></svg></button>
+            <label class="playback-thumbnail-zoom" for="playbackThumbnailZoom" title="Playback preview magnification" aria-label="Playback preview magnification"><svg aria-hidden="true"><use href="#icon-magnify"></use></svg><input id="playbackThumbnailZoom" type="range" min="1" max="16" step="1" value="6"></label>
+          </div>
+          <div id="playbackThumbnailResizeHandle" class="playback-thumbnail-resize-handle" aria-hidden="true"><svg viewBox="0 0 14 14" focusable="false"><path d="M2 11L11 2M6 11L11 6"></path></svg></div>
+        </div>
         <!-- TIA preview retained for possible restoration.
         <div class="preview-shell">
           <div class="preview-title">TIA Preview</div>
@@ -426,6 +439,11 @@
     <form method="dialog" class="dialog-body">
       <h2 id="codeDialogTitle">bB Data</h2>
       <div id="codeDiagnostics" class="code-diagnostics" aria-live="polite"></div>
+      <fieldset id="exportFormat" class="import-mode-options">
+        <legend>Export Format</legend>
+        <label class="check-row"><input id="exportFormatBb" name="exportFormat" type="radio" value="bb" checked> bB</label>
+        <label class="check-row"><input id="exportFormatAssembly" name="exportFormat" type="radio" value="assembly"> Assembly</label>
+      </fieldset>
       <fieldset id="bbExportMode" class="import-mode-options">
         <legend>Export Content</legend>
         <label class="check-row"><input id="exportBbTables" name="bbExportMode" type="radio" value="tables" checked> Tables Only</label>
@@ -448,7 +466,7 @@
         <label class="check-row" title="Adds separate X and Y variables for moving the whole animation as one object."><input id="exportPositionAnchor" name="bbPositioning" type="radio" value="anchor"> Use a separate animation position</label>
       </fieldset>
       <div id="bbRamSummary" class="bb-ram-summary" role="status">Tables Only uses no variables.</div>
-      <textarea id="codeText" spellcheck="false" aria-label="bB scene data" placeholder="Ordinary bB sprite data:
+      <textarea id="codeText" spellcheck="false" aria-label="YAJA bB or Assembly data" placeholder="Ordinary bB sprite data:
 
 player0:
 %00111100
@@ -477,11 +495,28 @@ $4A
 end
 ;@YAJA FRAME_END 0
 
-Keep every commented ;@YAJA line to restore frames, repeats, NUSIZ, offsets, assignments, and animation structure."></textarea>
+Keep every commented ;@YAJA line to restore frames, repeats, NUSIZ, offsets, assignments, and animation structure.
+
+— OR —
+
+YAJA Assembly Data:
+
+;@YAJA ASSEMBLY_MANIFEST { ...YAJA tracking metadata... }
+Walk_Frame00_P0_Gfx:
+  .byte %00111100
+  .byte %01100110
+
+Walk_Frame00_P0_Color_00 equ $48
+Walk_Frame00_P0_Color_01 equ $4A
+Walk_Frame00_P0_Color:
+  .byte Walk_Frame00_P0_Color_01
+  .byte Walk_Frame00_P0_Color_00
+
+Keep the manifest and every graphics/color table together to restore all animations."></textarea>
       <div class="dialog-actions">
         <button id="copyCode" type="button">Copy</button>
         <button id="downloadBas" type="button" class="btn-primary primary">Download .bas</button>
-        <button id="importFromText" type="button" class="btn-primary">Import bB</button>
+        <button id="importFromText" type="button" class="btn-primary">Import Data</button>
         <button value="cancel">Close</button>
       </div>
     </form>

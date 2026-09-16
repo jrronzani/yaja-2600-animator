@@ -1,23 +1,20 @@
-# Publishing YAJA 2600 Animator
+# Publishing YAJA 2600 Animator v1.5.0
 
-The 1.5.0 release is staged directly from `v1.5.0_clean_milestone`.
+The approved release source is `v1.5.0_clean_milestone`.
 
-## Web / itch
+## Web / Itch
 
-Upload `Itch Uploads/yaja-2600-animator-web-v1.5.0.zip` as the HTML5 build and enable **This file will be played in the browser**. ZIP entries must use `/` separators and expose `index.html`, `index.css`, `app.bundle.js`, and `assets/` at the archive root.
+Build the web ZIP directly from this folder. It must place `index.html`, `index.css`, `app.bundle.js`, and `assets/` at its root, with POSIX `/` entry paths. Upload it to Itch as the HTML5 build and enable **This file will be played in the browser**.
 
-## Desktop builds
+## Desktop packages
 
-Local Windows, macOS, and Linux packages are built from the same verified version folder. Native macOS/Linux launch testing still requires their respective operating systems before public release.
+GitHub Actions builds the Windows x64, macOS, and Linux x64 archives from the matching platform sources. The native menu must continue to send commands through the same renderer UI; do not substitute system glyphs for inline application controls.
 
-The desktop shell must not replace renderer controls with Unicode, emoji, OS glyphs, or native toolbar buttons. The native menu sends commands into the same web renderer; all visible app controls continue using the inline SVG symbols in `index.html`.
+## Release checks
 
-## Release checklist
-
-- Run `npm ci`, `npm run check`, and `npm run build` in the v1.5.0 source folder.
-- Test the localhost build and direct-file Chrome build.
-- Test the Electron shell with File, Edit, Animation, View, Window, and Help menus.
-- Confirm all three local fonts load without a network connection.
-- Confirm project save/open and bB/PNG export use native desktop dialogs.
-- Confirm no `tests`, `test-results`, `node_modules`, or developer profiles enter the ZIPs.
-- Verify the macOS archive includes `HOW TO INSTALL ON MACOS.md`.
+- Run `npm ci`, `npm run check`, `npm test`, and `npm run build` here.
+- Run the root regression suite.
+- Confirm local fonts load without a network connection.
+- Confirm project save/open and Data/PNG export use native desktop dialogs.
+- Exclude development folders and dependencies from release ZIPs.
+- Include `HOW TO INSTALL ON MACOS.md` in the macOS package.

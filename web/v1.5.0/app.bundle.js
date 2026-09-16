@@ -921,6 +921,324 @@ ${backgroundData}` : ""}`;
     return { ir, diagnostics, output, ramBytes: ir.ramBytes, filename: animationExportFilename(ir.animationName, content) };
   }
 
+  // src/core/assembly-codegen.js
+  var ASSEMBLY_MANIFEST_VERSION = 1;
+  var frameNumber2 = (index) => String(index).padStart(2, "0");
+  var asmNamespace = (name) => String(name || "UntitledAnimation").replace(/^_+/, "") || "UntitledAnimation";
+  var bits = (row) => row.map((value) => value ? "1" : "0").join("");
+  var projectAnimationView = (project, animation) => ({ ...project, animationName: animation.name, frames: animation.frames, currentFrame: animation.currentFrame, twoSpriteMode: animation.twoSpriteMode, activePlayer: animation.activePlayer, playerAssignments: animation.playerAssignments });
+  function sourceAnimations(project, scope) {
+    return scope === "all" && Array.isArray(project.animations) && project.animations.length ? project.animations : [{ id: project.activeAnimationId || "animation-1", name: project.animationName, frames: project.frames, currentFrame: project.currentFrame, twoSpriteMode: project.twoSpriteMode, activePlayer: project.activePlayer, playerAssignments: project.playerAssignments }];
+  }
+  function uniqueAnimationIrs(project, animations) {
+    const collection = asmNamespace(animationNamespace(project.projectName || "Untitled Project"));
+    const used = /* @__PURE__ */ new Set();
+    return animations.map((animation) => {
+      const base = `${collection}_${normalizeAnimationBase(animation.name)}`;
+      let name = base, suffix = 2;
+      while (used.has(name.toLowerCase())) name = `${base}${suffix++}`;
+      used.add(name.toLowerCase());
+      return createAnimationIR(projectAnimationView(project, animation), { content: "tables", namespace: `__${name}` });
+    });
+  }
+  function emitAnimationData(ir) {
+    const base = asmNamespace(ir.namespace), lines = [`; ${ir.animationName}`];
+    ir.frames.forEach((frame) => frame.players.forEach((player) => {
+      const prefix = `${base}_Frame${frameNumber2(frame.index)}_P${player.player}`;
+      lines.push(`${prefix}_Gfx:`);
+      [...player.pixels].reverse().forEach((row) => lines.push(`  .byte %${bits(row)}`));
+      lines.push("");
+      const colors = ir.kernel === "STANDARD" || ir.kernel === "MULTISPRITE" ? Array(player.height).fill(player.solidColor) : player.colors;
+      colors.forEach((color, row) => lines.push(`${prefix}_Color_${frameNumber2(row)} equ ${color}`));
+      lines.push(`${prefix}_Color:`);
+      for (let row = player.height - 1; row >= 0; row--) lines.push(`  .byte ${prefix}_Color_${frameNumber2(row)}`);
+      lines.push("");
+    }));
+    return lines;
+  }
+  function manifestFor(project, scope, animations, irs) {
+    return {
+      formatVersion: ASSEMBLY_MANIFEST_VERSION,
+      projectName: String(project.projectName || "Untitled Project"),
+      kernel: irs[0]?.kernel || "PXE",
+      region: project.region === "PAL" ? "PAL" : "NTSC",
+      background: irs[0]?.background || "$00",
+      compositionModel: project.compositionModel === "tia-right-copies" ? "tia-right-copies" : "adjacent",
+      activeAnimationId: scope === "all" ? project.activeAnimationId || animations[0]?.id : animations[0]?.id || "animation-1",
+      animations: irs.map((ir, index) => {
+        const source = animations[index] || {};
+        return {
+          id: String(source.id || ir.animationId || `animation-${index + 1}`),
+          name: ir.animationName,
+          namespace: asmNamespace(ir.namespace),
+          twoSpriteMode: ir.twoSpriteMode,
+          activePlayer: ir.activeSlots[0] || 0,
+          playerAssignments: ir.assignments,
+          frames: ir.frames.map((frame, frameIndex) => ({
+            name: String(source.frames?.[frameIndex]?.name || `Frame ${frameIndex + 1}`),
+            width: frame.width,
+            height: frame.height,
+            duration: frame.duration,
+            players: frame.players.map((player) => ({ slot: player.slot, player: player.player, width: player.width, height: player.height, solidColor: player.solidColor, nusiz: player.nusiz, xOffset: player.xOffset, yOffset: player.yOffset }))
+          }))
+        };
+      })
+    };
+  }
+  function assemblyExportFilename(name, scope = "current") {
+    return `${normalizeAnimationBase(name)}${scope === "all" ? "_AllAnimations" : ""}_Data.asm`;
+  }
+  function generateAssemblyData(project, options = {}) {
+    const scope = options.scope === "all" ? "all" : "current";
+    const animations = sourceAnimations(project, scope);
+    const irs = scope === "all" ? uniqueAnimationIrs(project, animations) : [createAnimationIR(project, { content: "tables" })];
+    const diagnostics = irs.flatMap((ir, index) => validateAnimationIR(ir).filter((item) => item.code !== "VARIABLE_OWNERSHIP").map((item) => scope === "all" ? { ...item, animationIndex: index, message: `${ir.animationName}: ${item.message}` } : item));
+    let output = "";
+    if (!diagnostics.some((item) => item.severity === "error")) {
+      const manifest = manifestFor(project, scope, animations, irs);
+      const lines = [
+        "; Atari 2600 sprite art and color data exported by YAJA 2600 Animator.",
+        "; This file is DASM data only. Include it from a 6502 scanline kernel that loads the tables.",
+        "; Graphics and color tables are bottom-up for common Atari 2600 kernels.",
+        `;@YAJA ASSEMBLY_MANIFEST ${JSON.stringify(manifest)}`,
+        "; This YAJA comment manifest is ignored by DASM and enables faithful YAJA re-import.",
+        ""
+      ];
+      irs.forEach((ir, index) => {
+        if (index) lines.push("");
+        lines.push(...emitAnimationData(ir));
+      });
+      output = lines.join("\n").trimEnd();
+    }
+    return { ir: scope === "all" ? { kind: "collection", animations: irs } : irs[0], diagnostics, output, filename: assemblyExportFilename(scope === "all" ? project.projectName : irs[0].animationName, scope) };
+  }
+
+  // src/core/assembly-parser.js
+  var blankPlayer = (height) => ({ pixels: Array.from({ length: height }, () => Array(8).fill(0)), colors: Array(height).fill("$0E"), solidColor: "$0E", nusiz: "normal", xOffset: 0, yOffset: 0, reference: null });
+  var keyFor = (namespace, frame, player) => `${namespace}_Frame${String(frame).padStart(2, "0")}_P${player}`;
+  function assemblyError(message) {
+    return { detected: true, players: [], error: message };
+  }
+  function tableMap(text) {
+    const lines = String(text || "").split(/\r?\n/);
+    const graphics = /* @__PURE__ */ new Map(), colorValues = /* @__PURE__ */ new Map(), colorTables = /* @__PURE__ */ new Map();
+    for (let index = 0; index < lines.length; index++) {
+      const graphicsLabel = lines[index].match(/^\s*([A-Za-z_][A-Za-z0-9_]*)_Frame(\d+)_P(\d+)_Gfx:\s*$/);
+      if (graphicsLabel) {
+        const base = keyFor(graphicsLabel[1], Number(graphicsLabel[2]), Number(graphicsLabel[3]));
+        const rows = [];
+        while (++index < lines.length) {
+          const row = lines[index].match(/^\s*\.byte\s+%([01]{8})\s*$/i);
+          if (!row) {
+            index--;
+            break;
+          }
+          rows.push(row[1].split("").map(Number));
+        }
+        if (!rows.length) throw new Error(`${base} has no graphics rows.`);
+        graphics.set(base, rows.reverse());
+        continue;
+      }
+      const colorConstant = lines[index].match(/^\s*([A-Za-z_][A-Za-z0-9_]*_Frame\d+_P\d+)_Color_(\d+)\s+equ\s+(\$[0-9A-Fa-f]{1,2})\s*$/i);
+      if (colorConstant) {
+        const values = colorValues.get(colorConstant[1]) || /* @__PURE__ */ new Map();
+        values.set(Number(colorConstant[2]), normalizeAtariCode(colorConstant[3]));
+        colorValues.set(colorConstant[1], values);
+        continue;
+      }
+      const colorLabel = lines[index].match(/^\s*([A-Za-z_][A-Za-z0-9_]*_Frame\d+_P\d+)_Color:\s*$/);
+      if (colorLabel) {
+        const rows = [];
+        while (++index < lines.length) {
+          const row = lines[index].match(/^\s*\.byte\s+([A-Za-z_][A-Za-z0-9_]*_Color_\d+)\s*$/);
+          if (!row) {
+            index--;
+            break;
+          }
+          rows.push(row[1]);
+        }
+        colorTables.set(colorLabel[1], rows);
+      }
+    }
+    return { graphics, colorValues, colorTables };
+  }
+  function colorsFor(base, height, tables) {
+    const values = tables.colorValues.get(base);
+    const lookup = tables.colorTables.get(base);
+    if (!values || !lookup || lookup.length !== height) throw new Error(`${base} has incomplete color data.`);
+    const colors = Array.from({ length: height }, (_, row) => values.get(row));
+    if (colors.some((color) => !color)) throw new Error(`${base} has an invalid color constant.`);
+    const expected = Array.from({ length: height }, (_, row) => `${base}_Color_${String(height - row - 1).padStart(2, "0")}`);
+    if (lookup.some((label, row) => label !== expected[row])) throw new Error(`${base} color lookup must be bottom-up.`);
+    return colors;
+  }
+  function playerFor(meta, tables) {
+    const base = keyFor(meta.namespace, meta.frame, meta.player);
+    const pixels = tables.graphics.get(base);
+    if (!pixels) throw new Error(`Missing graphics table ${base}_Gfx.`);
+    if (pixels.length !== meta.height) throw new Error(`${base} has ${pixels.length} rows; expected ${meta.height}.`);
+    return { pixels, colors: colorsFor(base, meta.height, tables), solidColor: normalizeAtariCode(meta.solidColor || "$0E"), nusiz: meta.nusiz || "normal", width: meta.width, height: meta.height, xOffset: Number(meta.xOffset) || 0, yOffset: Number(meta.yOffset) || 0, reference: null };
+  }
+  function projectFromManifest(manifest, tables) {
+    if (manifest.formatVersion !== 1 || !Array.isArray(manifest.animations) || !manifest.animations.length) throw new Error("Unsupported or incomplete YAJA Assembly manifest.");
+    const animations = manifest.animations.map((animation, animationIndex) => ({
+      id: String(animation.id || `animation-${animationIndex + 1}`),
+      name: String(animation.name || `Untitled Animation ${animationIndex + 1}`),
+      currentFrame: 0,
+      twoSpriteMode: !!animation.twoSpriteMode,
+      activePlayer: animation.activePlayer === 1 ? 1 : 0,
+      playerAssignments: Array.isArray(animation.playerAssignments) ? animation.playerAssignments : [0, 1],
+      frames: (animation.frames || []).map((frame, frameIndex) => {
+        const height = Math.max(1, Number(frame.height) || 16);
+        const players = [blankPlayer(height), blankPlayer(height)];
+        (frame.players || []).forEach((player) => {
+          if (player.slot !== 0 && player.slot !== 1) throw new Error(`Animation ${animationIndex + 1}, frame ${frameIndex + 1} has an invalid sprite slot.`);
+          players[player.slot] = playerFor({ ...player, namespace: animation.namespace, frame: frameIndex }, tables);
+        });
+        return { name: String(frame.name || `Frame ${frameIndex + 1}`), width: Math.max(1, Math.min(8, Number(frame.width) || 8)), height, duration: Math.max(1, Number(frame.duration) || 3), players };
+      })
+    }));
+    if (animations.some((animation) => !animation.frames.length)) throw new Error("YAJA Assembly manifest contains an animation without frames.");
+    return { app: "YAJA 2600 Animator", schemaVersion: 14, version: "1.5.0", projectName: String(manifest.projectName || "Untitled Project"), kernel: manifest.kernel || "PXE", region: manifest.region === "PAL" ? "PAL" : "NTSC", background: normalizeAtariCode(manifest.background || "$00"), compositionModel: manifest.compositionModel === "tia-right-copies" ? "tia-right-copies" : "adjacent", activeAnimationId: animations.some((animation) => animation.id === manifest.activeAnimationId) ? manifest.activeAnimationId : animations[0].id, animations };
+  }
+  function legacyProject(tables) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const [base, pixels] of tables.graphics) {
+      const match = base.match(/^(.+)_Frame(\d+)_P(\d+)$/);
+      if (!match) continue;
+      const [, namespace, frameText, playerText] = match;
+      const frames = groups.get(namespace) || /* @__PURE__ */ new Map();
+      const entries = frames.get(Number(frameText)) || [];
+      entries.push({ base, player: Number(playerText), pixels });
+      frames.set(Number(frameText), entries);
+      groups.set(namespace, frames);
+    }
+    if (!groups.size) throw new Error("No YAJA Assembly graphics tables found.");
+    const animations = [...groups].map(([namespace, frames], animationIndex) => {
+      const indices = [...frames.keys()].sort((a, b) => a - b);
+      if (indices.some((value, index) => value !== index)) throw new Error(`${namespace} has non-contiguous frame labels.`);
+      const assignments = [...new Set(indices.flatMap((index) => frames.get(index).map((entry) => entry.player)))].slice(0, 2);
+      return {
+        id: `legacy-${animationIndex + 1}`,
+        name: namespace.replace(/_/g, " "),
+        currentFrame: 0,
+        twoSpriteMode: assignments.length > 1,
+        activePlayer: 0,
+        playerAssignments: [assignments[0] ?? 0, assignments[1] ?? 1],
+        frames: indices.map((index) => {
+          const entries = frames.get(index), height = Math.max(...entries.map((entry) => entry.pixels.length)), players = [blankPlayer(height), blankPlayer(height)];
+          entries.slice(0, 2).forEach((entry, slot) => {
+            const colors = colorsFor(entry.base, entry.pixels.length, tables);
+            players[slot] = { pixels: entry.pixels, colors, solidColor: colors[0], nusiz: "normal", width: 8, height: entry.pixels.length, xOffset: 0, yOffset: 0, reference: null };
+          });
+          return { name: `Frame ${index + 1}`, width: 8, height, duration: 3, players };
+        })
+      };
+    });
+    return { app: "YAJA 2600 Animator", schemaVersion: 14, version: "1.5.0", projectName: "Imported Assembly Data", kernel: "PXE", region: "NTSC", background: "$00", compositionModel: "adjacent", activeAnimationId: animations[0].id, animations };
+  }
+  function sourceWithoutComment(line) {
+    return String(line || "").replace(/;.*/, "").replace(/\/\/.*/, "").trim();
+  }
+  function assemblyByte(token) {
+    const value = String(token || "").trim().replace(/^#/, "");
+    let parsed = null;
+    if (/^%[01]{1,8}$/.test(value)) parsed = parseInt(value.slice(1), 2);
+    else if (/^\$[0-9a-f]{1,2}$/i.test(value)) parsed = parseInt(value.slice(1), 16);
+    else if (/^0x[0-9a-f]{1,2}$/i.test(value)) parsed = parseInt(value.slice(2), 16);
+    else if (/^0b[01]{1,8}$/i.test(value)) parsed = parseInt(value.slice(2), 2);
+    else if (/^\d{1,3}$/.test(value)) parsed = Number(value);
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 255 ? parsed : null;
+  }
+  function dataBytes(line) {
+    const match = sourceWithoutComment(line).match(/^\s*(?:\.?byte|\.?db|dc\.b|fcb)\b\s*(.+)$/i);
+    if (!match) return null;
+    const tokens = match[1].split(",").map((token) => token.trim()).filter(Boolean);
+    if (!tokens.length) return [];
+    const values = tokens.map(assemblyByte);
+    return values.every((value) => value !== null) ? values : null;
+  }
+  function playerIndexFromLabel(label) {
+    const normalized = String(label || "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    const match = normalized.match(/(?:player|sprite|p|colup)([01])(?:gfx|graphic|graphics|image|bitmap|shape|data|color|colors|colup)?$/);
+    return match ? Number(match[1]) : null;
+  }
+  function isColorTable(label) {
+    return /(?:color|colup)/i.test(label);
+  }
+  function isSpriteTable(label) {
+    if (isColorTable(label)) return false;
+    return /(?:gfx|graphic|image|bitmap|shape)/i.test(label) || /(?:sprite|player|character|char)[A-Za-z0-9_\-]*(?:data)?$/i.test(label);
+  }
+  function genericTables(text) {
+    const lines = String(text || "").split(/\r?\n/);
+    const tables = [];
+    let current = null;
+    const isBareLabel = (line, index) => /^[A-Za-z_][A-Za-z0-9_]*\s*$/.test(sourceWithoutComment(line)) && dataBytes(lines[index + 1] || "") !== null;
+    for (let index = 0; index < lines.length; index++) {
+      const source = sourceWithoutComment(lines[index]);
+      const labelMatch = source.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/);
+      const bareLabel = !labelMatch && isBareLabel(lines[index], index) ? source : null;
+      if (labelMatch || bareLabel) {
+        const label = labelMatch ? labelMatch[1] : bareLabel;
+        current = { label, values: [] };
+        tables.push(current);
+        const inline = labelMatch ? dataBytes(labelMatch[2]) : null;
+        if (inline?.length) current.values.push(...inline);
+        continue;
+      }
+      const bytes = dataBytes(source);
+      if (bytes !== null && current) {
+        current.values.push(...bytes);
+        continue;
+      }
+      if (source) current = null;
+    }
+    return tables;
+  }
+  function genericSpriteImport(text) {
+    const tables = genericTables(text);
+    const graphics = tables.filter((table) => isSpriteTable(table.label));
+    if (!graphics.length) return { detected: false, players: [] };
+    if (graphics.every((table) => !table.values.length)) return { detected: true, players: [], error: "Assembly sprite table has no readable byte rows." };
+    const colors = tables.filter((table) => isColorTable(table.label) && table.values.length);
+    const byIndex = /* @__PURE__ */ new Map();
+    graphics.forEach((table) => {
+      if (!table.values.length || byIndex.size >= 2 && playerIndexFromLabel(table.label) === null) return;
+      const index = playerIndexFromLabel(table.label);
+      const slot = index ?? (byIndex.has(0) ? 1 : 0);
+      if (!byIndex.has(slot)) byIndex.set(slot, table);
+    });
+    const players = [...byIndex.entries()].sort(([a], [b]) => a - b).map(([index, table]) => {
+      const rawColors = colors.find((candidate) => playerIndexFromLabel(candidate.label) === index) || (index === 0 ? colors.find((candidate) => playerIndexFromLabel(candidate.label) === null) : null);
+      const height = table.values.length;
+      const colorValues = rawColors?.values.map((value) => normalizeAtariCode(`$${value.toString(16).padStart(2, "0")}`)) || [];
+      const rowColors = colorValues.length === 1 ? Array(height).fill(colorValues[0]) : Array.from({ length: height }, (_, row) => colorValues[row] || colorValues[colorValues.length - 1] || "$0E");
+      const reverse = /(?:bottom[_-]?up|reverse)/i.test(table.label);
+      const rows = table.values.map((value) => Array.from({ length: 8 }, (_, bit) => value & 128 >> bit ? 1 : 0));
+      return { index, rows: reverse ? rows.reverse() : rows, colors: reverse ? rowColors.reverse() : rowColors, solidColor: rowColors[0] || "$0E", nusiz: "normal" };
+    });
+    return players.length ? { detected: true, players } : { detected: true, players: [], error: "No readable Assembly sprite byte tables found." };
+  }
+  function parseAssemblyData(text) {
+    const source = String(text || "");
+    const manifestLine = source.match(/^;@YAJA ASSEMBLY_MANIFEST\s+(.+)$/m);
+    const yajaLabelPresent = /_Frame\d+_P\d+_Gfx:\s*$/m.test(source);
+    if (manifestLine || yajaLabelPresent) {
+      try {
+        const tables = tableMap(source);
+        const project = manifestLine ? projectFromManifest(JSON.parse(manifestLine[1]), tables) : legacyProject(tables);
+        return { detected: true, generated: true, project, players: [], legacy: !manifestLine };
+      } catch (error) {
+        return assemblyError(error.message);
+      }
+    }
+    const generic = genericSpriteImport(source);
+    if (!generic.detected) return { detected: false };
+    if (generic.error) return assemblyError(generic.error);
+    return { detected: true, generated: false, players: generic.players, legacy: true };
+  }
+
   // src/core/sprite-transform.js
   function clonePixels(pixels) {
     const width = Math.max(1, ...pixels.map((row) => row?.length || 0));
@@ -1253,6 +1571,30 @@ ${backgroundData}` : ""}`;
     }
     return selectionFromMask(selected);
   }
+  function moveSelectedScanlineColors(colors, pixels, selection2, dy, fallback = "$00") {
+    const height = Math.max(colors?.length || 0, pixels?.length || 0);
+    const source = Array.from({ length: height }, (_, row) => colors?.[row] ?? fallback);
+    if (!selection2 || !dy || !height) return { colors: source, movedRows: Array(height).fill(false) };
+    const mask = selectionToMask(selection2, pixels?.[0]?.length || 8, height);
+    const selectedRows = mask.map((row, y) => row.some((selected, x) => selected && !!pixels?.[y]?.[x]));
+    if (!selectedRows.some(Boolean)) return { colors: source, movedRows: Array(height).fill(false) };
+    const next = source.slice();
+    const movedRows = Array(height).fill(false);
+    selectedRows.forEach((selected, row) => {
+      const target = row + dy;
+      if (!selected || target < 0 || target >= height) return;
+      next[target] = source[row];
+      movedRows[target] = true;
+    });
+    const fillStep = dy < 0 ? 1 : -1;
+    selectedRows.forEach((selected, row) => {
+      if (!selected || movedRows[row]) return;
+      let neighbor = row + fillStep;
+      while (neighbor >= 0 && neighbor < height && selectedRows[neighbor]) neighbor += fillStep;
+      next[row] = neighbor >= 0 && neighbor < height ? source[neighbor] : source[row];
+    });
+    return { colors: next, movedRows };
+  }
   function compositeSelectionGrid(pixels, selection2, grid, targetX, targetY, frameWidth = pixels?.[0]?.length || 8, frameHeight = pixels?.length || 0) {
     const live = tightenSelectionToLivePixels(pixels, selection2, frameWidth, frameHeight);
     if (!live) return { pixels: pixels.map((row) => row.slice()), selection: null, changed: false };
@@ -1555,7 +1897,7 @@ ${backgroundData}` : ""}`;
     let match;
     while (match = playerRegex.exec(String(text || ""))) {
       const index = match[1] === void 0 ? null : Number(match[1]);
-      const rows = [...match[2].matchAll(/%([01]{1,8})/g)].map((bits) => bits[1].padEnd(8, "0").slice(0, 8).split("").map(Number));
+      const rows = [...match[2].matchAll(/%([01]{1,8})/g)].map((bits2) => bits2[1].padEnd(8, "0").slice(0, 8).split("").map(Number));
       if (rows.length) players.push({ index, rows, colors: [] });
     }
     const colorRegex = /player(\d+)?color\s*:\s*([\s\S]*?)end/gi;
@@ -2233,6 +2575,7 @@ ${backgroundData}` : ""}`;
   var SHARED_PICKER_HANDLE_KEY = "__yajaAnimatorLastProjectPickerHandle";
   var currentProjectFileHandle = null;
   var lastProjectPickerHandle = null;
+  var currentExportFormat = "bb";
   var currentBbExportMode = "tables";
   var currentBbExportScope = "current";
   var currentBbExportWithProjectData = false;
@@ -2310,6 +2653,14 @@ ${backgroundData}` : ""}`;
   var referenceDrag = null;
   var playTimer = null;
   var playbackRunning = false;
+  var playbackThumbnailDrag = null;
+  var playbackThumbnailResize = null;
+  var playbackThumbnailZoom = 6;
+  var playbackThumbnailCollapsed = false;
+  var playbackThumbnailExpandedHeight = 169;
+  var playbackThumbnailUserSized = false;
+  var playbackThumbnailTallestHeightAtManualSize = 0;
+  var playbackThumbnailWidestWidthAtManualSize = 0;
   var selectedFrames = /* @__PURE__ */ new Set([0]);
   var frameSelectionAnchor = 0;
   var framePointerSession = null;
@@ -3105,6 +3456,226 @@ ${backgroundData}` : ""}`;
     if (state.twoSpriteMode) drawPreviewPlayer(ctx, currentFrame().players[1], ox + p1PreviewX * pixelW, oy + (p1.yOffset - minY) * pixelH, pixelW, pixelH, true);
     el.previewCaption.textContent = `${aspect.label} / ${state.twoSpriteMode ? `P${state.playerAssignments[0]}+P${state.playerAssignments[1]}` : `P${state.playerAssignments[state.activePlayer]}`} / ${NUSIZ_MODES[currentPlayer().nusiz].label}`;
   }
+  function playbackThumbnailFrameBounds(frame, slots) {
+    const geometry = centeredCompositionGeometry(state.width, slots.map((slot) => ({
+      ...frame.players[slot],
+      width: playerWidth(frame, slot)
+    })));
+    const minY = Math.min(...slots.map((slot) => Number(frame.players[slot].yOffset) || 0));
+    const maxY = Math.max(...slots.map((slot) => (Number(frame.players[slot].yOffset) || 0) + playerHeight(frame, slot)));
+    return { minX: geometry.minX, maxX: geometry.maxX, minY, maxY };
+  }
+  function playbackThumbnailAnimationBounds(slots) {
+    const bounds = state.frames.map((frame) => playbackThumbnailFrameBounds(frame, slots));
+    const minX = Math.min(...bounds.map((item) => item.minX));
+    const maxX = Math.max(...bounds.map((item) => item.maxX));
+    const minY = Math.min(...bounds.map((item) => item.minY));
+    const maxY = Math.max(...bounds.map((item) => item.maxY));
+    return { minX, maxX, minY, maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+  }
+  function renderPlaybackThumbnail() {
+    const canvas = el.playbackThumbnailCanvas;
+    if (!canvas || !state) return;
+    syncPlaybackThumbnailAutoSize();
+    const rect = canvas.getBoundingClientRect();
+    const cssW = Math.max(1, rect.width);
+    const cssH = Math.max(1, rect.height);
+    const ctx = setCanvasSize(canvas, cssW, cssH);
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    ctx.fillStyle = colorHex(state.background);
+    ctx.fillRect(0, 0, cssW, cssH);
+    const frame = currentFrame();
+    const slots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
+    const geometry = centeredCompositionGeometry(state.width, slots.map((slot) => ({
+      ...frame.players[slot],
+      width: playerWidth(frame, slot)
+    })));
+    const bounds = playbackThumbnailAnimationBounds(slots);
+    const scale = playbackThumbnailZoom;
+    const unitH = scale * Math.max(1, state.verticalStretch);
+    const unitW = scale * 1.7;
+    const artWidth = bounds.width * unitW;
+    const artHeight = bounds.height * unitH;
+    const originX = (cssW - artWidth) / 2 - bounds.minX * unitW;
+    const originY = (cssH - artHeight) / 2 - bounds.minY * unitH;
+    slots.slice().sort((leftSlot, rightSlot) => playerLayerPriority(leftSlot) - playerLayerPriority(rightSlot) || leftSlot - rightSlot).forEach((slot) => {
+      const player = frame.players[slot];
+      const geometryIndex = slots.indexOf(slot);
+      drawThumbPlayer(
+        ctx,
+        player,
+        originX + geometry.starts[geometryIndex] * unitW,
+        originY + player.yOffset * unitH,
+        unitW,
+        unitH,
+        playerHeight(frame, slot),
+        playerWidth(frame, slot)
+      );
+    });
+  }
+  function playbackThumbnailBounds() {
+    const band = el.canvasBand?.getBoundingClientRect();
+    const viewport = el.canvasStageScroll?.getBoundingClientRect();
+    const thumbnail = el.playbackThumbnail?.getBoundingClientRect();
+    if (!band || !viewport || !thumbnail) return null;
+    return {
+      minLeft: viewport.left - band.left,
+      minTop: viewport.top - band.top,
+      maxLeft: Math.max(viewport.left - band.left, viewport.right - band.left - thumbnail.width),
+      maxTop: Math.max(viewport.top - band.top, viewport.bottom - band.top - thumbnail.height)
+    };
+  }
+  function placePlaybackThumbnail(left, top) {
+    const bounds = playbackThumbnailBounds();
+    if (!bounds || !el.playbackThumbnail) return;
+    const clampedLeft = Math.min(bounds.maxLeft, Math.max(bounds.minLeft, left));
+    const clampedTop = Math.min(bounds.maxTop, Math.max(bounds.minTop, top));
+    Object.assign(el.playbackThumbnail.style, {
+      left: `${clampedLeft}px`,
+      top: `${clampedTop}px`,
+      right: "auto",
+      bottom: "auto"
+    });
+  }
+  function clampPlaybackThumbnailToCanvas() {
+    if (!el.playbackThumbnail || !el.playbackThumbnail.style.left) return;
+    placePlaybackThumbnail(Number.parseFloat(el.playbackThumbnail.style.left) || 0, Number.parseFloat(el.playbackThumbnail.style.top) || 0);
+  }
+  function playbackThumbnailAnimationSpan() {
+    const slots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
+    return playbackThumbnailAnimationBounds(slots);
+  }
+  function playbackThumbnailTallestFrameHeight() {
+    return playbackThumbnailAnimationSpan().height;
+  }
+  function playbackThumbnailWidestFrameWidth() {
+    return playbackThumbnailAnimationSpan().width;
+  }
+  function playbackThumbnailRequiredHeight(tallestFrameHeight = playbackThumbnailTallestFrameHeight()) {
+    const controlHeight = 28;
+    const contentPadding = 12;
+    const pixels = tallestFrameHeight * playbackThumbnailZoom * Math.max(1, state.verticalStretch);
+    return Math.max(52, Math.ceil(pixels + contentPadding + controlHeight));
+  }
+  function playbackThumbnailRequiredWidth(widestFrameWidth = playbackThumbnailWidestFrameWidth()) {
+    const contentPadding = 12;
+    const pixels = widestFrameWidth * playbackThumbnailZoom * 1.7;
+    return Math.max(160, Math.ceil(pixels + contentPadding));
+  }
+  function syncPlaybackThumbnailAutoSize() {
+    if (!el.playbackThumbnail || playbackThumbnailCollapsed) return;
+    const tallestFrameHeight = playbackThumbnailTallestFrameHeight();
+    const widestFrameWidth = playbackThumbnailWidestFrameWidth();
+    const requiredHeight = playbackThumbnailRequiredHeight(tallestFrameHeight);
+    const requiredWidth = playbackThumbnailRequiredWidth(widestFrameWidth);
+    const viewport = el.canvasStageScroll?.getBoundingClientRect();
+    const maximumAutoHeight = viewport ? Math.max(72, Math.floor(viewport.height - 24)) : requiredHeight;
+    const maximumAutoWidth = viewport ? Math.max(160, Math.floor(viewport.width - 24)) : requiredWidth;
+    const fittedHeight = Math.min(requiredHeight, maximumAutoHeight);
+    const fittedWidth = Math.min(requiredWidth, maximumAutoWidth);
+    if (!playbackThumbnailUserSized) {
+      Object.assign(el.playbackThumbnail.style, { width: `${fittedWidth}px`, height: `${fittedHeight}px` });
+      playbackThumbnailExpandedHeight = fittedHeight;
+      clampPlaybackThumbnailToCanvas();
+    } else {
+      let resized = false;
+      if (tallestFrameHeight > playbackThumbnailTallestHeightAtManualSize && el.playbackThumbnail.offsetHeight < fittedHeight) {
+        el.playbackThumbnail.style.height = `${fittedHeight}px`;
+        playbackThumbnailExpandedHeight = fittedHeight;
+        resized = true;
+      }
+      if (widestFrameWidth > playbackThumbnailWidestWidthAtManualSize && el.playbackThumbnail.offsetWidth < fittedWidth) {
+        el.playbackThumbnail.style.width = `${fittedWidth}px`;
+        resized = true;
+      }
+      if (resized) clampPlaybackThumbnailToCanvas();
+    }
+  }
+  function syncPlaybackThumbnailControls() {
+    if (!el.playbackThumbnail) return;
+    el.playbackThumbnail.classList.toggle("collapsed", playbackThumbnailCollapsed);
+    el.playbackThumbnailZoom.value = String(playbackThumbnailZoom);
+    el.playbackThumbnailZoom.disabled = playbackThumbnailCollapsed;
+    const button = el.togglePlaybackThumbnailVisibility;
+    button.setAttribute("aria-pressed", String(!playbackThumbnailCollapsed));
+    button.title = playbackThumbnailCollapsed ? "Show playback preview" : "Hide playback preview";
+    button.setAttribute("aria-label", button.title);
+    button.querySelector("use")?.setAttribute("href", playbackThumbnailCollapsed ? "#icon-eye-off" : "#icon-eye");
+  }
+  function togglePlaybackThumbnailVisibility() {
+    if (!el.playbackThumbnail) return;
+    if (!playbackThumbnailCollapsed) {
+      playbackThumbnailExpandedHeight = Math.max(72, el.playbackThumbnail.offsetHeight);
+      el.playbackThumbnail.style.height = "28px";
+    } else {
+      el.playbackThumbnail.style.height = `${playbackThumbnailExpandedHeight}px`;
+    }
+    playbackThumbnailCollapsed = !playbackThumbnailCollapsed;
+    syncPlaybackThumbnailControls();
+    clampPlaybackThumbnailToCanvas();
+    if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
+  }
+  function resizePlaybackThumbnail(width, height) {
+    const viewport = el.canvasStageScroll?.getBoundingClientRect();
+    if (!viewport || !el.playbackThumbnail) return;
+    const minWidth = 160;
+    const minHeight = 72;
+    const maxWidth = Math.max(minWidth, Math.floor(viewport.width));
+    const maxHeight = Math.max(minHeight, Math.floor(viewport.height));
+    const nextWidth = Math.max(minWidth, Math.min(maxWidth, Math.round(width)));
+    const nextHeight = Math.max(minHeight, Math.min(maxHeight, Math.round(height)));
+    Object.assign(el.playbackThumbnail.style, { width: `${nextWidth}px`, height: `${nextHeight}px` });
+    if (!playbackThumbnailCollapsed) playbackThumbnailExpandedHeight = nextHeight;
+    clampPlaybackThumbnailToCanvas();
+    renderPlaybackThumbnail();
+  }
+  function beginPlaybackThumbnailResize(event) {
+    if (event.button !== 0 || !el.playbackThumbnail) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = el.playbackThumbnail.getBoundingClientRect();
+    playbackThumbnailUserSized = true;
+    playbackThumbnailTallestHeightAtManualSize = playbackThumbnailTallestFrameHeight();
+    playbackThumbnailWidestWidthAtManualSize = playbackThumbnailWidestFrameWidth();
+    playbackThumbnailResize = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height };
+    el.playbackThumbnailResizeHandle.setPointerCapture(event.pointerId);
+  }
+  function movePlaybackThumbnailResize(event) {
+    if (!playbackThumbnailResize || playbackThumbnailResize.pointerId !== event.pointerId) return;
+    resizePlaybackThumbnail(playbackThumbnailResize.width + event.clientX - playbackThumbnailResize.startX, playbackThumbnailResize.height + event.clientY - playbackThumbnailResize.startY);
+    event.preventDefault();
+  }
+  function endPlaybackThumbnailResize(event) {
+    if (!playbackThumbnailResize || playbackThumbnailResize.pointerId !== event.pointerId) return;
+    if (el.playbackThumbnailResizeHandle?.hasPointerCapture?.(event.pointerId)) el.playbackThumbnailResizeHandle.releasePointerCapture(event.pointerId);
+    playbackThumbnailResize = null;
+  }
+  function beginPlaybackThumbnailDrag(event) {
+    if (event.button !== 0 || !el.playbackThumbnail || !event.target.closest(".playback-thumbnail-surface")) return;
+    const thumbnail = el.playbackThumbnail.getBoundingClientRect();
+    playbackThumbnailDrag = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - thumbnail.left,
+      offsetY: event.clientY - thumbnail.top
+    };
+    el.playbackThumbnail.setPointerCapture(event.pointerId);
+    el.playbackThumbnail.classList.add("dragging");
+    event.preventDefault();
+  }
+  function movePlaybackThumbnailDrag(event) {
+    if (!playbackThumbnailDrag || playbackThumbnailDrag.pointerId !== event.pointerId) return;
+    const band = el.canvasBand?.getBoundingClientRect();
+    if (!band) return;
+    placePlaybackThumbnail(event.clientX - band.left - playbackThumbnailDrag.offsetX, event.clientY - band.top - playbackThumbnailDrag.offsetY);
+    event.preventDefault();
+  }
+  function endPlaybackThumbnailDrag(event) {
+    if (!playbackThumbnailDrag || playbackThumbnailDrag.pointerId !== event.pointerId || !el.playbackThumbnail) return;
+    if (el.playbackThumbnail.hasPointerCapture?.(event.pointerId)) el.playbackThumbnail.releasePointerCapture(event.pointerId);
+    playbackThumbnailDrag = null;
+    el.playbackThumbnail.classList.remove("dragging");
+  }
   function drawPreviewPlayer(ctx, player, ox, oy, unitW, ph, visible) {
     if (!visible) return;
     const mode = nusizMode(player.nusiz);
@@ -3521,6 +4092,7 @@ ${backgroundData}` : ""}`;
     player.colors = result.colors;
     renderRowColors();
     renderEditor();
+    if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
     if (el.previewCanvas) renderPreview();
   }
   function renderRowColors() {
@@ -3656,6 +4228,7 @@ ${backgroundData}` : ""}`;
       liveRow.title = `Row ${y}: ${color}`;
     });
     renderEditor();
+    if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
     if (el.previewCanvas) renderPreview();
     renderFrames();
   }
@@ -4732,6 +5305,7 @@ ${backgroundData}` : ""}`;
   function renderCanvasSurfaces() {
     renderEditor();
     renderRowColors();
+    if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
   }
   function renderProjectPanels() {
     renderPalette();
@@ -4850,6 +5424,7 @@ ${backgroundData}` : ""}`;
     el.p0ColorsTitle.textContent = `P${state.playerAssignments[0]}`;
     el.p1ColorsTitle.textContent = `P${state.playerAssignments[1]}`;
     [el.spriteCanvas, el.spriteCanvas1].forEach((canvas, slot) => canvas.setAttribute("aria-label", `P${state.playerAssignments[slot]} ${state.width}-pixel-wide Atari sprite editing canvas`));
+    syncPlaybackThumbnailControls();
     syncDesktopMenuState();
   }
   function syncNudgeButtons() {
@@ -5002,11 +5577,14 @@ ${backgroundData}` : ""}`;
       const player = frame.players[state.activePlayer];
       const width = frame.width || 8;
       const height = frame.height || player.pixels.length;
+      const pixelsBeforeNudge = player.pixels;
+      let colorDeltaY = dy;
       if (movePixels) {
         if (frameIndex === state.currentFrame && live) {
           selection = live;
           const nx = Math.max(0, Math.min(width - live.w, live.x + dx));
           const ny = Math.max(0, Math.min(height - live.h, live.y + dy));
+          colorDeltaY = ny - live.y;
           const data = extractSelectionPixels(player.pixels, live);
           player.pixels = moveMaskedSelectionPixels(player.pixels, live, data, nx, ny);
           selection = tightenSelectionToLivePixels(player.pixels, { ...live, x: nx, y: ny }, width, height);
@@ -5021,7 +5599,9 @@ ${backgroundData}` : ""}`;
       }
       if (moveColors) {
         const source = player.colors.slice(0, height);
-        if (frameIndex === state.currentFrame && colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean)) {
+        if (frameIndex === state.currentFrame && live && !colorSelection) {
+          player.colors = moveSelectedScanlineColors(source, pixelsBeforeNudge, live, colorDeltaY, state.currentColor).colors;
+        } else if (frameIndex === state.currentFrame && colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean)) {
           const next = source.slice();
           const movedMask = Array(height).fill(false);
           colorSelection.mask.forEach((selected, row) => {
@@ -5043,28 +5623,6 @@ ${backgroundData}` : ""}`;
       }
     });
     if (frameIndices.length > 1) el.statusMessage.textContent = `Nudged ${selectedFrameLabel()}`;
-    renderAll();
-  }
-  function moveSelectionBy(dx, dy) {
-    if (!selection) return;
-    const live = tightenSelectionToLivePixels(currentPlayer().pixels, selection, state.width, state.height);
-    if (!live) {
-      selection = null;
-      el.statusMessage.textContent = "The selection contains no live pixels";
-      renderAll();
-      return;
-    }
-    const nx = Math.max(0, Math.min(state.width - live.w, live.x + dx));
-    const ny = Math.max(0, Math.min(state.height - live.h, live.y + dy));
-    if (nx === live.x && ny === live.y) {
-      selection = live;
-      renderAll();
-      return;
-    }
-    pushHistory();
-    const data = extractSelectionPixels(currentPlayer().pixels, live);
-    currentPlayer().pixels = moveMaskedSelectionPixels(currentPlayer().pixels, live, data, nx, ny);
-    selection = tightenSelectionToLivePixels(currentPlayer().pixels, { ...live, x: nx, y: ny }, state.width, state.height);
     renderAll();
   }
   function scaleStepValue() {
@@ -5433,11 +5991,7 @@ ${backgroundData}` : ""}`;
     pushHistory();
     forEachSelectedFrame((frame) => {
       const player = frame.players[state.activePlayer];
-      if (state.twoSpriteMode) resizePlayerBottomAnchored(player, height);
-      else {
-        player.height = height;
-        resizePlayer(player, height);
-      }
+      resizePlayerBottomAnchored(player, height);
       frame.height = height;
     });
     state.height = playerHeight(currentFrame(), state.activePlayer);
@@ -5473,11 +6027,7 @@ ${backgroundData}` : ""}`;
     state.frames.forEach((frame) => {
       const player = frame.players[state.activePlayer];
       player.width = width;
-      if (state.twoSpriteMode) resizePlayerBottomAnchored(player, height);
-      else {
-        player.height = height;
-        resizePlayer(player, height);
-      }
+      resizePlayerBottomAnchored(player, height);
       player.nusiz = source.nusiz;
     });
     renderAll();
@@ -5610,10 +6160,11 @@ ${backgroundData}` : ""}`;
       schedulePlaybackStep();
     }, repeat * (1e3 / 60));
   }
-  function exportBB() {
+  function exportData() {
     state.projectName = el.projectName.value || state.projectName;
     syncActiveAnimation(state);
-    const result = generateAnimationCode(state, {
+    const assembly = currentExportFormat === "assembly";
+    const result = assembly ? generateAssemblyData(state, { scope: currentBbExportScope }) : generateAnimationCode(state, {
       content: currentBbExportMode,
       scope: currentBbExportScope,
       includeProjectData: currentBbExportWithProjectData,
@@ -5625,21 +6176,29 @@ ${backgroundData}` : ""}`;
     el.codeDiagnostics.innerHTML = visibleDiagnostics.map((item) => `<div class="diagnostic ${item.severity}"><strong>${item.severity}</strong><span>${item.message}</span></div>`).join("");
     el.codeDiagnostics.hidden = visibleDiagnostics.length === 0;
     const ownership = result.diagnostics.find((item) => item.code === "VARIABLE_OWNERSHIP");
-    el.bbRamSummary.textContent = ownership?.message || `${result.ramBytes || 0} variable${result.ramBytes === 1 ? "" : "s"} used.`;
+    el.bbRamSummary.textContent = assembly ? "Assembly Data exports art and per-row color tables only." : ownership?.message || `${result.ramBytes || 0} variable${result.ramBytes === 1 ? "" : "s"} used.`;
     const scopeLabel = currentBbExportScope === "all" ? "All Animations" : "Current Animation";
-    const contentLabel = currentBbExportMode === "demo" ? "Compilable Demo" : currentBbExportMode === "module" ? "Animation Module" : "Tables Only";
-    openCodeDialog(`Export bB ${contentLabel} \u2014 ${scopeLabel}`, result.output, false);
+    const contentLabel = assembly ? "Assembly Data" : currentBbExportMode === "demo" ? "Compilable Demo" : currentBbExportMode === "module" ? "Animation Module" : "Tables Only";
+    openCodeDialog(`Export ${contentLabel} \u2014 ${scopeLabel}`, result.output, false);
   }
-  function syncBbExportOptions() {
+  function syncExportOptions() {
+    const assembly = currentExportFormat === "assembly";
     const tablesOnly = currentBbExportMode === "tables";
-    el.bbExportPositioning.disabled = tablesOnly;
-    el.bbExportPositioning.classList.toggle("is-disabled", tablesOnly);
+    el.bbExportMode.disabled = assembly;
+    el.bbExportOptions.disabled = assembly;
+    el.bbExportPositioning.disabled = assembly || tablesOnly;
+    el.bbExportMode.classList.toggle("is-disabled", assembly);
+    el.bbExportOptions.classList.toggle("is-disabled", assembly);
+    el.bbExportPositioning.classList.toggle("is-disabled", assembly || tablesOnly);
+    el.codeText.setAttribute("aria-label", assembly ? "Assembly data" : "bB scene data");
+    el.downloadBas.textContent = assembly ? "Download .asm" : "Download .bas";
   }
   function openCodeDialog(title, text, importMode) {
     el.codeDialogTitle.textContent = title;
     el.codeText.value = text;
     el.codeDialog.classList.toggle("bb-import-dialog", importMode);
     el.importFromText.style.display = importMode ? "inline-block" : "none";
+    el.exportFormat.style.display = importMode ? "none" : "grid";
     el.bbExportMode.style.display = importMode ? "none" : "grid";
     el.bbExportScope.style.display = importMode ? "none" : "grid";
     el.bbExportOptions.style.display = importMode ? "none" : "grid";
@@ -5649,11 +6208,12 @@ ${backgroundData}` : ""}`;
     if (importMode) {
       el.codeDiagnostics.innerHTML = "";
       el.codeDiagnostics.hidden = true;
-    } else syncBbExportOptions();
+    } else syncExportOptions();
     if (!el.codeDialog.open) el.codeDialog.showModal();
   }
-  function importBBText(text) {
-    const parsed = parseBB(text);
+  function importDataText(text) {
+    const assembly = parseAssemblyData(text);
+    const parsed = assembly.detected ? assembly : parseBB(text);
     const showImportError = (message) => {
       const diagnostic = document.createElement("div");
       diagnostic.className = "diagnostic error";
@@ -5671,7 +6231,7 @@ ${backgroundData}` : ""}`;
       try {
         candidate = migrateProject(parsed.project);
       } catch (error) {
-        return showImportError(`Could not import generated YAJA bB: ${error.message}`);
+        return showImportError(`Could not import generated YAJA ${assembly.detected ? "Assembly" : "bB"} data: ${error.message}`);
       }
       pushHistory();
       state = { ...defaultState(), ...candidate, currentFrame: 0, activePlayer: candidate.activePlayer === 1 ? 1 : 0 };
@@ -5683,7 +6243,7 @@ ${backgroundData}` : ""}`;
       return true;
     }
     if (!parsed.players.length) {
-      return showImportError("No player sprite data found. Paste a YAJA export or one or two player#: blocks.");
+      return showImportError("No YAJA Assembly data or bB player sprite data found. Paste a YAJA export, Assembly tables, or one or two player#: blocks.");
     }
     pushHistory();
     state.kernel = parsed.inferredKernel || state.kernel;
@@ -6570,6 +7130,23 @@ ${backgroundData}` : ""}`;
     el.framesList.addEventListener("pointerup", endTimelinePointer);
     el.framesList.addEventListener("pointercancel", endTimelinePointer);
     el.playAnim.addEventListener("click", togglePlayback);
+    el.playbackThumbnailZoom.addEventListener("input", () => {
+      playbackThumbnailZoom = Math.max(1, Math.min(16, Number(el.playbackThumbnailZoom.value) || 6));
+      syncPlaybackThumbnailControls();
+      if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
+    });
+    el.togglePlaybackThumbnailVisibility.addEventListener("click", (event) => {
+      event.stopPropagation();
+      togglePlaybackThumbnailVisibility();
+    });
+    el.playbackThumbnail.addEventListener("pointerdown", beginPlaybackThumbnailDrag);
+    el.playbackThumbnail.addEventListener("pointermove", movePlaybackThumbnailDrag);
+    el.playbackThumbnail.addEventListener("pointerup", endPlaybackThumbnailDrag);
+    el.playbackThumbnail.addEventListener("pointercancel", endPlaybackThumbnailDrag);
+    el.playbackThumbnailResizeHandle.addEventListener("pointerdown", beginPlaybackThumbnailResize);
+    el.playbackThumbnailResizeHandle.addEventListener("pointermove", movePlaybackThumbnailResize);
+    el.playbackThumbnailResizeHandle.addEventListener("pointerup", endPlaybackThumbnailResize);
+    el.playbackThumbnailResizeHandle.addEventListener("pointercancel", endPlaybackThumbnailResize);
     el.copySelection.addEventListener("click", () => copySelection(false));
     el.cutSelection.addEventListener("click", () => copySelection(true));
     el.pasteSelection.addEventListener("click", pasteSelection);
@@ -6634,37 +7211,43 @@ ${backgroundData}` : ""}`;
     el.copyP0P1.addEventListener("click", copyP0ToP1);
     el.copyColorsP0P1.addEventListener("click", copyColorsP0ToP1);
     el.mirrorP0P1.addEventListener("click", mirrorP0ToP1);
-    el.exportCode.addEventListener("click", exportBB);
-    el.importCode.addEventListener("click", () => openCodeDialog("Import bB Data", "", true));
+    el.exportCode.addEventListener("click", exportData);
+    el.importCode.addEventListener("click", () => openCodeDialog("Import Data", "", true));
     el.importFromText.addEventListener("click", () => {
-      if (importBBText(el.codeText.value)) el.codeDialog.close();
+      if (importDataText(el.codeText.value)) el.codeDialog.close();
     });
     el.copyCode.addEventListener("click", () => navigator.clipboard?.writeText(el.codeText.value));
+    [el.exportFormatBb, el.exportFormatAssembly].forEach((control) => control.addEventListener("change", () => {
+      if (!control.checked) return;
+      currentExportFormat = control.value;
+      syncExportOptions();
+      exportData();
+    }));
     [el.exportBbTables, el.exportBbModule, el.exportBbDemo].forEach((control) => control.addEventListener("change", () => {
       if (!control.checked) return;
       currentBbExportMode = control.value;
-      syncBbExportOptions();
-      exportBB();
+      syncExportOptions();
+      exportData();
     }));
     [el.exportBbCurrent, el.exportBbAll].forEach((control) => control.addEventListener("change", () => {
       if (!control.checked) return;
       currentBbExportScope = control.value;
-      exportBB();
+      exportData();
     }));
     el.exportWithProjectData.addEventListener("change", () => {
       currentBbExportWithProjectData = el.exportWithProjectData.checked;
-      exportBB();
+      exportData();
     });
     el.exportWithComments.addEventListener("change", () => {
       currentBbExportWithComments = el.exportWithComments.checked;
-      exportBB();
+      exportData();
     });
     [el.exportPositionSprite, el.exportPositionAnchor].forEach((control) => control.addEventListener("change", () => {
       if (!control.checked) return;
       currentBbPositioning = control.value;
-      exportBB();
+      exportData();
     }));
-    el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), currentBbExportFilename || animationExportFilename(state.animationName, currentBbExportMode)));
+    el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), currentBbExportFilename || (currentExportFormat === "assembly" ? assemblyExportFilename(state.animationName, currentBbExportScope) : animationExportFilename(state.animationName, currentBbExportMode))));
     el.exportSheet.addEventListener("click", openExportPngDialog);
     [el.exportPngSelected, el.exportPngAll].forEach((control) => control.addEventListener("change", updateExportPngSummary));
     el.confirmExportPng.addEventListener("click", confirmExportPng);
@@ -6751,6 +7334,7 @@ ${backgroundData}` : ""}`;
     el.placeText.addEventListener("click", placeText);
     window.addEventListener("resize", () => {
       renderAll();
+      clampPlaybackThumbnailToCanvas();
       positionColorBlockEditor();
     });
     el.palettePanel.closest(".right-panel")?.addEventListener("scroll", positionColorBlockEditor, { passive: true });
@@ -6903,7 +7487,7 @@ ${backgroundData}` : ""}`;
     }
     if (state.tool === "select" && selection && e.key.startsWith("Arrow")) {
       e.preventDefault();
-      moveSelectionBy(e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0, e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
+      nudge(e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0, e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
       return;
     }
     if (e.key === "ArrowLeft" && !e.ctrlKey) {
@@ -7061,6 +7645,11 @@ ${backgroundData}` : ""}`;
       "toggleSpriteVisibility1",
       "previewCanvas",
       "previewCaption",
+      "playbackThumbnail",
+      "playbackThumbnailCanvas",
+      "playbackThumbnailZoom",
+      "togglePlaybackThumbnailVisibility",
+      "playbackThumbnailResizeHandle",
       "rowColors0",
       "rowColors1",
       "p0ColorsColumn",
@@ -7152,11 +7741,14 @@ ${backgroundData}` : ""}`;
       "confirmExportPng",
       "codeDialog",
       "codeDialogTitle",
+      "exportFormat",
       "bbExportMode",
       "bbExportScope",
       "bbExportOptions",
       "bbExportPositioning",
       "bbRamSummary",
+      "exportFormatBb",
+      "exportFormatAssembly",
       "exportBbTables",
       "exportBbModule",
       "exportBbDemo",

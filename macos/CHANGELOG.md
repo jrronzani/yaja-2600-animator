@@ -1,5 +1,9 @@
 # YAJA 2600 Animator v1.5.0
 
+## v1.5.0
+
+- Import Data now accepts common labelled Assembly sprite tables in addition to YAJA's round-trip format. It understands familiar byte directives and binary, hexadecimal, and decimal data, then brings the available sprite rows and colors into the editor.
+
 ## Major changes since v1.3.4
 
 This release brings the editor, timeline, and two-sprite workflow into a more finished place while keeping existing projects compatible.
@@ -24,6 +28,18 @@ This release brings the editor, timeline, and two-sprite workflow into a more fi
 - Auto-Paint and Auto-Color handle transparent images more reliably and can ignore common black backgrounds, avoiding the overly dark colors they could introduce.
 - Exported PNGs use Atari-shaped pixels and can be brought back in as a reference with a much closer match to the original grid.
 - Fast color-column drags fill every row crossed by the pointer instead of leaving gaps.
+
+### A more useful playback preview
+
+- The canvas includes a small animation preview that plays along with the timeline. It uses the selected background color and shows the same sprite overlap, copy modes, offsets, and scanline colors as the finished animation.
+- The preview stays in place while you scroll or zoom the editor. You can drag it anywhere within the canvas, resize its window, adjust its magnification, or hide it when you need more room.
+- Its view stays steady across the animation, using the widest and tallest frame so the window does not jump as frames change.
+
+### Import and export data
+
+- The former bB commands are now simply called **Import Data** and **Export Data**. bB remains available for familiar YAJA and batari Basic workflows.
+- Export Data can also create DASM-ready Assembly art and color tables for the current animation or the whole project. The Assembly export is deliberately data-only, ready to be used with a scanline kernel.
+- YAJA Assembly data can be imported again as a complete project, including multiple animations, frames, timing, colors, player assignments, offsets, and copy modes. Earlier YAJA Assembly tables can also recover their available art and colors.
 
 ### Saving, imports, and desktop use
 

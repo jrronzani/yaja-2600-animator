@@ -335,7 +335,7 @@ export function emitAnimationDemo(ir, options = {}) {
   return `${demoHeader(ir, options)}${moduleBank}${emitAnimationModule(ir, options)}${backgroundData ? `\n\n${backgroundData}` : ""}`;
 }
 
-function animationProjectView(project, animation) {
+export function animationProjectView(project, animation) {
   return {
     ...project, animationName: animation.name, frames: animation.frames,
     currentFrame: animation.currentFrame, twoSpriteMode: animation.twoSpriteMode,

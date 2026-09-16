@@ -1,7 +1,9 @@
 import { animationExportFilename, generateAnimationCode } from "./core/codegen.js";
+import { assemblyExportFilename, generateAssemblyData } from "./core/assembly-codegen.js";
+import { parseAssemblyData } from "./core/assembly-parser.js";
 import { CURRENT_SCHEMA_VERSION, migrateProject, normalizePlayerAssignments, playerLimitForKernel } from "./core/project-model.js";
 import { createRotationSession } from "./core/sprite-transform.js";
-import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, cropPixelsToSelection, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, floodFillPixels, floodFillScanlines, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelection, placeSelectionPixels, rasterCellFromLocal, rasterLineCells, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
+import { applyOffsetsToAllFrames, brushCells, circlePivotFromPointer, combineRasterSelections, compositeSelectionGrid, cropPixelsToSelection, duplicateSelectedFrames, extractSelectionPixels, flipSelectionInFrame, floodFillPixels, floodFillScanlines, fullSelectionMask, growRasterArtwork, maskBoundarySegments, morphSelectionInFrame, moveSelectedScanlineColors, moveSelection, placeSelectionPixels, rasterCellFromLocal, rasterLineCells, reorderSelectedFrameBlock, resampleValues, reverseSelectedFrames, scaleRasterArtwork, scaleSelectionInFrame, selectionContains, selectionFromMask, selectionFromRectangle, selectionToMask, tightenSelectionToLivePixels, visualCircleCells } from "./core/editor-ops.js";
 import { parseBatariBasicSpriteData } from "./core/bb-parser.js";
 import { applyTheme, getPreferredTheme, normalizeThemeId } from "./themes.js";
 import { buildStoredZip } from "./core/zip.js";
@@ -46,6 +48,7 @@ const PROJECT_PICKER_ID = "yaja-animator-project-files";
 const SHARED_PICKER_HANDLE_KEY = "__yajaAnimatorLastProjectPickerHandle";
 let currentProjectFileHandle = null;
 let lastProjectPickerHandle = null;
+let currentExportFormat = "bb";
 let currentBbExportMode = "tables";
 let currentBbExportScope = "current";
 let currentBbExportWithProjectData = false;
@@ -129,6 +132,14 @@ let referenceTransformActive = false;
 let referenceDrag = null;
 let playTimer = null;
 let playbackRunning = false;
+let playbackThumbnailDrag = null;
+let playbackThumbnailResize = null;
+let playbackThumbnailZoom = 6;
+let playbackThumbnailCollapsed = false;
+let playbackThumbnailExpandedHeight = 169;
+let playbackThumbnailUserSized = false;
+let playbackThumbnailTallestHeightAtManualSize = 0;
+let playbackThumbnailWidestWidthAtManualSize = 0;
 let selectedFrames = new Set([0]);
 let frameSelectionAnchor = 0;
 let framePointerSession = null;
@@ -975,6 +986,255 @@ function renderPreview() {
   el.previewCaption.textContent = `${aspect.label} / ${state.twoSpriteMode ? `P${state.playerAssignments[0]}+P${state.playerAssignments[1]}` : `P${state.playerAssignments[state.activePlayer]}`} / ${NUSIZ[currentPlayer().nusiz].label}`;
 }
 
+function playbackThumbnailFrameBounds(frame, slots) {
+  const geometry = centeredCompositionGeometry(state.width, slots.map(slot => ({
+    ...frame.players[slot],
+    width: playerWidth(frame, slot)
+  })));
+  // Frame the configured sprite grids, including empty rows and columns. This
+  // keeps the preview's coordinate system fixed while pixels are drawn.
+  const minY = Math.min(...slots.map(slot => Number(frame.players[slot].yOffset) || 0));
+  const maxY = Math.max(...slots.map(slot => (Number(frame.players[slot].yOffset) || 0) + playerHeight(frame, slot)));
+  return { minX: geometry.minX, maxX: geometry.maxX, minY, maxY };
+}
+function playbackThumbnailAnimationBounds(slots) {
+  const bounds = state.frames.map(frame => playbackThumbnailFrameBounds(frame, slots));
+  const minX = Math.min(...bounds.map(item => item.minX));
+  const maxX = Math.max(...bounds.map(item => item.maxX));
+  const minY = Math.min(...bounds.map(item => item.minY));
+  const maxY = Math.max(...bounds.map(item => item.maxY));
+  return { minX, maxX, minY, maxY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
+// Preview framing uses the visible bounds of every frame, so transparent
+// editor rows do not waste space and playback cannot resize or jump per frame.
+function renderPlaybackThumbnail() {
+  const canvas = el.playbackThumbnailCanvas;
+  if (!canvas || !state) return;
+  syncPlaybackThumbnailAutoSize();
+  const rect = canvas.getBoundingClientRect();
+  const cssW = Math.max(1, rect.width);
+  const cssH = Math.max(1, rect.height);
+  const ctx = setCanvasSize(canvas, cssW, cssH);
+  // setCanvasSize gives editable canvases explicit CSS dimensions. This preview
+  // lives in a resizable grid row, so let its surface own the display size.
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  ctx.fillStyle = colorHex(state.background);
+  ctx.fillRect(0, 0, cssW, cssH);
+
+  const frame = currentFrame();
+  const slots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
+  const geometry = centeredCompositionGeometry(state.width, slots.map(slot => ({
+    ...frame.players[slot],
+    width: playerWidth(frame, slot)
+  })));
+  const bounds = playbackThumbnailAnimationBounds(slots);
+  // Resizing this window changes its viewport only. The selected zoom remains
+  // the art scale, and the composition stays centered if the viewport clips it.
+  const scale = playbackThumbnailZoom;
+  const unitH = scale * Math.max(1, state.verticalStretch);
+  const unitW = scale * 1.7;
+  const artWidth = bounds.width * unitW;
+  const artHeight = bounds.height * unitH;
+  const originX = (cssW - artWidth) / 2 - bounds.minX * unitW;
+  const originY = (cssH - artHeight) / 2 - bounds.minY * unitH;
+
+  slots
+    .slice()
+    .sort((leftSlot, rightSlot) => playerLayerPriority(leftSlot) - playerLayerPriority(rightSlot) || leftSlot - rightSlot)
+    .forEach(slot => {
+      const player = frame.players[slot];
+      const geometryIndex = slots.indexOf(slot);
+      drawThumbPlayer(ctx, player,
+        originX + geometry.starts[geometryIndex] * unitW,
+        originY + player.yOffset * unitH,
+        unitW, unitH, playerHeight(frame, slot), playerWidth(frame, slot));
+    });
+}
+
+function playbackThumbnailBounds() {
+  const band = el.canvasBand?.getBoundingClientRect();
+  const viewport = el.canvasStageScroll?.getBoundingClientRect();
+  const thumbnail = el.playbackThumbnail?.getBoundingClientRect();
+  if (!band || !viewport || !thumbnail) return null;
+  return {
+    minLeft: viewport.left - band.left,
+    minTop: viewport.top - band.top,
+    maxLeft: Math.max(viewport.left - band.left, viewport.right - band.left - thumbnail.width),
+    maxTop: Math.max(viewport.top - band.top, viewport.bottom - band.top - thumbnail.height)
+  };
+}
+
+function placePlaybackThumbnail(left, top) {
+  const bounds = playbackThumbnailBounds();
+  if (!bounds || !el.playbackThumbnail) return;
+  const clampedLeft = Math.min(bounds.maxLeft, Math.max(bounds.minLeft, left));
+  const clampedTop = Math.min(bounds.maxTop, Math.max(bounds.minTop, top));
+  Object.assign(el.playbackThumbnail.style, {
+    left: `${clampedLeft}px`,
+    top: `${clampedTop}px`,
+    right: "auto",
+    bottom: "auto"
+  });
+}
+
+function clampPlaybackThumbnailToCanvas() {
+  if (!el.playbackThumbnail || !el.playbackThumbnail.style.left) return;
+  placePlaybackThumbnail(Number.parseFloat(el.playbackThumbnail.style.left) || 0, Number.parseFloat(el.playbackThumbnail.style.top) || 0);
+}
+
+function playbackThumbnailAnimationSpan() {
+  const slots = state.twoSpriteMode ? [0, 1] : [state.activePlayer];
+  return playbackThumbnailAnimationBounds(slots);
+}
+
+function playbackThumbnailTallestFrameHeight() {
+  return playbackThumbnailAnimationSpan().height;
+}
+
+function playbackThumbnailWidestFrameWidth() {
+  return playbackThumbnailAnimationSpan().width;
+}
+
+function playbackThumbnailRequiredHeight(tallestFrameHeight = playbackThumbnailTallestFrameHeight()) {
+  const controlHeight = 28;
+  const contentPadding = 12;
+  const pixels = tallestFrameHeight * playbackThumbnailZoom * Math.max(1, state.verticalStretch);
+  return Math.max(52, Math.ceil(pixels + contentPadding + controlHeight));
+}
+
+function playbackThumbnailRequiredWidth(widestFrameWidth = playbackThumbnailWidestFrameWidth()) {
+  const contentPadding = 12;
+  const pixels = widestFrameWidth * playbackThumbnailZoom * 1.7;
+  return Math.max(160, Math.ceil(pixels + contentPadding));
+}
+
+function syncPlaybackThumbnailAutoSize() {
+  if (!el.playbackThumbnail || playbackThumbnailCollapsed) return;
+  const tallestFrameHeight = playbackThumbnailTallestFrameHeight();
+  const widestFrameWidth = playbackThumbnailWidestFrameWidth();
+  const requiredHeight = playbackThumbnailRequiredHeight(tallestFrameHeight);
+  const requiredWidth = playbackThumbnailRequiredWidth(widestFrameWidth);
+  const viewport = el.canvasStageScroll?.getBoundingClientRect();
+  // Never grow the fixed preview past the canvas viewport. The renderer then
+  // reduces the sprite scale equally on both axes instead of clipping it.
+  const maximumAutoHeight = viewport ? Math.max(72, Math.floor(viewport.height - 24)) : requiredHeight;
+  const maximumAutoWidth = viewport ? Math.max(160, Math.floor(viewport.width - 24)) : requiredWidth;
+  const fittedHeight = Math.min(requiredHeight, maximumAutoHeight);
+  const fittedWidth = Math.min(requiredWidth, maximumAutoWidth);
+  if (!playbackThumbnailUserSized) {
+    Object.assign(el.playbackThumbnail.style, { width: `${fittedWidth}px`, height: `${fittedHeight}px` });
+    playbackThumbnailExpandedHeight = fittedHeight;
+    clampPlaybackThumbnailToCanvas();
+  } else {
+    let resized = false;
+    if (tallestFrameHeight > playbackThumbnailTallestHeightAtManualSize && el.playbackThumbnail.offsetHeight < fittedHeight) {
+      el.playbackThumbnail.style.height = `${fittedHeight}px`;
+      playbackThumbnailExpandedHeight = fittedHeight;
+      resized = true;
+    }
+    if (widestFrameWidth > playbackThumbnailWidestWidthAtManualSize && el.playbackThumbnail.offsetWidth < fittedWidth) {
+      el.playbackThumbnail.style.width = `${fittedWidth}px`;
+      resized = true;
+    }
+    if (resized) clampPlaybackThumbnailToCanvas();
+  }
+}
+
+function syncPlaybackThumbnailControls() {
+  if (!el.playbackThumbnail) return;
+  el.playbackThumbnail.classList.toggle("collapsed", playbackThumbnailCollapsed);
+  el.playbackThumbnailZoom.value = String(playbackThumbnailZoom);
+  el.playbackThumbnailZoom.disabled = playbackThumbnailCollapsed;
+  const button = el.togglePlaybackThumbnailVisibility;
+  button.setAttribute("aria-pressed", String(!playbackThumbnailCollapsed));
+  button.title = playbackThumbnailCollapsed ? "Show playback preview" : "Hide playback preview";
+  button.setAttribute("aria-label", button.title);
+  button.querySelector("use")?.setAttribute("href", playbackThumbnailCollapsed ? "#icon-eye-off" : "#icon-eye");
+}
+
+function togglePlaybackThumbnailVisibility() {
+  if (!el.playbackThumbnail) return;
+  if (!playbackThumbnailCollapsed) {
+    playbackThumbnailExpandedHeight = Math.max(72, el.playbackThumbnail.offsetHeight);
+    el.playbackThumbnail.style.height = "28px";
+  } else {
+    el.playbackThumbnail.style.height = `${playbackThumbnailExpandedHeight}px`;
+  }
+  playbackThumbnailCollapsed = !playbackThumbnailCollapsed;
+  syncPlaybackThumbnailControls();
+  clampPlaybackThumbnailToCanvas();
+  if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
+}
+
+function resizePlaybackThumbnail(width, height) {
+  const viewport = el.canvasStageScroll?.getBoundingClientRect();
+  if (!viewport || !el.playbackThumbnail) return;
+  const minWidth = 160;
+  const minHeight = 72;
+  const maxWidth = Math.max(minWidth, Math.floor(viewport.width));
+  const maxHeight = Math.max(minHeight, Math.floor(viewport.height));
+  const nextWidth = Math.max(minWidth, Math.min(maxWidth, Math.round(width)));
+  const nextHeight = Math.max(minHeight, Math.min(maxHeight, Math.round(height)));
+  Object.assign(el.playbackThumbnail.style, { width: `${nextWidth}px`, height: `${nextHeight}px` });
+  if (!playbackThumbnailCollapsed) playbackThumbnailExpandedHeight = nextHeight;
+  clampPlaybackThumbnailToCanvas();
+  renderPlaybackThumbnail();
+}
+
+function beginPlaybackThumbnailResize(event) {
+  if (event.button !== 0 || !el.playbackThumbnail) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const rect = el.playbackThumbnail.getBoundingClientRect();
+  playbackThumbnailUserSized = true;
+  playbackThumbnailTallestHeightAtManualSize = playbackThumbnailTallestFrameHeight();
+  playbackThumbnailWidestWidthAtManualSize = playbackThumbnailWidestFrameWidth();
+  playbackThumbnailResize = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height };
+  el.playbackThumbnailResizeHandle.setPointerCapture(event.pointerId);
+}
+
+function movePlaybackThumbnailResize(event) {
+  if (!playbackThumbnailResize || playbackThumbnailResize.pointerId !== event.pointerId) return;
+  resizePlaybackThumbnail(playbackThumbnailResize.width + event.clientX - playbackThumbnailResize.startX, playbackThumbnailResize.height + event.clientY - playbackThumbnailResize.startY);
+  event.preventDefault();
+}
+
+function endPlaybackThumbnailResize(event) {
+  if (!playbackThumbnailResize || playbackThumbnailResize.pointerId !== event.pointerId) return;
+  if (el.playbackThumbnailResizeHandle?.hasPointerCapture?.(event.pointerId)) el.playbackThumbnailResizeHandle.releasePointerCapture(event.pointerId);
+  playbackThumbnailResize = null;
+}
+
+function beginPlaybackThumbnailDrag(event) {
+  if (event.button !== 0 || !el.playbackThumbnail || !event.target.closest(".playback-thumbnail-surface")) return;
+  const thumbnail = el.playbackThumbnail.getBoundingClientRect();
+  playbackThumbnailDrag = {
+    pointerId: event.pointerId,
+    offsetX: event.clientX - thumbnail.left,
+    offsetY: event.clientY - thumbnail.top
+  };
+  el.playbackThumbnail.setPointerCapture(event.pointerId);
+  el.playbackThumbnail.classList.add("dragging");
+  event.preventDefault();
+}
+
+function movePlaybackThumbnailDrag(event) {
+  if (!playbackThumbnailDrag || playbackThumbnailDrag.pointerId !== event.pointerId) return;
+  const band = el.canvasBand?.getBoundingClientRect();
+  if (!band) return;
+  placePlaybackThumbnail(event.clientX - band.left - playbackThumbnailDrag.offsetX, event.clientY - band.top - playbackThumbnailDrag.offsetY);
+  event.preventDefault();
+}
+
+function endPlaybackThumbnailDrag(event) {
+  if (!playbackThumbnailDrag || playbackThumbnailDrag.pointerId !== event.pointerId || !el.playbackThumbnail) return;
+  if (el.playbackThumbnail.hasPointerCapture?.(event.pointerId)) el.playbackThumbnail.releasePointerCapture(event.pointerId);
+  playbackThumbnailDrag = null;
+  el.playbackThumbnail.classList.remove("dragging");
+}
+
 function drawPreviewPlayer(ctx, player, ox, oy, unitW, ph, visible) {
   if (!visible) return;
   const mode = nusizMode(player.nusiz);
@@ -1411,6 +1671,7 @@ function floodFillColorRows(y, playerIndex = state.activePlayer, erase = false) 
   player.colors = result.colors;
   renderRowColors();
   renderEditor();
+  if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
   if (el.previewCanvas) renderPreview();
 }
 
@@ -1554,6 +1815,7 @@ function paintRowColorRange(fromRow, toRow, playerIndex = state.activePlayer) {
     liveRow.title = `Row ${y}: ${color}`;
   });
   renderEditor();
+  if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
   if (el.previewCanvas) renderPreview();
   renderFrames();
 }
@@ -2660,6 +2922,7 @@ function renderAll() {
 function renderCanvasSurfaces() {
   renderEditor();
   renderRowColors();
+  if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
 }
 
 function renderProjectPanels() {
@@ -2777,6 +3040,7 @@ function syncControls() {
   el.p0ColorsTitle.textContent = `P${state.playerAssignments[0]}`;
   el.p1ColorsTitle.textContent = `P${state.playerAssignments[1]}`;
   [el.spriteCanvas, el.spriteCanvas1].forEach((canvas, slot) => canvas.setAttribute("aria-label", `P${state.playerAssignments[slot]} ${state.width}-pixel-wide Atari sprite editing canvas`));
+  syncPlaybackThumbnailControls();
   syncDesktopMenuState();
 }
 
@@ -2945,11 +3209,14 @@ function nudge(dx, dy) {
     const player = frame.players[state.activePlayer];
     const width = frame.width || 8;
     const height = frame.height || player.pixels.length;
+    const pixelsBeforeNudge = player.pixels;
+    let colorDeltaY = dy;
     if (movePixels) {
       if (frameIndex === state.currentFrame && live) {
         selection = live;
         const nx = Math.max(0, Math.min(width - live.w, live.x + dx));
         const ny = Math.max(0, Math.min(height - live.h, live.y + dy));
+        colorDeltaY = ny - live.y;
         const data = extractSelectionPixels(player.pixels, live);
         player.pixels = moveMaskedSelectionPixels(player.pixels, live, data, nx, ny);
         selection = tightenSelectionToLivePixels(player.pixels, { ...live, x: nx, y: ny }, width, height);
@@ -2964,7 +3231,9 @@ function nudge(dx, dy) {
     }
     if (moveColors) {
       const source = player.colors.slice(0, height);
-      if (frameIndex === state.currentFrame && colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean)) {
+      if (frameIndex === state.currentFrame && live && !colorSelection) {
+        player.colors = moveSelectedScanlineColors(source, pixelsBeforeNudge, live, colorDeltaY, state.currentColor).colors;
+      } else if (frameIndex === state.currentFrame && colorSelection?.player === state.activePlayer && colorSelection.mask?.some(Boolean)) {
         const next = source.slice();
         const movedMask = Array(height).fill(false);
         colorSelection.mask.forEach((selected, row) => { if (selected && row < height) next[row] = state.currentColor; });
@@ -3356,11 +3625,7 @@ function setHeight() {
   pushHistory();
   forEachSelectedFrame(frame => {
     const player = frame.players[state.activePlayer];
-    if (state.twoSpriteMode) resizePlayerBottomAnchored(player, height);
-    else {
-      player.height = height;
-      resizePlayer(player, height);
-    }
+    resizePlayerBottomAnchored(player, height);
     frame.height = height;
   });
   state.height = playerHeight(currentFrame(), state.activePlayer);
@@ -3396,11 +3661,7 @@ function applySizeToAll() {
   state.frames.forEach(frame => {
     const player = frame.players[state.activePlayer];
     player.width = width;
-    if (state.twoSpriteMode) resizePlayerBottomAnchored(player, height);
-    else {
-      player.height = height;
-      resizePlayer(player, height);
-    }
+    resizePlayerBottomAnchored(player, height);
     player.nusiz = source.nusiz;
   });
   renderAll();
@@ -3561,31 +3822,41 @@ function schedulePlaybackStep() {
   }, repeat * (1000 / 60));
 }
 
-function exportBB() {
+function exportData() {
   state.projectName = el.projectName.value || state.projectName;
   syncActiveAnimation(state);
-  const result = generateAnimationCode(state, {
-    content: currentBbExportMode,
-    scope: currentBbExportScope,
-    includeProjectData: currentBbExportWithProjectData,
-    includeComments: currentBbExportWithComments,
-    positioning: currentBbPositioning
-  });
+  const assembly = currentExportFormat === "assembly";
+  const result = assembly
+    ? generateAssemblyData(state, { scope: currentBbExportScope })
+    : generateAnimationCode(state, {
+      content: currentBbExportMode,
+      scope: currentBbExportScope,
+      includeProjectData: currentBbExportWithProjectData,
+      includeComments: currentBbExportWithComments,
+      positioning: currentBbPositioning
+    });
   currentBbExportFilename = result.filename;
   const visibleDiagnostics = result.diagnostics.filter(item => item.severity !== "info");
   el.codeDiagnostics.innerHTML = visibleDiagnostics.map(item => `<div class="diagnostic ${item.severity}"><strong>${item.severity}</strong><span>${item.message}</span></div>`).join("");
   el.codeDiagnostics.hidden = visibleDiagnostics.length === 0;
   const ownership = result.diagnostics.find(item => item.code === "VARIABLE_OWNERSHIP");
-  el.bbRamSummary.textContent = ownership?.message || `${result.ramBytes || 0} variable${result.ramBytes === 1 ? "" : "s"} used.`;
+  el.bbRamSummary.textContent = assembly ? "Assembly Data exports art and per-row color tables only." : ownership?.message || `${result.ramBytes || 0} variable${result.ramBytes === 1 ? "" : "s"} used.`;
   const scopeLabel = currentBbExportScope === "all" ? "All Animations" : "Current Animation";
-  const contentLabel = currentBbExportMode === "demo" ? "Compilable Demo" : currentBbExportMode === "module" ? "Animation Module" : "Tables Only";
-  openCodeDialog(`Export bB ${contentLabel} — ${scopeLabel}`, result.output, false);
+  const contentLabel = assembly ? "Assembly Data" : currentBbExportMode === "demo" ? "Compilable Demo" : currentBbExportMode === "module" ? "Animation Module" : "Tables Only";
+  openCodeDialog(`Export ${contentLabel} — ${scopeLabel}`, result.output, false);
 }
 
-function syncBbExportOptions() {
+function syncExportOptions() {
+  const assembly = currentExportFormat === "assembly";
   const tablesOnly = currentBbExportMode === "tables";
-  el.bbExportPositioning.disabled = tablesOnly;
-  el.bbExportPositioning.classList.toggle("is-disabled", tablesOnly);
+  el.bbExportMode.disabled = assembly;
+  el.bbExportOptions.disabled = assembly;
+  el.bbExportPositioning.disabled = assembly || tablesOnly;
+  el.bbExportMode.classList.toggle("is-disabled", assembly);
+  el.bbExportOptions.classList.toggle("is-disabled", assembly);
+  el.bbExportPositioning.classList.toggle("is-disabled", assembly || tablesOnly);
+  el.codeText.setAttribute("aria-label", assembly ? "Assembly data" : "bB scene data");
+  el.downloadBas.textContent = assembly ? "Download .asm" : "Download .bas";
 }
 
 function openCodeDialog(title, text, importMode) {
@@ -3593,6 +3864,7 @@ function openCodeDialog(title, text, importMode) {
   el.codeText.value = text;
   el.codeDialog.classList.toggle("bb-import-dialog", importMode);
   el.importFromText.style.display = importMode ? "inline-block" : "none";
+  el.exportFormat.style.display = importMode ? "none" : "grid";
   el.bbExportMode.style.display = importMode ? "none" : "grid";
   el.bbExportScope.style.display = importMode ? "none" : "grid";
   el.bbExportOptions.style.display = importMode ? "none" : "grid";
@@ -3600,12 +3872,12 @@ function openCodeDialog(title, text, importMode) {
   el.bbRamSummary.style.display = importMode ? "none" : "block";
   el.downloadBas.style.display = importMode ? "none" : "inline-flex";
   if (importMode) { el.codeDiagnostics.innerHTML = ""; el.codeDiagnostics.hidden = true; }
-  else syncBbExportOptions();
+  else syncExportOptions();
   if (!el.codeDialog.open) el.codeDialog.showModal();
 }
-
-function importBBText(text) {
-  const parsed = parseBB(text);
+function importDataText(text) {
+  const assembly = parseAssemblyData(text);
+  const parsed = assembly.detected ? assembly : parseBB(text);
   const showImportError = message => {
     const diagnostic = document.createElement("div");
     diagnostic.className = "diagnostic error";
@@ -3620,7 +3892,7 @@ function importBBText(text) {
   if (parsed.error) return showImportError(parsed.error);
   if (parsed.generated && parsed.project) {
     let candidate;
-    try { candidate = migrateProject(parsed.project); } catch (error) { return showImportError(`Could not import generated YAJA bB: ${error.message}`); }
+    try { candidate = migrateProject(parsed.project); } catch (error) { return showImportError(`Could not import generated YAJA ${assembly.detected ? "Assembly" : "bB"} data: ${error.message}`); }
     pushHistory();
     state = { ...defaultState(), ...candidate, currentFrame: 0, activePlayer: candidate.activePlayer === 1 ? 1 : 0 };
     resetSpriteVisibility();
@@ -3631,7 +3903,7 @@ function importBBText(text) {
     return true;
   }
   if (!parsed.players.length) {
-    return showImportError("No player sprite data found. Paste a YAJA export or one or two player#: blocks.");
+    return showImportError("No YAJA Assembly data or bB player sprite data found. Paste a YAJA export, Assembly tables, or one or two player#: blocks.");
   }
   pushHistory();
   state.kernel = parsed.inferredKernel || state.kernel;
@@ -4429,6 +4701,23 @@ function bindEvents() {
   el.framesList.addEventListener("pointerup", endTimelinePointer);
   el.framesList.addEventListener("pointercancel", endTimelinePointer);
   el.playAnim.addEventListener("click", togglePlayback);
+  el.playbackThumbnailZoom.addEventListener("input", () => {
+    playbackThumbnailZoom = Math.max(1, Math.min(16, Number(el.playbackThumbnailZoom.value) || 6));
+    syncPlaybackThumbnailControls();
+    if (!playbackThumbnailCollapsed) renderPlaybackThumbnail();
+  });
+  el.togglePlaybackThumbnailVisibility.addEventListener("click", event => {
+    event.stopPropagation();
+    togglePlaybackThumbnailVisibility();
+  });
+  el.playbackThumbnail.addEventListener("pointerdown", beginPlaybackThumbnailDrag);
+  el.playbackThumbnail.addEventListener("pointermove", movePlaybackThumbnailDrag);
+  el.playbackThumbnail.addEventListener("pointerup", endPlaybackThumbnailDrag);
+  el.playbackThumbnail.addEventListener("pointercancel", endPlaybackThumbnailDrag);
+  el.playbackThumbnailResizeHandle.addEventListener("pointerdown", beginPlaybackThumbnailResize);
+  el.playbackThumbnailResizeHandle.addEventListener("pointermove", movePlaybackThumbnailResize);
+  el.playbackThumbnailResizeHandle.addEventListener("pointerup", endPlaybackThumbnailResize);
+  el.playbackThumbnailResizeHandle.addEventListener("pointercancel", endPlaybackThumbnailResize);
   el.copySelection.addEventListener("click", () => copySelection(false));
   el.cutSelection.addEventListener("click", () => copySelection(true));
   el.pasteSelection.addEventListener("click", pasteSelection);
@@ -4481,27 +4770,33 @@ function bindEvents() {
   el.copyP0P1.addEventListener("click", copyP0ToP1);
   el.copyColorsP0P1.addEventListener("click", copyColorsP0ToP1);
   el.mirrorP0P1.addEventListener("click", mirrorP0ToP1);
-  el.exportCode.addEventListener("click", exportBB);
-  el.importCode.addEventListener("click", () => openCodeDialog("Import bB Data", "", true));
+  el.exportCode.addEventListener("click", exportData);
+  el.importCode.addEventListener("click", () => openCodeDialog("Import Data", "", true));
   el.importFromText.addEventListener("click", () => {
-    if (importBBText(el.codeText.value)) el.codeDialog.close();
+    if (importDataText(el.codeText.value)) el.codeDialog.close();
   });
   el.copyCode.addEventListener("click", () => navigator.clipboard?.writeText(el.codeText.value));
+  [el.exportFormatBb, el.exportFormatAssembly].forEach(control => control.addEventListener("change", () => {
+    if (!control.checked) return;
+    currentExportFormat = control.value;
+    syncExportOptions();
+    exportData();
+  }));
   [el.exportBbTables, el.exportBbModule, el.exportBbDemo].forEach(control => control.addEventListener("change", () => {
     if (!control.checked) return;
     currentBbExportMode = control.value;
-    syncBbExportOptions();
-    exportBB();
+    syncExportOptions();
+    exportData();
   }));
-  [el.exportBbCurrent, el.exportBbAll].forEach(control => control.addEventListener("change", () => { if (!control.checked) return; currentBbExportScope = control.value; exportBB(); }));
-  el.exportWithProjectData.addEventListener("change", () => { currentBbExportWithProjectData = el.exportWithProjectData.checked; exportBB(); });
-  el.exportWithComments.addEventListener("change", () => { currentBbExportWithComments = el.exportWithComments.checked; exportBB(); });
+  [el.exportBbCurrent, el.exportBbAll].forEach(control => control.addEventListener("change", () => { if (!control.checked) return; currentBbExportScope = control.value; exportData(); }));
+  el.exportWithProjectData.addEventListener("change", () => { currentBbExportWithProjectData = el.exportWithProjectData.checked; exportData(); });
+  el.exportWithComments.addEventListener("change", () => { currentBbExportWithComments = el.exportWithComments.checked; exportData(); });
   [el.exportPositionSprite, el.exportPositionAnchor].forEach(control => control.addEventListener("change", () => {
     if (!control.checked) return;
     currentBbPositioning = control.value;
-    exportBB();
+    exportData();
   }));
-  el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), currentBbExportFilename || animationExportFilename(state.animationName, currentBbExportMode)));
+  el.downloadBas.addEventListener("click", () => downloadBlob(new Blob([el.codeText.value], { type: "text/plain" }), currentBbExportFilename || (currentExportFormat === "assembly" ? assemblyExportFilename(state.animationName, currentBbExportScope) : animationExportFilename(state.animationName, currentBbExportMode))));
   el.exportSheet.addEventListener("click", openExportPngDialog);
   [el.exportPngSelected, el.exportPngAll].forEach(control => control.addEventListener("change", updateExportPngSummary));
   el.confirmExportPng.addEventListener("click", confirmExportPng);
@@ -4573,7 +4868,7 @@ function bindEvents() {
   el.resetReferenceDefaults.addEventListener("click", resetReferenceDefaults);
   el.applyReferenceTransformAll.addEventListener("click", applyReferenceTransformAll);
   el.placeText.addEventListener("click", placeText);
-  window.addEventListener("resize", () => { renderAll(); positionColorBlockEditor(); });
+  window.addEventListener("resize", () => { renderAll(); clampPlaybackThumbnailToCanvas(); positionColorBlockEditor(); });
   el.palettePanel.closest(".right-panel")?.addEventListener("scroll", positionColorBlockEditor, { passive: true });
   window.addEventListener("keydown", handleKeys);
 }
@@ -4669,7 +4964,7 @@ function handleKeys(e) {
   }
   if (state.tool === "select" && selection && e.key.startsWith("Arrow")) {
     e.preventDefault();
-    moveSelectionBy(e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0, e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
+    nudge(e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0, e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
     return;
   }
   if (e.key === "ArrowLeft" && !e.ctrlKey) { state.currentFrame = Math.max(0, state.currentFrame - 1); rotationSession = null; syncControls(); renderAll(); }
@@ -4697,12 +4992,12 @@ function cacheElements() {
     "playerAssignment0", "playerAssignment0Row", "playerAssignment0Label", "playerAssignment1", "playerAssignment1Row", "spriteNusizLabel", "spriteNusiz", "spriteSolidColorRow", "spriteSolidColor", "spriteOffsetX", "spriteOffsetY", "applySizeAll", "applyOffsetsAll", "swapPlayers", "copyP0P1", "copyColorsP0P1", "mirrorP0P1", "fillShapes", "mirrorDraw", "brushWidth", "brushHeight", "undo", "redo",
     "nudgePixels", "nudgeColors", "scaleStep", "stretchHDown", "stretchHUp", "stretchVDown", "stretchVUp", "scaleUniformDown", "scaleUniformUp", "flipH", "flipV", "flipColor", "rotateL", "rotateR", "rotateAngle", "grow", "shrink", "clearFrame",
     "frameLabel", "pixelReadout", "canvasReadout", "showGrid", "gridSettingsDisclosure", "gridSettingsPopover", "gridColorPicker", "gridIntensity", "gridIntensityValue", "resetGridSettings", "bgColorPicker", "bgColorPopover", "bgPalette", "showColorColumns", "onion", "onionOpacity", "onionFrames", "zoom", "playAnim", "loopPlayback", "timelineSummary", "timelineHeading", "framesActions", "editorZone",
-    "canvasBand", "canvasStageScroll", "spriteStage", "lockedSpriteFeedback", "compositionBackdrop", "compositionColorColumns", "playerCanvasGroup0", "playerCanvasGroup1", "spriteCanvas", "spriteCanvas1", "spriteCanvasLabel0", "spriteCanvasLabel1", "spriteCanvasSelector0", "spriteCanvasSelector1", "spriteCanvasAssignment0", "spriteCanvasAssignment1", "toggleSpriteVisibility0", "toggleSpriteVisibility1", "previewCanvas", "previewCaption", "rowColors0", "rowColors1", "p0ColorsColumn", "p1ColorsColumn", "p0ColorsTitle", "p1ColorsTitle", "selectionBar", "selectionInfo", "copySelection",
+    "canvasBand", "canvasStageScroll", "spriteStage", "lockedSpriteFeedback", "compositionBackdrop", "compositionColorColumns", "playerCanvasGroup0", "playerCanvasGroup1", "spriteCanvas", "spriteCanvas1", "spriteCanvasLabel0", "spriteCanvasLabel1", "spriteCanvasSelector0", "spriteCanvasSelector1", "spriteCanvasAssignment0", "spriteCanvasAssignment1", "toggleSpriteVisibility0", "toggleSpriteVisibility1", "previewCanvas", "previewCaption", "playbackThumbnail", "playbackThumbnailCanvas", "playbackThumbnailZoom", "togglePlaybackThumbnailVisibility", "playbackThumbnailResizeHandle", "rowColors0", "rowColors1", "p0ColorsColumn", "p1ColorsColumn", "p0ColorsTitle", "p1ColorsTitle", "selectionBar", "selectionInfo", "copySelection",
     "cutSelection", "pasteSelection", "stampFromSelection", "cropSelection", "clearSelection", "insertFrame", "duplicateFrame",
     "removeFrame", "moveFrameLeft", "moveFrameRight", "reverseFrames", "framesList", "currentColorSwatch", "currentColor",
     "palettePanel", "palette", "displayRegion", "paletteEyedropper", "colorBlocks", "stamps", "newColorBlock", "newStamp", "colorBlockEditor", "colorBlockEditorTitle", "colorBlockEditorHeight", "colorBlockEditorLines", "colorBlockHueOffset", "colorBlockHueOffsetValue", "colorBlockLightnessOffset", "colorBlockLightnessOffsetValue", "saveColorBlockEdit", "saveColorBlockCopy", "stampEditor", "stampEditorTitle", "stampEditorWidth", "stampEditorHeight", "stampEditorZoom", "stampEditorReadout", "stampEditorCanvasContainer", "stampEditorCanvas", "stampEditorPreviewCanvas", "saveStampEdit", "saveStampCopy",
     "refFile", "loadReference", "loadReferenceA", "loadReferenceB", "referenceImportSingle", "referenceImportDual", "refControls", "refOpacity", "refScale", "refX", "refY", "threshold", "refDither", "refIgnoreBlack", "refFitMode", "refBrightness", "refContrast", "referenceTransform", "resetReferenceDefaults", "applyReferenceTransformAll", "toggleReference", "extractShape",
-    "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "bbExportMode", "bbExportScope", "bbExportOptions", "bbExportPositioning", "bbRamSummary", "exportBbTables", "exportBbModule", "exportBbDemo", "exportBbCurrent", "exportBbAll", "codeText", "copyCode", "downloadBas",
+    "autoColor", "removeReference", "sequenceDialog", "sequenceSummary", "sequenceCreateFrames", "sequenceApplyTransform", "sequenceOptions", "importCurrentFrame", "importFrameSequence", "chooseReferenceImages", "exportPngDialog", "exportPngSummary", "exportPngSelected", "exportPngAll", "confirmExportPng", "codeDialog", "codeDialogTitle", "exportFormat", "bbExportMode", "bbExportScope", "bbExportOptions", "bbExportPositioning", "bbRamSummary", "exportFormatBb", "exportFormatAssembly", "exportBbTables", "exportBbModule", "exportBbDemo", "exportBbCurrent", "exportBbAll", "codeText", "copyCode", "downloadBas",
     "importFromText", "codeDiagnostics", "bbProjectDataOption", "bbCommentsOption", "exportWithProjectData", "exportWithComments", "exportPositionSprite", "exportPositionAnchor", "textDialog", "textToolText", "textToolY", "textToolX", "textDirection", "placeText",
     "statusKernel", "statusFrame", "statusMessage"
   ].forEach(id => el[id] = document.getElementById(id === "fullscreenButton" ? "btn-fullscreen" : id));

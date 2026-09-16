@@ -1,12 +1,12 @@
 # YAJA 2600 Animator Documentation
 
-YAJA 2600 Animator is a pixel-accurate Atari 2600 player-sprite animation editor. It supports Standard, Multisprite, DPC+, and PXE projects, per-frame sprite dimensions, NUSIZ, offsets, timing, colors, reference images, and round-trip YAJA bB interchange files.
+YAJA 2600 Animator is a pixel-accurate Atari 2600 player-sprite animation editor. It supports Standard, Multisprite, DPC+, and PXE projects, per-frame sprite dimensions, NUSIZ, offsets, timing, colors, reference images, and round-trip YAJA bB interchange files and DASM-ready Assembly data.
 
 ## Starting a project
 
-Choose the kernel and display region, then set each frame's Width, Height, NUSIZ, X/Y offsets, and Frame Repeat. Two Sprite Mode adds Sprite B and a second assignment. Auto Sprite Select appears directly under Two Sprite Mode when that mode is enabled. When checked, the visible sprite under a canvas tool becomes active; when unchecked, every canvas tool remains locked to the manually selected Sprite A or B, including all NUSIZ copies. The labels beneath the two canvases also switch the active sprite, while their eye controls temporarily hide a sprite without changing project data.
+Choose the kernel and display region, then set each frame's Width, Height, NUSIZ, X/Y offsets, and Frame Repeat. Two Sprite Mode adds Sprite B and a second assignment. Auto Sprite Select appears directly under Two Sprite Mode when that mode is enabled: when checked, the visible sprite under a canvas tool becomes active; when unchecked, every canvas tool remains locked to the manually selected Sprite A or B, including all NUSIZ copies.
 
-Kernel is the leftmost canvas-toolbar section with a full-width dropdown. The canvas controls follow with BG, Grid, Colors, and Zoom. BG opens the official Atari color palette in NTSC or PAL. Grid appearance opens from the small control beside Grid, where its color and Opacity can be adjusted.
+Kernel is the leftmost canvas-toolbar section with a full-width dropdown. The following canvas controls include BG, Grid, Colors, and Zoom. BG opens the official Atari color palette and keeps the selected Atari number beside the swatch; Grid appearance opens from the small settings button beside Grid.
 
 ## Drawing and editing
 
@@ -16,7 +16,7 @@ Selection uses exact pixel masks. Drag selected pixels to move them, use arrow k
 
 ## Timeline
 
-PLAY previews the current animation; Loop controls wrapping. Add, duplicate, reorder, reverse, and delete act on selected frames. Shift selects a range, Ctrl/Command adds individual frames, and blank-area dragging creates a marquee selection. Frame Repeat is stored per frame; Apply to All copies it to the animation. Frames are displayed from Frame 1, and the timeline shows the complete animation duration including repeats.
+PLAY previews the current animation in the canvas and in a small Atari-scale thumbnail. The thumbnail has no grid, uses the selected background color, and can be dragged anywhere within the canvas viewport; it stays put while the main canvas scrolls or zooms. Loop controls wrapping. Add, duplicate, reorder, reverse, and delete act on selected frames. Shift selects a range, Ctrl/Command adds individual frames, and blank-area dragging creates a marquee selection. Frame Repeat is stored per frame; Apply to All copies it to the animation.
 
 ## Animation library
 
@@ -28,22 +28,22 @@ DPC+ and PXE frames can use scanline color streams. Standard and Multisprite use
 
 ## Editor appearance preferences
 
-Grid visibility, grid color and Opacity, and Auto Sprite Selection are editor preferences saved in browser storage. They do not change animation content and are intentionally excluded from project JSON and bB exports. Grid appearance is stored per theme, so a legible choice for a light theme does not replace the choice for a dark theme. New preference states start with Grid visible and Auto Sprite Select off; older saved choices are retained.
+Grid brightness, grid color, workspace dots, and Auto Sprite Selection are editor preferences saved in browser storage. They do not change animation content and are intentionally excluded from project JSON and bB exports. Grid appearance is stored per theme, so a legible choice for a light theme does not replace the choice for a dark theme. Older projects load without migration and receive the default preferences: grid and dots visible, theme grid appearance, and automatic sprite selection enabled.
 
 ## Image references
 
-Import one image for the current frame or a naturally sorted sequence. References are stored per frame and sprite slot. Fit mode, opacity, scale, fine X/Y placement, brightness, contrast, threshold, dithering, Auto-Paint, and Auto-Color help translate artwork to Atari pixels and colors. Auto-Paint and Auto-Color ignore transparent pixels and can ignore a solid black background, preventing common reference-image backgrounds from darkening the result.
+Import one image for the current frame or a naturally sorted sequence. References are stored per frame and sprite slot. Fit mode, opacity, scale, fine X/Y placement, brightness, contrast, threshold, dithering, Auto-Paint, and Auto-Color help translate artwork to Atari pixels and colors.
 
 ## Saving and exporting
 
-- **Save** opens the normal Save As chooser and writes a JSON project containing animation data plus editor-only stamps, color blocks, and reference images. Desktop File-menu Save continues to update the current project path, while Save As chooses a new path.
-- **Export bB** offers Data Only modules or a Compilable Demo for the current animation or every animation. The all-animation demo starts with the first animation and switches with joystick Up/Down.
-- **Import bB** restores generated YAJA animation data and supports partial import from ordinary `player#:` blocks.
+- **Save** writes a JSON project containing animation data plus editor-only stamps, color blocks, and reference images.
+- **Export Data** offers bB Data Only modules or a Compilable Demo for the current animation or every animation. Choose Assembly to export DASM-ready bottom-up sprite graphics and color tables only. Assembly output needs a separate scanline kernel and does not include runtime code.
+- **Import Data** restores generated YAJA bB and Assembly animation data. Assembly exports with the YAJA comment manifest restore complete projects; earlier YAJA Assembly tables recover art and scanline colors with safe defaults for data they did not carry. Import Data also recognizes ordinary labelled sprite tables using common DASM byte directives and binary, hexadecimal, or decimal values. Ordinary `player#:` bB blocks remain supported.
 - **Export PNG** writes one PNG for a single frame or a ZIP of individual PNGs for multiple selected/all frames.
 
 ## Desktop menus
 
-- **File:** new/open/save projects, import/export bB, export PNG, and import references.
+- **File:** new/open/save projects, import/export data, export PNG, and import references.
 - **Edit:** undo/redo and pixel-selection clipboard actions.
 - **Animation:** playback and frame commands.
 - **View:** grid, color-column, onion-skin, reload, and fullscreen controls.
